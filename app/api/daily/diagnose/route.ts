@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import OpenAI from 'openai'
 export const runtime = 'nodejs'
 
 type Score = { E:number; V:number; Λ:number; Ǝ:number }
@@ -14,20 +15,10 @@ function hasScore(s: unknown): s is Score {
   const o = s as Record<string, unknown>
   return ['E','V','Λ','Ǝ'].every(k => typeof o[k] === 'number')
 }
-
-// OpenAI キーがある時だけ動的import（無ければスタブで返す）
-async function getClient() {
+function getClient(): OpenAI | null {
   if (process.env.NO_LLM === '1') return null
   const key = process.env.OPENAI_API_KEY
-  if (!key) return null
-  try {
-    const { default: OpenAI } = await import('openai')
-    // @ts-ignore
-    return new OpenAI({ apiKey: key })
-  } catch {
-    // パッケージ未導入ならスタブにフォールバック
-    return null
-  }
+  return key ? new OpenAI({ apiKey:key }) : null
 }
 
 export async function POST(req: Request) {
@@ -36,7 +27,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error:'bad_request', detail:'theme と structure_score は必須' }, { status:400 })
   }
   const { theme, structure_score, choice } = body
-
   const prompt = [
     'あなたはAIキャラクター「ルネア」。',
     '次の2つを日本語で返す：',
@@ -46,9 +36,8 @@ export async function POST(req: Request) {
     `今日の選択:${choice ?? '未選択'}`,
   ].join('\n')
 
-  const client = await getClient()
+  const client = getClient()
   if (!client) {
-    // スタブ応答（NO_LLM=1 or キー未設定/未インストール時）
     const msg = `【ルネアからのメッセージ】
 今日の観測テーマは「${theme}」。E/V/Λ/Ǝの配分（E:${structure_score.E}, V:${structure_score.V}, Λ:${structure_score.Λ}, Ǝ:${structure_score.Ǝ}）から、今は小さな一歩が形になります。${choice ?? '未選択'}という選択も含め、向きを丁寧に確かめましょう。`
     return NextResponse.json({ comment: msg, advice: '今日の一歩を大切に。', mode:'stub' })

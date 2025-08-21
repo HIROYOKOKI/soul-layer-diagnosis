@@ -2,76 +2,42 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-export const runtime = 'nodejs' // Nodeで実行（Edge不可）
+export const runtime = 'nodejs'
 
-type Score = { E: number; V: number; Λ: number; Ǝ: number }
-type Theme = 'work' | 'love' | 'future' | 'self'
-type Choice = 'E' | 'V' | 'Λ' | 'Ǝ'
-type Body = {
-  userId?: string
-  theme?: Theme
-  choice?: Choice
-  structure_score?: Partial<Score>
-  comment?: string
-  advice?: string
-}
+type Score = { E:number; V:number; Λ:number; Ǝ:number }
+type Body = { userId?:string; theme?:'work'|'love'|'future'|'self'; choice?:'E'|'V'|'Λ'|'Ǝ'; structure_score?:Partial<Score>; comment?:string; advice?:string }
 
-function getSupabase() {
+function getSb(){
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey) return null
-  return createClient(url, serviceKey, { auth: { persistSession: false } })
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if(!url || !key) return null
+  return createClient(url, key, { auth:{ persistSession:false } })
 }
 
-const okTheme = new Set<Theme>(['work', 'love', 'future', 'self'])
-const okChoice = new Set<Choice>(['E', 'V', 'Λ', 'Ǝ'])
+export async function POST(req: Request){
+  const sb = getSb()
+  if(!sb) return NextResponse.json({ error:'supabase_not_configured' }, { status:503 })
+  const b = (await req.json()) as Body
+  if(!b.theme) return NextResponse.json({ error:'bad_request', detail:'theme required' }, { status:400 })
 
-export async function POST(req: Request) {
-  try {
-    const body = (await req.json()) as Body
-    const sb = getSupabase()
-    if (!sb) {
-      return NextResponse.json(
-        { error: 'supabase_not_configured', detail: 'Set NEXT_PUBLIC_SUPABASE_URL & SUPABASE_SERVICE_ROLE_KEY' },
-        { status: 503 }
-      )
-    }
-
-    if (!body.theme || !okTheme.has(body.theme)) {
-      return NextResponse.json({ error: 'bad_request', detail: 'theme is required' }, { status: 400 })
-    }
-
-    const payload = {
-      user_id: body.userId ?? 'guest',
-      theme: body.theme,
-      choice: body.choice && okChoice.has(body.choice) ? body.choice : null,
-      structure_score: {
-        E: Number(body.structure_score?.E ?? 0),
-        V: Number(body.structure_score?.V ?? 0),
-        Λ: Number(body.structure_score?.Λ ?? 0),
-        Ǝ: Number(body.structure_score?.Ǝ ?? 0),
-      },
-      comment: body.comment ?? null,
-      advice: body.advice ?? null,
-    }
-
-    const { data, error } = await sb
-      .from('daily_results')
-      .insert([payload])
-      .select('id, created_at')
-      .single()
-
-    if (error) {
-      return NextResponse.json({ error: 'insert_failed', detail: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ ok: true, id: data?.id, created_at: data?.created_at })
-  } catch (e: any) {
-    return NextResponse.json({ error: 'server_error', detail: String(e?.message ?? e) }, { status: 500 })
+  const payload = {
+    user_id: b.userId ?? 'guest',
+    theme: b.theme,
+    choice: b.choice ?? null,
+    structure_score: {
+      E: Number(b.structure_score?.E ?? 0),
+      V: Number(b.structure_score?.V ?? 0),
+      Λ: Number(b.structure_score?.Λ ?? 0),
+      Ǝ: Number(b.structure_score?.Ǝ ?? 0),
+    },
+    comment: b.comment ?? null,
+    advice: b.advice ?? null,
   }
+  const { data, error } = await sb.from('daily_results').insert([payload]).select('id,created_at').single()
+  if(error) return NextResponse.json({ error:'insert_failed', detail:error.message }, { status:500 })
+  return NextResponse.json({ ok:true, id:data?.id, created_at:data?.created_at })
 }
 
-export function GET() {
-  // 簡易ヘルス
-  return NextResponse.json({ ok: true, endpoint: '/api/daily/save' })
+export function GET(){ // ← これがあるとGETで生存確認できる
+  return NextResponse.json({ ok:true, endpoint:'/api/daily/save' })
 }

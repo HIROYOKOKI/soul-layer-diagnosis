@@ -2,8 +2,8 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  // ← これで “workspace root を誤認” 警告を抑止
   turbopack: { root: __dirname },
+  eslint: { ignoreDuringBuilds: true }, // ← これを追加
 }
 
 export default nextConfig

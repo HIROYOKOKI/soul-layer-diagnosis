@@ -67,8 +67,9 @@ export default function LoginIntro() {
 }
 
 /* ========= ドーム型ガラスボタン ========= */
-function DomeButton({ label }: { label: string }) {
+function DomeNeonButton({ label }: { label: string }) {
   const [active, setActive] = useState(false)
+
   return (
     <div
       onMouseDown={() => setActive(true)}
@@ -81,10 +82,14 @@ function DomeButton({ label }: { label: string }) {
         display:'inline-block',
         borderRadius:9999,
         padding:2,
-        background:'linear-gradient(90deg, rgba(14,165,233,.95), rgba(236,72,153,.95))',
-        boxShadow: '0 0 14px rgba(14,165,233,.22), 0 0 14px rgba(236,72,153,.22)',
-        transform: active ? 'translateY(1px) scale(0.99)' : 'translateY(0)',
-        transition:'transform .14s ease, box-shadow .18s ease',
+        background: active
+          ? 'linear-gradient(90deg, rgba(14,165,233,1), rgba(236,72,153,1))'
+          : 'rgba(255,255,255,0.08)',
+        boxShadow: active
+          ? '0 0 25px rgba(14,165,233,.75), 0 0 35px rgba(236,72,153,.75)'
+          : '0 4px 14px rgba(0,0,0,.6)',
+        transform: active ? 'scale(1.02)' : 'scale(1)',
+        transition:'all .22s ease',
       }}
     >
       <button
@@ -93,49 +98,49 @@ function DomeButton({ label }: { label: string }) {
           border:'none',
           outline:'none',
           borderRadius:9999,
-          padding:'14px 42px',
-          minHeight:46,
+          padding:'14px 48px',
+          minHeight:48,
           color:'#fff',
           fontSize:16,
-          letterSpacing:'.18em',
+          letterSpacing:'.15em',
+          background: active
+            ? 'linear-gradient(180deg, rgba(255,255,255,.2), rgba(0,0,0,.6))'
+            : 'rgba(0,0,0,.85)',
+          backdropFilter:'blur(6px)',
+          WebkitBackdropFilter:'blur(6px)',
           cursor:'pointer',
-          background:'linear-gradient(180deg, rgba(255,255,255,.18), rgba(0,0,0,.36))',
-          backdropFilter:'blur(8px)',
-          WebkitBackdropFilter:'blur(8px)',
-          boxShadow: `
-            inset 0 1px 1px rgba(255,255,255,.38),    /* 上のハイライト */
-            inset 0 -1px 2px rgba(0,0,0,.45)          /* 下の陰影 */
-          `,
           position:'relative',
           overflow:'hidden',
         }}
       >
-        {/* クリック時の内側パルス */}
+        {label}
+
+        {/* クリック時の内側フラッシュ */}
         {active && (
           <span
             style={{
               position:'absolute',
               inset:0,
               borderRadius:9999,
-              background:'radial-gradient(circle, rgba(255,255,255,.42), rgba(56,189,248,.28) 45%, rgba(236,72,153,.22) 70%, rgba(255,255,255,0) 72%)',
-              animation:'pulseGlow 0.32s ease-out forwards',
+              background:'radial-gradient(circle, rgba(255,255,255,.5), rgba(236,72,153,.45) 40%, rgba(14,165,233,.35) 70%, transparent 80%)',
+              animation:'pulseFlash 0.4s ease-out forwards',
               pointerEvents:'none'
             } as CSSProperties}
           />
         )}
-        {label}
       </button>
 
       <style jsx>{`
-        @keyframes pulseGlow {
-          0%   { opacity: .7; transform: scale(0.6); }
-          70%  { opacity: .3; transform: scale(1.5); }
-          100% { opacity: 0;  transform: scale(2.1); }
+        @keyframes pulseFlash {
+          0%   { opacity: .9; transform: scale(0.6); }
+          60%  { opacity: .5; transform: scale(1.3); }
+          100% { opacity: 0;   transform: scale(1.8); }
         }
       `}</style>
     </div>
   )
 }
+
 
 /* ========= styles ========= */
 const styles = {

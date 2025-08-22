@@ -56,87 +56,118 @@ export default function LoginIntro() {
       )}
 
       {/* ボタン：ドーム型ガラス */}
-      <div style={styles.bottomBlock}>
-        <div style={{ ...styles.buttonRow, opacity: phase === 'still' ? 1 : 1 /* <- 常時表示にするなら1 */ }}>
-          <DomeButton label="はじめて" />
-          <DomeButton label="ログイン" />
-        </div>
-      </div>
-    </div>
-  )
-}
+   function DomeButton({ label }: { label: string }) {
+  const [pressed, setPressed] = useState(false)
 
-/* ========= ドーム型ガラスボタン ========= */
-function DomeButton({ label }: { label: string }) {
-  const [active, setActive] = useState(false)
+  // エレベーション（浮遊感）— hoverで少し上がる、押すと沈む
+  const lift = pressed ? 0 : 2
 
   return (
     <div
-      onMouseDown={() => setActive(true)}
-      onMouseUp={() => setActive(false)}
-      onMouseLeave={() => setActive(false)}
-      onTouchStart={() => setActive(true)}
-      onTouchEnd={() => setActive(false)}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      onMouseLeave={() => setPressed(false)}
+      onTouchStart={() => setPressed(true)}
+      onTouchEnd={() => setPressed(false)}
       style={{
-        position:'relative',
-        display:'inline-block',
-        borderRadius:9999,
-        padding:2,
-        background: active
-          ? 'linear-gradient(90deg, rgba(14,165,233,1), rgba(236,72,153,1))'
-          : 'rgba(255,255,255,0.08)',
-        boxShadow: active
-          ? '0 0 25px rgba(14,165,233,.75), 0 0 35px rgba(236,72,153,.75)'
-          : '0 4px 14px rgba(0,0,0,.6)',
-        transform: active ? 'scale(1.02)' : 'scale(1)',
-        transition:'all .22s ease',
+        position: 'relative',
+        display: 'inline-block',
+        padding: 0,
+        borderRadius: 9999,
+        // 外側の細いフチ（ごく薄いグレー）— ガラスの縁
+        background: 'rgba(255,255,255,0.06)',
+        // 浮遊影（2層）：ぼかし大＋小で床面との距離感を出す
+        boxShadow:
+          pressed
+            ? '0 6px 12px rgba(0,0,0,.45), 0 2px 4px rgba(0,0,0,.35)'
+            : '0 18px 28px rgba(0,0,0,.45), 0 6px 12px rgba(0,0,0,.35)',
+        transform: pressed ? 'translateY(1px) scale(0.995)' : `translateY(-${lift}px)`,
+        transition: 'transform .16s ease, box-shadow .18s ease, background .2s ease',
       }}
     >
+      {/* 実体（黒いドーム＋内側グラデ） */}
       <button
         type="button"
         style={{
-          border:'none',
-          outline:'none',
-          borderRadius:9999,
-          padding:'14px 48px',
-          minHeight:48,
-          color:'#fff',
-          fontSize:16,
-          letterSpacing:'.15em',
-          background: active
-            ? 'linear-gradient(180deg, rgba(255,255,255,.2), rgba(0,0,0,.6))'
-            : 'rgba(0,0,0,.85)',
-          backdropFilter:'blur(6px)',
-          WebkitBackdropFilter:'blur(6px)',
-          cursor:'pointer',
-          position:'relative',
-          overflow:'hidden',
+          position: 'relative',
+          border: 'none',
+          outline: 'none',
+          cursor: 'pointer',
+          borderRadius: 9999,
+          padding: '14px 48px',
+          minHeight: 48,
+          color: '#fff',
+          letterSpacing: '.18em',
+          fontSize: 16,
+          // ドーム感：上明るめ→下暗めのグラデ＋わずかな透明感
+          background: 'linear-gradient(180deg, rgba(30,30,35,.65), rgba(5,5,10,.9))',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          // 内側のエッジ（ガラスっぽい縁）
+          boxShadow: 'inset 0 1px 1px rgba(255,255,255,.22), inset 0 -2px 4px rgba(0,0,0,.55)',
+          overflow: 'hidden',
         }}
       >
-        {label}
-
-        {/* クリック時の内側フラッシュ */}
-        {active && (
+        {/* 上面ハイライト（細い光の帯） */}
+        <span
+          aria-hidden
+          style={{
+            pointerEvents: 'none',
+            position: 'absolute',
+            left: 10,
+            right: 10,
+            top: 5,
+            height: 10,
+            borderRadius: 9999,
+            background:
+              'linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0))',
+            filter: 'blur(1px)',
+          }}
+        />
+        {/* 下面リムライト（下端にかける青みの縁光） */}
+        <span
+          aria-hidden
+          style={{
+            pointerEvents: 'none',
+            position: 'absolute',
+            left: 8,
+            right: 8,
+            bottom: 4,
+            height: 12,
+            borderRadius: 9999,
+            background:
+              'linear-gradient(180deg, rgba(56,189,248,.20), rgba(56,189,248,0))',
+            filter: 'blur(2px)',
+            opacity: .9,
+          }}
+        />
+        {/* 内側グロウ（クリック時だけドーム内が発光） */}
+        {pressed && (
           <span
+            aria-hidden
             style={{
-              position:'absolute',
-              inset:0,
-              borderRadius:9999,
-              background:'radial-gradient(circle, rgba(255,255,255,.5), rgba(236,72,153,.45) 40%, rgba(14,165,233,.35) 70%, transparent 80%)',
-              animation:'pulseFlash 0.4s ease-out forwards',
-              pointerEvents:'none'
+              pointerEvents: 'none',
+              position: 'absolute',
+              inset: 0,
+              borderRadius: 9999,
+              background:
+                'radial-gradient(120% 120% at 50% 50%, rgba(236,72,153,.55) 0%, rgba(14,165,233,.45) 45%, rgba(255,255,255,.15) 60%, rgba(255,255,255,0) 65%)',
+              animation: 'domeFlash .35s ease-out forwards',
             } as CSSProperties}
           />
         )}
-      </button>
 
-      <style jsx>{`
-        @keyframes pulseFlash {
-          0%   { opacity: .9; transform: scale(0.6); }
-          60%  { opacity: .5; transform: scale(1.3); }
-          100% { opacity: 0;   transform: scale(1.8); }
-        }
-      `}</style>
+        {label}
+
+        {/* キーアニメーション（inline） */}
+        <style jsx>{`
+          @keyframes domeFlash {
+            0%   { opacity: .9; transform: scale(0.85); }
+            70%  { opacity: .4; transform: scale(1.15); }
+            100% { opacity: 0;  transform: scale(1.35); }
+          }
+        `}</style>
+      </button>
     </div>
   )
 }

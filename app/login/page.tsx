@@ -6,8 +6,10 @@ import NextImage from 'next/image'
 function DomeButton({ label, variant }: { label: string; variant: 'pink' | 'blue' }) {
   const [pressed, setPressed] = useState(false)
 
-  // 発光色（押した時だけ使う）
-  const glowColor = variant === 'pink' ? '#ec4899' : '#0ea5e9'
+  const glowColor = variant === 'pink' ? '#ff4fdf' : '#4fc3ff'  // 彩度を上げてネオンっぽく
+  const glowShadow = variant === 'pink'
+    ? '0 0 12px #ff4fdf, 0 0 24px #ff4fdf, 0 0 48px #ff4fdf'
+    : '0 0 12px #4fc3ff, 0 0 24px #4fc3ff, 0 0 48px #4fc3ff'
 
   return (
     <div
@@ -17,13 +19,10 @@ function DomeButton({ label, variant }: { label: string; variant: 'pink' | 'blue
       onTouchStart={() => setPressed(true)}
       onTouchEnd={() => setPressed(false)}
       style={{
-        position:'relative',
         display:'inline-block',
         borderRadius:9999,
-        // 浮遊影（通常時のみ。押下時は沈む）
-        boxShadow: pressed ? '0 8px 14px rgba(0,0,0,.45)' : '0 22px 34px rgba(0,0,0,.5), 0 8px 16px rgba(0,0,0,.35)',
-        transform: pressed ? 'translateY(1px) scale(.995)' : 'translateY(-2px)',
-        transition:'transform .12s ease, box-shadow .18s ease'
+        transform: pressed ? 'scale(0.98)' : 'scale(1)',
+        transition:'transform .15s ease'
       }}
     >
       <button
@@ -35,57 +34,51 @@ function DomeButton({ label, variant }: { label: string; variant: 'pink' | 'blue
           cursor:'pointer',
           borderRadius:9999,
           padding:'14px 48px',
-          minHeight:48,
-          color:'#fff',
-          letterSpacing:'.18em',
           fontSize:16,
-          // ★通常は“真っ黒”のみ（ガラス質のドーム感は内側の光沢で表現）
-          background:'#0a0a0a',
-          boxShadow:'inset 0 1px 1px rgba(255,255,255,.22), inset 0 -2px 4px rgba(0,0,0,.55)',
-          overflow:'hidden'
+          letterSpacing:'.15em',
+          color:'#fff',
+          background:'#000',
+          overflow:'hidden',
+          // 押したとき → ネオン全開
+          boxShadow: pressed ? glowShadow : 'inset 0 1px 2px rgba(255,255,255,.15), inset 0 -2px 6px rgba(0,0,0,.5)'
         }}
       >
-        {/* 上面ハイライト（常時） */}
-        <span aria-hidden style={{
-          pointerEvents:'none', position:'absolute', left:10, right:10, top:6, height:10,
-          borderRadius:9999,
-          background:'linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0))',
-          filter:'blur(1px)'
-        }}/>
-
-        {/* ★押下時だけ：外周ネオン輪郭＋内側全面発光 */}
-        {pressed && (
-          <>
-            {/* 外周の強いネオン輪郭 */}
-            <span aria-hidden style={{
-              pointerEvents:'none', position:'absolute', inset:-2, borderRadius:9999,
-              boxShadow:`0 0 24px ${glowColor}, 0 0 64px ${glowColor}`,
-              border:`2px solid ${glowColor}`,
-              opacity:.95
-            }}/>
-            {/* 内側のネオン塗り（中央ほど明るい） */}
-            <span aria-hidden style={{
-              pointerEvents:'none', position:'absolute', inset:0, borderRadius:9999,
-              background:`radial-gradient(120% 120% at 50% 50%, ${glowColor} 0%, rgba(255,255,255,.25) 55%, rgba(255,255,255,0) 65%)`,
-              animation:'flashFill .35s ease-out forwards'
-            } as CSSProperties}/>
-          </>
-        )}
-
         {label}
 
-        {/* keyframes */}
+        {/* 常時ハイライト（ガラス感） */}
+        <span aria-hidden style={{
+          position:'absolute',
+          inset:0,
+          borderRadius:9999,
+          background:'linear-gradient(180deg, rgba(255,255,255,.2), rgba(0,0,0,0))',
+          opacity:.3,
+          pointerEvents:'none'
+        }}/>
+
+        {/* 押したときだけ拡散光（アニメ付き） */}
+        {pressed && (
+          <span aria-hidden style={{
+            position:'absolute',
+            inset:-20,
+            borderRadius:9999,
+            background:`radial-gradient(circle, ${glowColor}88 0%, transparent 70%)`,
+            filter:'blur(18px)',
+            animation:'neonPulse .4s ease-out'
+          }}/>
+        )}
+
         <style jsx>{`
-          @keyframes flashFill {
-            0%   { opacity: .95; transform: scale(.9); }
-            70%  { opacity: .45; transform: scale(1.15); }
-            100% { opacity: 0;   transform: scale(1.28); }
+          @keyframes neonPulse {
+            0%   { opacity: 1; transform: scale(0.8); }
+            70%  { opacity: 0.7; transform: scale(1.2); }
+            100% { opacity: 0;   transform: scale(1.4); }
           }
         `}</style>
       </button>
     </div>
   )
 }
+
 
 
 /* ========= ページ本体 ========= */

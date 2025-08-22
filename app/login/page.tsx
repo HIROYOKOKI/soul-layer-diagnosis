@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
 type Phase = 'video' | 'still'
 
@@ -23,6 +24,7 @@ export default function LoginIntro() {
     v.addEventListener('ended', onEnded)
     v.addEventListener('error', onError)
 
+    // fail-safe: 万一endedが来ない端末用の保険（約3秒想定＋余裕）
     const failSafe = window.setTimeout(() => setPhase('still'), 4500)
 
     return () => {
@@ -38,7 +40,7 @@ export default function LoginIntro() {
 
   return (
     <main style={styles.page}>
-      {/* 背景：video→still クロスフェード */}
+      {/* background stack: video -> still crossfade */}
       <div style={styles.bgStack} aria-hidden>
         <img
           src="/login-still.png"
@@ -58,22 +60,112 @@ export default function LoginIntro() {
         />
       </div>
 
-      {/* ボタン：下部に横並びでフェードイン */}
+      {/* bottom buttons (fade-in after still) */}
       <div style={styles.bottomBlock}>
         <div style={{ ...styles.buttonRow, opacity: buttonsOpacity }}>
-          <a href="/login/form?mode=signup" style={styles.btnPink}>
-            はじめて<span aria-hidden style={styles.glass}/>
-          </a>
-          <a href="/login/form" style={styles.btnBlue}>
-            ログイン<span aria-hidden style={styles.glass}/>
-          </a>
+          <GlowButton href="/login/form?mode=signup" variant="pink">はじめて</GlowButton>
+          <GlowButton href="/login/form" variant="blue">ログイン</GlowButton>
         </div>
       </div>
+
+      {/* ripple keyframes */}
+      <style jsx global>{`
+        @keyframes evaeRipple {
+          0%   { transform: translate(-50%, -50%) scale(0);  opacity: .9; }
+          70%  { transform: translate(-50%, -50%) scale(8);  opacity: .45; }
+          100% { transform: translate(-50%, -50%) scale(12); opacity: 0; }
+        }
+      `}</style>
     </main>
   )
 }
 
-/* ===== styles ===== */
+/* ---------- GlowButton (anchor with ripple & glow) ---------- */
+function GlowButton({
+  href,
+  children,
+  variant,
+}: {
+  href: string
+  children: ReactNode
+  variant: 'pink' | 'blue'
+}) {
+  const glow = variant === 'pink' ? 'rgba(255,79,223,.65)' : 'rgba(79,195,255,.65)'
+  const baseShadow =
+    'inset 0 1px 2px rgba(255,255,255,.15), inset 0 -2px 6px rgba(0,0,0,.5)'
+  const pressedShadow = `0 0 14px ${glow}, 0 0 28px ${glow}`
+
+  const onPointerDown = (e: React.PointerEvent<HTMLAnchorElement>) => {
+    const a = e.currentTarget
+    const rect = a.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    // temporary glow
+    a.style.boxShadow = pressedShadow
+
+    // ripple element
+    const ripple = document.createElement('span')
+    ripple.style.position = 'absolute'
+    ripple.style.left = `${x}px`
+    ripple.style.top = `${y}px`
+    ripple.style.width = '14px'
+    ripple.style.height = '14px'
+    ripple.style.borderRadius = '9999px'
+    ripple.style.background = `radial-gradient(circle, ${glow} 0%, transparent 60%)`
+    ripple.style.filter = 'blur(6px)'
+    ripple.style.transform = 'translate(-50%, -50%) scale(0)'
+    ripple.style.pointerEvents = 'none'
+    ripple.style.animation = 'evaeRipple .45s ease-out forwards'
+
+    a.appendChild(ripple)
+    ripple.addEventListener('animationend', () => {
+      ripple.remove()
+    }, { once: true })
+  }
+
+  const onPointerUp = (e: React.PointerEvent<HTMLAnchorElement>) => {
+    e.currentTarget.style.boxShadow = baseShadow
+  }
+
+  return (
+    <a
+      href={href}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onPointerLeave={onPointerUp}
+      style={{
+        position: 'relative',
+        display: 'inline-block',
+        textDecoration: 'none',
+        borderRadius: 9999,
+        padding: '14px 48px',
+        color: '#fff',
+        background: '#000',
+        boxShadow: baseShadow,
+        overflow: 'hidden', // clip ripple inside
+      }}
+    >
+      {children}
+      {/* glass highlight */}
+      <span
+        aria-hidden
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 9999,
+          background:
+            'linear-gradient(180deg, rgba(255,255,255,.2), rgba(0,0,0,0))',
+          opacity: 0.3,
+          pointerEvents: 'none',
+        }}
+      />
+    </a>
+  )
+}
+
+/* ---------- styles ---------- */
 const styles: Record<string, CSSProperties> = {
   page: {
     position: 'relative',
@@ -101,48 +193,15 @@ const styles: Record<string, CSSProperties> = {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 'calc(env(safe-area-inset-bottom,0) + 6vh)',
+    bottom: 'calc(env(safe-area-inset-bottom, 0) + 6vh)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
-    transition: 'opacity .6s ease',
   },
   buttonRow: {
     display: 'flex',
     gap: 18,
     transition: 'opacity .6s ease',
   },
-  btnBase: {
-    position: 'relative',
-    display: 'inline-block',
-    textDecoration: 'none',
-    borderRadius: 9999,
-    padding: '14px 48px',
-    color: '#fff',
-    background: '#000',
-    boxShadow:
-      'inset 0 1px 2px rgba(255,255,255,.15), inset 0 -2px 6px rgba(0,0,0,.5)',
-    overflow: 'hidden',
-  },
-  btnPink: {} as CSSProperties,
-  btnBlue: {} as CSSProperties,
-  glass: {
-    position: 'absolute',
-    inset: 0,
-    borderRadius: 9999,
-    background:
-      'linear-gradient(180deg, rgba(255,255,255,.2), rgba(0,0,0,0))',
-    opacity: 0.3,
-    pointerEvents: 'none',
-  },
-}
-
-styles.btnPink = {
-  ...styles.btnBase,
-  boxShadow: styles.btnBase.boxShadow + ', 0 0 10px rgba(255,79,223,.2)',
-}
-styles.btnBlue = {
-  ...styles.btnBase,
-  boxShadow: styles.btnBase.boxShadow + ', 0 0 10px rgba(79,195,255,.2)',
 }

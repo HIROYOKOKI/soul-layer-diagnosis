@@ -62,7 +62,7 @@ export default function LoginIntro() {
           <button onClick={() => setPhase('still')} style={styles.skip}>スキップ</button>
         )}
       </div>
-    </div>
+
   )
 }
 

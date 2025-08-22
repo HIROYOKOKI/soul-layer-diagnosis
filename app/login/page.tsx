@@ -1,46 +1,29 @@
 'use client'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 
-type Phase = 'video' | 'still' | 'error'
+type Phase = 'video' | 'still'
 
 export default function LoginDebug() {
   const [phase, setPhase] = useState<Phase>('video')
-  const [msg, setMsg] = useState<string>('loading...')
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
 
-    const onCanPlay = () => { setMsg('canplay'); /* 再生に進む */ }
-    const onLoadedData = () => setMsg('loadeddata')
-    const onPlay = () => setMsg('playing')
-    const onEnded = () => { setMsg('ended -> still'); setPhase('still') }
-    const onError = () => { setMsg('video error'); setPhase('error') }
-
-    v.addEventListener('canplay', onCanPlay)
-    v.addEventListener('loadeddata', onLoadedData)
-    v.addEventListener('play', onPlay)
-    v.addEventListener('ended', onEnded)
-    v.addEventListener('error', onError)
-
-    // 自動再生（muted+playsInlineでSafariもOKのはず）
     v.muted = true
     v.playsInline = true
-    v.play().catch((e) => { setMsg('autoplay rejected'); setPhase('still') })
 
-    return () => {
-      v.removeEventListener('canplay', onCanPlay)
-      v.removeEventListener('loadeddata', onLoadedData)
-      v.removeEventListener('play', onPlay)
-      v.removeEventListener('ended', onEnded)
-      v.removeEventListener('error', onError)
-    }
+    // 自動再生（失敗したら静止画）
+    v.play().catch(() => setPhase('still'))
+
+    // ここでは ended に切り替えず、常に動画を見せたいなら何もしない
+    // v.addEventListener('ended', () => setPhase('still')) // ← 不要。ループで回すため。
   }, [])
 
   return (
     <main style={page}>
-      {/* 背景：必ず背面、クリック無効 */}
+      {/* 背景（背面・クリック無効） */}
       <div style={bgWrap} aria-hidden>
         {phase === 'video' ? (
           <video
@@ -51,25 +34,19 @@ export default function LoginDebug() {
             muted
             playsInline
             preload="auto"
-            style={bgMedia}
+            loop                     // ← ループで切り替えを防ぐ
+            style={bgMedia}          // ← 画面全面に絶対配置
           />
         ) : (
           <img src="/login-still.png" alt="" aria-hidden style={bgMedia} />
         )}
       </div>
 
-      {/* 前景：遷移確認リンク */}
+      {/* 前景リンク（動作確認用） */}
       <div style={center}>
         <h1 style={{ margin: 0 }}>LOGIN DEBUG</h1>
         <a href="/login/form" style={btn}>/login/form へ</a>
         <a href="/login/form?mode=signup" style={btn}>/login/form?mode=signup へ</a>
-      </div>
-
-      {/* デバッグ表示（右上） */}
-      <div style={badge}>
-        phase: {phase} — {msg}{' '}
-        <a href="/login-intro.mp4" target="_blank" rel="noreferrer" style={link}>open mp4</a>{' / '}
-        <a href="/login-still.png" target="_blank" rel="noreferrer" style={link}>open png</a>
       </div>
     </main>
   )
@@ -92,6 +69,8 @@ const bgWrap: CSSProperties = {
 }
 
 const bgMedia: CSSProperties = {
+  position: 'absolute',  // ← これが効く
+  inset: 0,
   width: '100%',
   height: '100%',
   objectFit: 'cover',
@@ -115,17 +94,3 @@ const btn: CSSProperties = {
   color: '#fff',
   textDecoration: 'none',
 }
-
-const badge: CSSProperties = {
-  position: 'fixed',
-  right: 8,
-  top: 8,
-  zIndex: 20,
-  background: 'rgba(0,0,0,.6)',
-  border: '1px solid #333',
-  padding: '6px 8px',
-  borderRadius: 8,
-  fontSize: 12,
-}
-
-const link: CSSProperties = { color: '#9dc9ff', textDecoration: 'underline' }

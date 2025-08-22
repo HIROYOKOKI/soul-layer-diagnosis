@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { useState, type CSSProperties } from 'react'
 
 export const dynamic = 'force-dynamic'
-export const revalidate = 0
-export default function LoginLanding() {
+export const fetchCache = 'force-no-store'
+
   return (
     <main style={styles.page}>
       <section style={styles.card}>

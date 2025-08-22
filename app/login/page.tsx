@@ -70,62 +70,65 @@ export default function LoginIntro() {
 function NeonButton({ label }: { label: string }) {
   const [hovered, setHovered] = useState(false)
   const [active, setActive] = useState(false)
-  const gradient = 'linear-gradient(90deg, rgba(14,165,233,.95), rgba(236,72,153,.95))'
-  const reduced = useMemo(
-    () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
-    []
-  )
 
-  const glow = active ? 1 : hovered ? (reduced ? 0.55 : 0.75) : 0.35
-  const scale = active ? (reduced ? 0.99 : 0.96) : hovered ? (reduced ? 1.005 : 1.02) : 1
+  // ブルー→ピンクの軸は維持
+  const rail = 'linear-gradient(90deg, rgba(14,165,233,.95), rgba(236,72,153,.95))'
+
+  // 発光は控えめ、輪郭をくっきり
+  const outerGlow = hovered ? 24 : 18
+  const glowAlpha = active ? 0.85 : hovered ? 0.55 : 0.35
+  const scale = active ? 0.98 : hovered ? 1.01 : 1
 
   return (
     <div
-      style={{ position:'relative', transform:`scale(${scale})`, transition:'transform .18s ease' }}
-      onMouseEnter={()=>setHovered(true)}
-      onMouseLeave={()=>setHovered(false)}
-      onFocus={()=>setHovered(true)}
-      onBlur={()=>setHovered(false)}
-      onMouseDown={()=>setActive(true)}
-      onMouseUp={()=>setActive(false)}
-      onTouchStart={()=>setActive(true)}
-      onTouchEnd={()=>setActive(false)}
+      style={{ position:'relative', transform:`scale(${scale})`, transition:'transform .16s ease' }}
+      onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)}
+      onFocus={()=>setHovered(true)} onBlur={()=>setHovered(false)}
+      onMouseDown={()=>setActive(true)} onMouseUp={()=>setActive(false)}
+      onTouchStart={()=>setActive(true)} onTouchEnd={()=>setActive(false)}
     >
+      {/* 外側の控えめネオン */}
       <div
         aria-hidden
         style={{
-          position:'absolute',
-          inset:-6,
-          borderRadius:12,
-          filter:`blur(${active ? 26 : hovered ? 22 : 16}px)`,
-          opacity: active ? 0.95 : hovered ? 0.8 : 0.7,
-          background:gradient,
-          transition:'filter .18s ease, opacity .18s ease'
+          position:'absolute', inset:-6, borderRadius:12,
+          filter:`blur(${outerGlow}px)`,
+          opacity: glowAlpha,
+          background: rail,
+          transition:'filter .16s ease, opacity .16s ease'
         }}
       />
+      {/* 境界（くっきりしたレール） */}
       <div
         style={{
-          position:'relative',
-          display:'inline-flex',
-          borderRadius:12,
-          padding:2,
-          background:gradient,
-          boxShadow:`0 0 ${32 + glow*40}px rgba(236,72,153,${glow}), 0 0 ${32 + glow*40}px rgba(14,165,233,${glow})`,
-          transition:'box-shadow .18s ease'
+          position:'relative', display:'inline-flex',
+          borderRadius:12, padding:2, background: rail,
+          // 発光は軽く、縁を際立たせる
+          boxShadow:`0 0 ${12 + (hovered?8:0)}px rgba(14,165,233,${glowAlpha*0.45}),
+                     0 0 ${12 + (hovered?8:0)}px rgba(236,72,153,${glowAlpha*0.45})`,
+          transition:'box-shadow .16s ease'
         }}
       >
         <button
           type="button"
           onClick={(e)=>e.preventDefault()}
           style={{
-            border:'none', outline:'none', cursor:'default',
-            borderRadius:12,
-            background:'rgba(0,0,0,.85)',
+            border:'none', outline:'none', cursor:'pointer',
+            borderRadius:10,
+            // 微ガラス（内側グラデ）
+            background: 'linear-gradient(180deg, rgba(0,0,0,.82), rgba(0,0,0,.9))',
+            // 1px の内側エッジで精密感
+            boxShadow: `inset 0 0 0 1px rgba(255,255,255,.12),
+                        inset 0 -1px 0 rgba(255,255,255,.06)`,
+            // サイズ感：低め＆ワイド
+            padding:'12px 28px',
+            minHeight: 44,
             color:'#fff',
-            padding:'14px 36px',
-            fontSize:16, letterSpacing:'.15em',
-            boxShadow: active ? '0 0 0 2px rgba(255,255,255,.25) inset' : 'none',
-            transition:'box-shadow .18s ease'
+            fontSize:16,
+            letterSpacing:'.18em',
+            // アクティブ時の押し込み表現
+            transform: active ? 'translateY(1px)' : 'none',
+            transition:'transform .06s ease, box-shadow .16s ease'
           }}
         >
           {label}

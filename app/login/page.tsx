@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import NextImage from 'next/image'
 
 type Phase = 'video' | 'still'
@@ -55,78 +55,92 @@ export default function LoginIntro() {
         />
       )}
 
-      {/* ボタン群 */}
+      {/* ボタン：ドーム型ガラス */}
       <div style={styles.bottomBlock}>
-        <div style={{ ...styles.buttonRow, opacity: phase === 'still' ? 1 : 0 }}>
-          <NeonButton label="はじめて" />
-          <NeonButton label="ログイン" />
+        <div style={{ ...styles.buttonRow, opacity: phase === 'still' ? 1 : 1 /* <- 常時表示にするなら1 */ }}>
+          <DomeButton label="はじめて" />
+          <DomeButton label="ログイン" />
         </div>
       </div>
     </div>
   )
 }
 
-/* ====== ネオンボタン ====== */
+/* ========= ドーム型ガラスボタン ========= */
 function DomeButton({ label }: { label: string }) {
   const [active, setActive] = useState(false)
-
   return (
-    <button
+    <div
       onMouseDown={() => setActive(true)}
       onMouseUp={() => setActive(false)}
       onMouseLeave={() => setActive(false)}
+      onTouchStart={() => setActive(true)}
+      onTouchEnd={() => setActive(false)}
       style={{
         position:'relative',
-        border:'none',
-        outline:'none',
-        cursor:'pointer',
-        borderRadius:9999, // pill shape
-        padding:'14px 42px',
-        fontSize:16,
-        letterSpacing:'.15em',
-        color:'#fff',
-        background:'linear-gradient(180deg, rgba(255,255,255,.18), rgba(0,0,0,.35))',
-        backdropFilter:'blur(8px)',
-        WebkitBackdropFilter:'blur(8px)',
-        boxShadow: `
-          inset 0 1px 1px rgba(255,255,255,.35),  /* top highlight */
-          inset 0 -1px 2px rgba(0,0,0,.4),       /* bottom shadow */
-          0 0 12px rgba(56,189,248,.4),          /* blue glow */
-          0 0 18px rgba(236,72,153,.35)          /* pink glow */
-        `,
-        transform: active ? 'translateY(1px) scale(0.98)' : 'translateY(0)',
-        transition:'all .18s ease',
+        display:'inline-block',
+        borderRadius:9999,
+        padding:2,
+        background:'linear-gradient(90deg, rgba(14,165,233,.95), rgba(236,72,153,.95))',
+        boxShadow: '0 0 14px rgba(14,165,233,.22), 0 0 14px rgba(236,72,153,.22)',
+        transform: active ? 'translateY(1px) scale(0.99)' : 'translateY(0)',
+        transition:'transform .14s ease, box-shadow .18s ease',
       }}
     >
-      {label}
-      {/* クリック時の発光エフェクト */}
-      {active && (
-        <span
-          style={{
-            position:'absolute',
-            inset:0,
-            borderRadius:9999,
-            background:'radial-gradient(circle, rgba(255,255,255,.35), transparent 70%)',
-            animation:'pulse 0.35s ease-out forwards',
-            pointerEvents:'none'
-          }}
-        />
-      )}
+      <button
+        type="button"
+        style={{
+          border:'none',
+          outline:'none',
+          borderRadius:9999,
+          padding:'14px 42px',
+          minHeight:46,
+          color:'#fff',
+          fontSize:16,
+          letterSpacing:'.18em',
+          cursor:'pointer',
+          background:'linear-gradient(180deg, rgba(255,255,255,.18), rgba(0,0,0,.36))',
+          backdropFilter:'blur(8px)',
+          WebkitBackdropFilter:'blur(8px)',
+          boxShadow: `
+            inset 0 1px 1px rgba(255,255,255,.38),    /* 上のハイライト */
+            inset 0 -1px 2px rgba(0,0,0,.45)          /* 下の陰影 */
+          `,
+          position:'relative',
+          overflow:'hidden',
+        }}
+      >
+        {/* クリック時の内側パルス */}
+        {active && (
+          <span
+            style={{
+              position:'absolute',
+              inset:0,
+              borderRadius:9999,
+              background:'radial-gradient(circle, rgba(255,255,255,.42), rgba(56,189,248,.28) 45%, rgba(236,72,153,.22) 70%, rgba(255,255,255,0) 72%)',
+              animation:'pulseGlow 0.32s ease-out forwards',
+              pointerEvents:'none'
+            } as CSSProperties}
+          />
+        )}
+        {label}
+      </button>
+
       <style jsx>{`
-        @keyframes pulse {
-          0%   { opacity: .6; transform: scale(0.6); }
-          70%  { opacity: .25; transform: scale(1.4); }
-          100% { opacity: 0;   transform: scale(1.9); }
+        @keyframes pulseGlow {
+          0%   { opacity: .7; transform: scale(0.6); }
+          70%  { opacity: .3; transform: scale(1.5); }
+          100% { opacity: 0;  transform: scale(2.1); }
         }
       `}</style>
-    </button>
+    </div>
   )
 }
 
-
+/* ========= styles ========= */
 const styles = {
   root: { position:'relative', minHeight:'100dvh', background:'#000', color:'#fff', overflow:'hidden' },
   bg: { position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover' },
-  bottomBlock: { position:'absolute', left:0, right:0, bottom:'8vh', display:'flex', justifyContent:'center', alignItems:'center' },
-  buttonRow: { display:'flex', gap:18, transition:'opacity .45s ease' },
+  bottomBlock: { position:'absolute', left:0, right:0, bottom:'calc(env(safe-area-inset-bottom,0) + 6vh)', display:'flex', justifyContent:'center', alignItems:'center' },
+  buttonRow: { display:'flex', gap:18, transition:'opacity .35s ease' },
 } satisfies Record<string, CSSProperties>

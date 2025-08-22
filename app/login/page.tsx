@@ -88,18 +88,9 @@ function DomeButton({
 
         <style jsx>{`
           @keyframes neonPulse {
-            0% {
-              opacity: 1;
-              transform: scale(0.8);
-            }
-            70% {
-              opacity: 0.7;
-              transform: scale(1.2);
-            }
-            100% {
-              opacity: 0;
-              transform: scale(1.4);
-            }
+            0% { opacity: 1; transform: scale(0.8); }
+            70%{ opacity: 0.7; transform: scale(1.2); }
+            100%{ opacity: 0;   transform: scale(1.4); }
           }
         `}</style>
       </button>
@@ -116,12 +107,8 @@ export default function LoginIntro() {
   const router = useRouter()
 
   useEffect(() => {
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')
-      .matches
-    if (reduced) {
-      setPhase('still')
-      return
-    }
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (reduced) { setPhase('still'); return }
 
     const v = videoRef.current
     if (!v) return
@@ -167,8 +154,10 @@ export default function LoginIntro() {
       )}
 
       <div style={styles.bottomBlock}>
-        <div style={{ ...styles.buttonRow, opacity: phase === 'still' ? 1 : 0 }}>
-          {/* 左=ピンク発光 ／ 右=青発光 */}
+        <div
+          // ← 動作確認のため常時1。問題なければ phase 条件に戻してOK
+          style={{ ...styles.buttonRow, opacity: 1 }}
+        >
           <DomeButton label="はじめて" variant="pink" />
           <DomeButton
             label="ログイン"
@@ -195,7 +184,8 @@ const styles = {
     inset: 0,
     width: '100%',
     height: '100%',
-    objectFit: 'cover'
+    objectFit: 'cover',
+    zIndex: 0
   },
   bottomBlock: {
     position: 'absolute',
@@ -204,7 +194,8 @@ const styles = {
     bottom: 'calc(env(safe-area-inset-bottom,0) + 6vh)',
     display: 'flex',
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    zIndex: 1 // ← 背景より前にしてクリック可に
   },
   buttonRow: { display: 'flex', gap: 18, transition: 'opacity .35s ease' }
 } satisfies Record<string, CSSProperties>

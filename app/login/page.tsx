@@ -57,21 +57,6 @@ export default function LoginIntro() {
         />
       )}
 
-      {/* ロゴ＆コピー */}
-      <div style={styles.topBlock}>
-        <div style={styles.logo}>EVΛƎ</div>
-        <div style={styles.logoSub}>ENERGY VISION AWAKENING ECHO</div>
-        <h1 style={styles.title}>ソウル レイヤー診断</h1>
-        <p style={styles.subtitle}>Soul Layer Diagnosis</p>
-      </div>
-
-      {/* ボタン群（いまはデザインのみ） */}
-      <div style={styles.bottomBlock}>
-        <div style={{ ...styles.buttonRow, opacity: phase === 'still' ? 1 : 0 }}>
-          <NeonButton label="はじめて" />
-          <NeonButton label="ログイン" />
-        </div>
-
         {/* スキップ（任意） */}
         {phase === 'video' && (
           <button onClick={() => setPhase('still')} style={styles.skip}>スキップ</button>

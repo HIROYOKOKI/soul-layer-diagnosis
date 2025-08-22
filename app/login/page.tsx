@@ -67,76 +67,62 @@ export default function LoginIntro() {
 }
 
 /* ====== ネオンボタン ====== */
-function NeonButton({ label }: { label: string }) {
-  const [hovered, setHovered] = useState(false)
+function DomeButton({ label }: { label: string }) {
   const [active, setActive] = useState(false)
 
-  // ブルー→ピンクの軸は維持
-  const rail = 'linear-gradient(90deg, rgba(14,165,233,.95), rgba(236,72,153,.95))'
-
-  // 発光は控えめ、輪郭をくっきり
-  const outerGlow = hovered ? 24 : 18
-  const glowAlpha = active ? 0.85 : hovered ? 0.55 : 0.35
-  const scale = active ? 0.98 : hovered ? 1.01 : 1
-
   return (
-    <div
-      style={{ position:'relative', transform:`scale(${scale})`, transition:'transform .16s ease' }}
-      onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)}
-      onFocus={()=>setHovered(true)} onBlur={()=>setHovered(false)}
-      onMouseDown={()=>setActive(true)} onMouseUp={()=>setActive(false)}
-      onTouchStart={()=>setActive(true)} onTouchEnd={()=>setActive(false)}
+    <button
+      onMouseDown={() => setActive(true)}
+      onMouseUp={() => setActive(false)}
+      onMouseLeave={() => setActive(false)}
+      style={{
+        position:'relative',
+        border:'none',
+        outline:'none',
+        cursor:'pointer',
+        borderRadius:9999, // pill shape
+        padding:'14px 42px',
+        fontSize:16,
+        letterSpacing:'.15em',
+        color:'#fff',
+        background:'linear-gradient(180deg, rgba(255,255,255,.18), rgba(0,0,0,.35))',
+        backdropFilter:'blur(8px)',
+        WebkitBackdropFilter:'blur(8px)',
+        boxShadow: `
+          inset 0 1px 1px rgba(255,255,255,.35),  /* top highlight */
+          inset 0 -1px 2px rgba(0,0,0,.4),       /* bottom shadow */
+          0 0 12px rgba(56,189,248,.4),          /* blue glow */
+          0 0 18px rgba(236,72,153,.35)          /* pink glow */
+        `,
+        transform: active ? 'translateY(1px) scale(0.98)' : 'translateY(0)',
+        transition:'all .18s ease',
+      }}
     >
-      {/* 外側の控えめネオン */}
-      <div
-        aria-hidden
-        style={{
-          position:'absolute', inset:-6, borderRadius:12,
-          filter:`blur(${outerGlow}px)`,
-          opacity: glowAlpha,
-          background: rail,
-          transition:'filter .16s ease, opacity .16s ease'
-        }}
-      />
-      {/* 境界（くっきりしたレール） */}
-      <div
-        style={{
-          position:'relative', display:'inline-flex',
-          borderRadius:12, padding:2, background: rail,
-          // 発光は軽く、縁を際立たせる
-          boxShadow:`0 0 ${12 + (hovered?8:0)}px rgba(14,165,233,${glowAlpha*0.45}),
-                     0 0 ${12 + (hovered?8:0)}px rgba(236,72,153,${glowAlpha*0.45})`,
-          transition:'box-shadow .16s ease'
-        }}
-      >
-        <button
-          type="button"
-          onClick={(e)=>e.preventDefault()}
+      {label}
+      {/* クリック時の発光エフェクト */}
+      {active && (
+        <span
           style={{
-            border:'none', outline:'none', cursor:'pointer',
-            borderRadius:10,
-            // 微ガラス（内側グラデ）
-            background: 'linear-gradient(180deg, rgba(0,0,0,.82), rgba(0,0,0,.9))',
-            // 1px の内側エッジで精密感
-            boxShadow: `inset 0 0 0 1px rgba(255,255,255,.12),
-                        inset 0 -1px 0 rgba(255,255,255,.06)`,
-            // サイズ感：低め＆ワイド
-            padding:'12px 28px',
-            minHeight: 44,
-            color:'#fff',
-            fontSize:16,
-            letterSpacing:'.18em',
-            // アクティブ時の押し込み表現
-            transform: active ? 'translateY(1px)' : 'none',
-            transition:'transform .06s ease, box-shadow .16s ease'
+            position:'absolute',
+            inset:0,
+            borderRadius:9999,
+            background:'radial-gradient(circle, rgba(255,255,255,.35), transparent 70%)',
+            animation:'pulse 0.35s ease-out forwards',
+            pointerEvents:'none'
           }}
-        >
-          {label}
-        </button>
-      </div>
-    </div>
+        />
+      )}
+      <style jsx>{`
+        @keyframes pulse {
+          0%   { opacity: .6; transform: scale(0.6); }
+          70%  { opacity: .25; transform: scale(1.4); }
+          100% { opacity: 0;   transform: scale(1.9); }
+        }
+      `}</style>
+    </button>
   )
 }
+
 
 const styles = {
   root: { position:'relative', minHeight:'100dvh', background:'#000', color:'#fff', overflow:'hidden' },

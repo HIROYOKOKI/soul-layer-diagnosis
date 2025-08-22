@@ -2,13 +2,12 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import NextImage from 'next/image'
 
-/* ========= ドーム型ガラスボタン ========= */
+/* ========= ドーム型ボタン（黒ベース／variantで発光色切替） ========= */
 function DomeButton({ label, variant }: { label: string; variant: 'pink' | 'blue' }) {
   const [pressed, setPressed] = useState(false)
   const lift = pressed ? 0 : 2
-
-  // 発光カラーを variant で切り替え
-  const glowColor = variant === 'pink' ? 'rgba(236,72,153,.55)' : 'rgba(14,165,233,.55)'
+  const glow = variant === 'pink' ? 'rgba(236,72,153,.55)' : 'rgba(14,165,233,.55)'
+  const glowSoft = variant === 'pink' ? 'rgba(236,72,153,.35)' : 'rgba(14,165,233,.35)'
 
   return (
     <div
@@ -22,12 +21,17 @@ function DomeButton({ label, variant }: { label: string; variant: 'pink' | 'blue
         display: 'inline-block',
         borderRadius: 9999,
         transform: pressed ? 'translateY(1px) scale(0.995)' : `translateY(-${lift}px)`,
-        transition: 'transform .16s ease, box-shadow .18s ease, background .2s ease',
+        transition: 'transform .16s ease',
+        // 浮遊影（2層）
+        boxShadow: pressed
+          ? '0 8px 16px rgba(0,0,0,.45), 0 3px 8px rgba(0,0,0,.35)'
+          : '0 22px 32px rgba(0,0,0,.45), 0 8px 16px rgba(0,0,0,.35)',
       }}
     >
       <button
         type="button"
         style={{
+          position: 'relative',
           border: 'none',
           outline: 'none',
           cursor: 'pointer',
@@ -37,27 +41,56 @@ function DomeButton({ label, variant }: { label: string; variant: 'pink' | 'blue
           color: '#fff',
           letterSpacing: '.18em',
           fontSize: 16,
-          // CMYK指定色に近い黒ベース
+          // ベース色（CMYK c94 m91 y82 k75 ≒ #0a0a0a）
           background: '#0a0a0a',
-          boxShadow: pressed
-            ? `0 0 12px ${glowColor}`
-            : `0 0 24px ${glowColor}, 0 0 48px ${glowColor}55`,
-          position: 'relative',
+          // ドームの内側の質感（光沢＋陰影）
+          boxShadow:
+            'inset 0 1px 1px rgba(255,255,255,.22), inset 0 -2px 4px rgba(0,0,0,.55)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
           overflow: 'hidden',
         }}
       >
-        {/* 発光エフェクト */}
+        {/* 上面ハイライト */}
+        <span
+          aria-hidden
+          style={{
+            pointerEvents: 'none',
+            position: 'absolute',
+            left: 10, right: 10, top: 6, height: 10,
+            borderRadius: 9999,
+            background: 'linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0))',
+            filter: 'blur(1px)',
+          }}
+        />
+        {/* 下面リムライト（variant色のニュアンス） */}
+        <span
+          aria-hidden
+          style={{
+            pointerEvents: 'none',
+            position: 'absolute',
+            left: 8, right: 8, bottom: 5, height: 12,
+            borderRadius: 9999,
+            background: `linear-gradient(180deg, ${glowSoft}, rgba(0,0,0,0))`,
+            filter: 'blur(2px)',
+          }}
+        />
+        {/* クリック時の内側発光（variant色のみ） */}
         {pressed && (
           <span
             aria-hidden
             style={{
-              position: 'absolute', inset: 0, borderRadius: 9999,
-              background: `radial-gradient(circle at center, ${glowColor} 0%, transparent 70%)`,
+              pointerEvents: 'none',
+              position: 'absolute',
+              inset: 0,
+              borderRadius: 9999,
+              background: `radial-gradient(120% 120% at 50% 50%, ${glow} 0%, rgba(255,255,255,.15) 55%, rgba(255,255,255,0) 65%)`,
               animation: 'domeFlash .35s ease-out forwards',
-            }}
+            } as CSSProperties}
           />
         )}
         {label}
+        {/* keyframes を JSX 内に安全に定義 */}
         <style jsx>{`
           @keyframes domeFlash {
             0%   { opacity: .9; transform: scale(0.85); }
@@ -69,6 +102,7 @@ function DomeButton({ label, variant }: { label: string; variant: 'pink' | 'blue
     </div>
   )
 }
+
 /* ========= ページ本体 ========= */
 type Phase = 'video' | 'still'
 
@@ -123,10 +157,12 @@ export default function LoginIntro() {
         />
       )}
 
-     <div style={{ ...styles.buttonRow, opacity: phase === 'still' ? 1 : 0 }}>
-  <DomeButton label="はじめて" variant="pink" />
-  <DomeButton label="ログイン" variant="blue" />
-</div>
+      <div style={styles.bottomBlock}>
+        <div style={{ ...styles.buttonRow, opacity: phase === 'still' ? 1 : 0 }}>
+          {/* 左=ピンク発光 ／ 右=青発光 */}
+          <DomeButton label="はじめて" variant="pink" />
+          <DomeButton label="ログイン" variant="blue" />
+        </div>
       </div>
     </div>
   )

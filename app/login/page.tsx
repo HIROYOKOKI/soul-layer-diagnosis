@@ -6,16 +6,12 @@ import { useState, type CSSProperties } from 'react'
 export default function LoginLanding() {
   return (
     <main style={styles.page}>
-      {/* 前景コンテンツ */}
       <section style={styles.card}>
-        <h1 style={styles.title}>EVΛƎ · Login</h1>
+        <h1 style={styles.title}>EVΛƎ・Login</h1>
         <p style={styles.subtitle}>あなたの意識の軌跡に、静かな光を。</p>
         <div style={styles.row}>
-          <DomeButton
-            label="はじめて"
-            variant="pink"
-            onClick={() => (location.href = '/login/form?mode=signup')}
-          />
+          {/* ← 両方とも href で“確実に飛ぶ” */}
+          <DomeButton label="はじめて" variant="pink" href="/login/form?mode=signup" />
           <DomeButton label="ログイン" variant="blue" href="/login/form" />
         </div>
       </section>
@@ -27,37 +23,27 @@ export default function LoginLanding() {
         <div style={styles.noise} />
       </div>
 
-      {/* keyframes */}
       <style jsx>{`
-        @keyframes pulse {
-          0% { transform: scale(0.98); opacity: .7; }
-          50% { transform: scale(1.02); opacity: 1; }
-          100% { transform: scale(0.98); opacity: .7; }
-        }
-        @keyframes drift {
-          0% { transform: translateY(0); opacity: .35; }
-          50% { transform: translateY(-12px); opacity: .6; }
-          100% { transform: translateY(0); opacity: .35; }
-        }
+        @keyframes pulse { 0%{transform:scale(.98);opacity:.7}50%{transform:scale(1.02);opacity:1}100%{transform:scale(.98);opacity:.7}}
+        @keyframes drift { 0%{transform:translateY(0);opacity:.35}50%{transform:translateY(-12px);opacity:.6}100%{transform:translateY(0);opacity:.35}}
       `}</style>
     </main>
   )
 }
 
-/* ===== DomeButton（Linkを直接スタイル） ===== */
+/* Link直スタイルのDomeButton（buttonネストしない） */
 function DomeButton({
   label,
   variant,
-  onClick,
   href,
 }: {
   label: string
   variant: 'pink' | 'blue'
-  onClick?: () => void
-  href?: string
+  href: string
 }) {
   const [pressed, setPressed] = useState(false)
   const glow = variant === 'pink' ? '#ff4fdf' : '#4fc3ff'
+
   const baseStyle: CSSProperties = {
     position: 'relative',
     display: 'inline-block',
@@ -78,24 +64,6 @@ function DomeButton({
     transition: 'box-shadow .15s ease',
   }
 
-  const core = (
-    <>
-      {label}
-      <span
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          borderRadius: 9999,
-          background:
-            'linear-gradient(180deg, rgba(255,255,255,.2), rgba(0,0,0,0))',
-          opacity: 0.28,
-          pointerEvents: 'none',
-        }}
-      />
-    </>
-  )
-
   return (
     <div
       onMouseDown={() => setPressed(true)}
@@ -110,15 +78,21 @@ function DomeButton({
         transition: 'transform .15s ease',
       }}
     >
-      {href ? (
-        <Link href={href} style={baseStyle}>
-          {core}
-        </Link>
-      ) : (
-        <button type="button" onClick={onClick} style={baseStyle}>
-          {core}
-        </button>
-      )}
+      <Link href={href} style={baseStyle}>
+        {label}
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: 9999,
+            background:
+              'linear-gradient(180deg, rgba(255,255,255,.2), rgba(0,0,0,0))',
+            opacity: 0.28,
+            pointerEvents: 'none',
+          }}
+        />
+      </Link>
     </div>
   )
 }
@@ -150,11 +124,10 @@ const styles: Record<string, CSSProperties> = {
   title: { margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: '.08em' },
   subtitle: { margin: '2px 0 8px', opacity: 0.8 },
   row: { display: 'flex', gap: 12, justifyContent: 'center' },
-
   bg: {
     position: 'fixed',
     inset: 0,
-    zIndex: -1,            // 重要：前面を覆わない
+    zIndex: -1,           // 前面を覆わない
     pointerEvents: 'none',
     background: 'radial-gradient(50% 40% at 50% 60%, #112233 0%, #000 70%)',
   },

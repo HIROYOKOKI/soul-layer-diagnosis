@@ -67,7 +67,7 @@ export default function LoginIntro() {
 }
 
 /* ========= ドーム型ガラスボタン ========= */
-function DomeNeonButton({ label }: { label: string }) {
+function DomeButton({ label }: { label: string }) {
   const [active, setActive] = useState(false)
 
   return (

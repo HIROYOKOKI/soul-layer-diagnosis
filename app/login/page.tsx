@@ -1,7 +1,62 @@
 'use client'
-import { useState, type CSSProperties } from 'react'
 import Link from 'next/link'
+import { useState, type CSSProperties } from 'react'
 
+/** ← デバッグ用の“絶対に見える”ログインページ */
+export default function LoginPageDebug() {
+  return (
+    <main
+      style={{
+        position: 'relative',
+        minHeight: '100dvh',
+        background: '#0b0b0b',
+        display: 'grid',
+        placeItems: 'center',
+        zIndex: 0,               // 背景より前
+        opacity: 1,              // フェーズ無視で固定表示
+      }}
+    >
+      <div
+        style={{
+          zIndex: 10,            // 何があっても前面
+          color: '#fff',
+          display: 'flex',
+          gap: 24,
+          alignItems: 'center',
+          flexDirection: 'column',
+          border: '1px dashed #666', // 目視用
+          padding: 24,
+          borderRadius: 16,
+          background: 'rgba(255,255,255,0.04)',
+          backdropFilter: 'blur(2px)',
+        }}
+      >
+        <h1 style={{ margin: 0, fontSize: 20 }}>EVΛƎ · Login</h1>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <DomeButton label="はじめて" variant="pink" onClick={() => alert('onboarding')} />
+          <DomeButton label="ログイン" variant="blue" href="/login/form" />
+        </div>
+        <p style={{ margin: 0, fontSize: 12, opacity: .7 }}>
+          ※デバッグ版：opacity固定・z-index固定・背景は下層に固定
+        </p>
+      </div>
+
+      {/* 背景（常に背面 & イベント無効） */}
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: -1,            // ← これ超重要：必ず背面！
+          pointerEvents: 'none', // 背景がクリックを奪わない
+          background:
+            'radial-gradient(50% 40% at 50% 50%, #123 0%, #000 70%)',
+        }}
+      />
+    </main>
+  )
+}
+
+/* ====== あなたのDomeButton（Link版） ====== */
 function DomeButton({
   label,
   variant,
@@ -14,7 +69,6 @@ function DomeButton({
   href?: string
 }) {
   const [pressed, setPressed] = useState(false)
-
   const glowColor = variant === 'pink' ? '#ff4fdf' : '#4fc3ff'
   const glowShadow =
     variant === 'pink'
@@ -32,86 +86,4 @@ function DomeButton({
     padding: '14px 48px',
     fontSize: 16,
     letterSpacing: '.15em',
-    color: '#fff',
-    background: '#000',
-    overflow: 'hidden',
-    boxShadow: pressed
-      ? glowShadow
-      : 'inset 0 1px 2px rgba(255,255,255,.15), inset 0 -2px 6px rgba(0,0,0,.5)',
-  }
-
-  const CoreChildren = (
-    <>
-      {label}
-      <span
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          borderRadius: 9999,
-          background:
-            'linear-gradient(180deg, rgba(255,255,255,.2), rgba(0,0,0,0))',
-          opacity: 0.3,
-          pointerEvents: 'none',
-        }}
-      />
-      {pressed && (
-        <span
-          aria-hidden
-          style={{
-            position: 'absolute',
-            inset: -20,
-            borderRadius: 9999,
-            background: `radial-gradient(circle, ${glowColor}88 0%, transparent 70%)`,
-            filter: 'blur(18px)',
-            animation: 'neonPulse .4s ease-out',
-          }}
-        />
-      )}
-      <style jsx>{`
-        @keyframes neonPulse {
-          0% {
-            opacity: 1;
-            transform: scale(0.8);
-          }
-          70% {
-            opacity: 0.7;
-            transform: scale(1.2);
-          }
-          100% {
-            opacity: 0;
-            transform: scale(1.4);
-          }
-        }
-      `}</style>
-    </>
-  )
-
-  return (
-    <div
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
-      onMouseLeave={() => setPressed(false)}
-      onTouchStart={() => setPressed(true)}
-      onTouchEnd={() => setPressed(false)}
-      style={{
-        display: 'inline-block',
-        borderRadius: 9999,
-        transform: pressed ? 'scale(0.98)' : 'scale(1)',
-        transition: 'transform .15s ease',
-      }}
-    >
-      {href ? (
-        <Link href={href} style={baseStyle}>
-          {CoreChildren}
-        </Link>
-      ) : (
-        <button type="button" onClick={onClick} style={baseStyle}>
-          {CoreChildren}
-        </button>
-      )}
-    </div>
-  )
-}
-
-export default DomeButton
+    color: '#fff

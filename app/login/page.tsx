@@ -64,7 +64,7 @@ const page: CSSProperties = {
 const bgWrap: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  zIndex: -1,
+  zIndex: 0,
   pointerEvents: 'none',
 }
 
@@ -83,7 +83,7 @@ const center: CSSProperties = {
   placeItems: 'center',
   minHeight: '100dvh',
   position: 'relative',
-  zIndex: 10,
+  zIndex: 1,
 }
 
 const btn: CSSProperties = {

@@ -1,10 +1,9 @@
 'use client'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { useRouter } from 'next/navigation'
 import NextImage from 'next/image'
 import Link from 'next/link'
 
-/* ========= ドーム型ボタン（Link直スタイル） ========= */
+/* ========= DomeButton (Link版) ========= */
 function DomeButton({
   label,
   variant,
@@ -15,65 +14,56 @@ function DomeButton({
   href: string
 }) {
   const [pressed, setPressed] = useState(false)
-  const glowColor = variant === 'pink' ? '#ff4fdf' : '#4fc3ff'
-  const glowShadow =
-    variant === 'pink'
-      ? '0 0 12px #ff4fdf, 0 0 24px #ff4fdf, 0 0 48px #ff4fdf'
-      : '0 0 12px #4fc3ff, 0 0 24px #4fc3ff, 0 0 48px #4fc3ff'
+  const glow = variant === 'pink' ? '#ff4fdf' : '#4fc3ff'
 
-  const baseStyle: CSSProperties = {
+  const style: CSSProperties = {
     position: 'relative',
+    display: 'inline-block',
     border: 'none',
     outline: 'none',
+    textDecoration: 'none',
     cursor: 'pointer',
     borderRadius: 9999,
     padding: '14px 48px',
     fontSize: 16,
-    letterSpacing: '.15em',
+    letterSpacing: '0.15em',
     color: '#fff',
     background: '#000',
     overflow: 'hidden',
     boxShadow: pressed
-      ? glowShadow
+      ? `0 0 12px ${glow}, 0 0 24px ${glow}, 0 0 48px ${glow}`
       : 'inset 0 1px 2px rgba(255,255,255,.15), inset 0 -2px 6px rgba(0,0,0,.5)',
-    textDecoration: 'none',
-    display: 'inline-block',
+    transition: 'box-shadow .12s ease',
   }
 
   return (
-    <div
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
-      onMouseLeave={() => setPressed(false)}
-      onTouchStart={() => setPressed(true)}
-      onTouchEnd={() => setPressed(false)}
-      style={{
-        display: 'inline-block',
-        borderRadius: 9999,
-        transform: pressed ? 'scale(0.98)' : 'scale(1)',
-        transition: 'transform .15s ease',
-      }}
+    <Link
+      href={href}
+      prefetch={false}
+      style={style}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
     >
-      <Link href={href} style={baseStyle}>
-        {label}
-        <span
-          aria-hidden
-          style={{
-            position: 'absolute',
-            inset: 0,
-            borderRadius: 9999,
-            background:
-              'linear-gradient(180deg, rgba(255,255,255,.2), rgba(0,0,0,0))',
-            opacity: 0.3,
-            pointerEvents: 'none',
-          }}
-        />
-      </Link>
-    </div>
+      {label}
+      <span
+        aria-hidden
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 9999,
+          background:
+            'linear-gradient(180deg, rgba(255,255,255,.2), rgba(0,0,0,0))',
+          opacity: 0.3,
+          pointerEvents: 'none',
+        }}
+      />
+    </Link>
   )
 }
 
-/* ========= ページ本体 ========= */
+/* ========= Page ========= */
 type Phase = 'video' | 'still'
 
 export default function LoginIntro() {
@@ -97,9 +87,6 @@ export default function LoginIntro() {
     const onError = () => setPhase('still')
     v.addEventListener('ended', onEnded)
     v.addEventListener('error', onError)
-
-    const img = new window.Image()
-    img.src = '/login-still.png'
 
     return () => {
       v.removeEventListener('ended', onEnded)
@@ -131,7 +118,7 @@ export default function LoginIntro() {
       )}
 
       <div style={styles.bottomBlock}>
-        <div style={{ ...styles.buttonRow, opacity: phase === 'still' ? 1 : 0 }}>
+        <div style={styles.buttonRow}>
           <DomeButton label="はじめて" variant="pink" href="/login/form?mode=signup" />
           <DomeButton label="ログイン" variant="blue" href="/login/form" />
         </div>
@@ -140,7 +127,7 @@ export default function LoginIntro() {
   )
 }
 
-/* ========= styles ========= */
+/* ========= Styles ========= */
 const styles = {
   root: {
     position: 'relative',
@@ -165,5 +152,5 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  buttonRow: { display: 'flex', gap: 18, transition: 'opacity .35s ease' },
+  buttonRow: { display: 'flex', gap: 18 },
 } satisfies Record<string, CSSProperties>

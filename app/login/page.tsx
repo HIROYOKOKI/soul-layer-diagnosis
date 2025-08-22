@@ -1,70 +1,25 @@
 'use client'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useRouter } from 'next/navigation'
+import NextImage from 'next/image'
 
-import Link from 'next/link'
-import { useState, type CSSProperties } from 'react'
-
-export const dynamic = 'force-dynamic'
-export const fetchCache = 'force-no-store'
-
-  return (
-    <main style={styles.page}>
-      <section style={styles.card}>
-        <h1 style={styles.title}>EVΛƎ・Login</h1>
-        <p style={styles.subtitle}>あなたの意識の軌跡に、静かな光を。</p>
-        <div style={styles.row}>
-          {/* ← 両方とも href で“確実に飛ぶ” */}
-          <DomeButton label="はじめて" variant="pink" href="/login/form?mode=signup" />
-          <DomeButton label="ログイン" variant="blue" href="/login/form" />
-        </div>
-      </section>
-
-      {/* 背景（背面固定） */}
-      <div style={styles.bg} aria-hidden>
-        <div style={styles.aura} />
-        <div style={styles.aura2} />
-        <div style={styles.noise} />
-      </div>
-
-      <style jsx>{`
-        @keyframes pulse { 0%{transform:scale(.98);opacity:.7}50%{transform:scale(1.02);opacity:1}100%{transform:scale(.98);opacity:.7}}
-        @keyframes drift { 0%{transform:translateY(0);opacity:.35}50%{transform:translateY(-12px);opacity:.6}100%{transform:translateY(0);opacity:.35}}
-      `}</style>
-    </main>
-  )
-}
-
-/* Link直スタイルのDomeButton（buttonネストしない） */
+/* ========= ドーム型ボタン（黒ベース／variantで発光色切替） ========= */
 function DomeButton({
   label,
   variant,
-  href,
+  onClick
 }: {
   label: string
   variant: 'pink' | 'blue'
-  href: string
+  onClick?: () => void
 }) {
   const [pressed, setPressed] = useState(false)
-  const glow = variant === 'pink' ? '#ff4fdf' : '#4fc3ff'
 
-  const baseStyle: CSSProperties = {
-    position: 'relative',
-    display: 'inline-block',
-    border: 'none',
-    outline: 'none',
-    textDecoration: 'none',
-    cursor: 'pointer',
-    borderRadius: 9999,
-    padding: '14px 48px',
-    fontSize: 16,
-    letterSpacing: '0.15em',
-    color: '#fff',
-    background: '#000',
-    overflow: 'hidden',
-    boxShadow: pressed
-      ? `0 0 12px ${glow}, 0 0 24px ${glow}, 0 0 48px ${glow}`
-      : 'inset 0 1px 2px rgba(255,255,255,.15), inset 0 -2px 6px rgba(0,0,0,.5)',
-    transition: 'box-shadow .15s ease',
-  }
+  const glowColor = variant === 'pink' ? '#ff4fdf' : '#4fc3ff'
+  const glowShadow =
+    variant === 'pink'
+      ? '0 0 12px #ff4fdf, 0 0 24px #ff4fdf, 0 0 48px #ff4fdf'
+      : '0 0 12px #4fc3ff, 0 0 24px #4fc3ff, 0 0 48px #4fc3ff'
 
   return (
     <div
@@ -77,11 +32,32 @@ function DomeButton({
         display: 'inline-block',
         borderRadius: 9999,
         transform: pressed ? 'scale(0.98)' : 'scale(1)',
-        transition: 'transform .15s ease',
+        transition: 'transform .15s ease'
       }}
     >
-      <Link href={href} style={baseStyle}>
+      <button
+        type="button"
+        onClick={onClick}
+        style={{
+          position: 'relative',
+          border: 'none',
+          outline: 'none',
+          cursor: 'pointer',
+          borderRadius: 9999,
+          padding: '14px 48px',
+          fontSize: 16,
+          letterSpacing: '.15em',
+          color: '#fff',
+          background: '#000',
+          overflow: 'hidden',
+          boxShadow: pressed
+            ? glowShadow
+            : 'inset 0 1px 2px rgba(255,255,255,.15), inset 0 -2px 6px rgba(0,0,0,.5)'
+        }}
+      >
         {label}
+
+        {/* ガラス感ハイライト */}
         <span
           aria-hidden
           style={{
@@ -90,80 +66,145 @@ function DomeButton({
             borderRadius: 9999,
             background:
               'linear-gradient(180deg, rgba(255,255,255,.2), rgba(0,0,0,0))',
-            opacity: 0.28,
-            pointerEvents: 'none',
+            opacity: 0.3,
+            pointerEvents: 'none'
           }}
         />
-      </Link>
+
+        {/* 押したときの拡散光 */}
+        {pressed && (
+          <span
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: -20,
+              borderRadius: 9999,
+              background: `radial-gradient(circle, ${glowColor}88 0%, transparent 70%)`,
+              filter: 'blur(18px)',
+              animation: 'neonPulse .4s ease-out'
+            }}
+          />
+        )}
+
+        <style jsx>{`
+          @keyframes neonPulse {
+            0% {
+              opacity: 1;
+              transform: scale(0.8);
+            }
+            70% {
+              opacity: 0.7;
+              transform: scale(1.2);
+            }
+            100% {
+              opacity: 0;
+              transform: scale(1.4);
+            }
+          }
+        `}</style>
+      </button>
     </div>
   )
 }
 
-/* ===== styles ===== */
-const styles: Record<string, CSSProperties> = {
-  page: {
+/* ========= ページ本体 ========= */
+type Phase = 'video' | 'still'
+
+export default function LoginIntro() {
+  const [phase, setPhase] = useState<Phase>('video')
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+      .matches
+    if (reduced) {
+      setPhase('still')
+      return
+    }
+
+    const v = videoRef.current
+    if (!v) return
+    v.muted = true
+    v.playsInline = true
+    v.play().catch(() => setPhase('still'))
+
+    const onEnded = () => setPhase('still')
+    const onError = () => setPhase('still')
+    v.addEventListener('ended', onEnded)
+    v.addEventListener('error', onError)
+
+    const img = new window.Image()
+    img.src = '/login-still.png'
+
+    return () => {
+      v.removeEventListener('ended', onEnded)
+      v.removeEventListener('error', onError)
+    }
+  }, [])
+
+  return (
+    <div style={styles.root}>
+      {phase === 'video' ? (
+        <video
+          ref={videoRef}
+          style={styles.bg}
+          src="/login-intro.mp4"
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          poster="/login-still.png"
+        />
+      ) : (
+        <NextImage
+          src="/login-still.png"
+          alt="login still"
+          fill
+          priority
+          style={styles.bg as CSSProperties}
+        />
+      )}
+
+      <div style={styles.bottomBlock}>
+        <div style={{ ...styles.buttonRow, opacity: phase === 'still' ? 1 : 0 }}>
+          {/* 左=ピンク発光 ／ 右=青発光 */}
+          <DomeButton label="はじめて" variant="pink" />
+          <DomeButton
+            label="ログイン"
+            variant="blue"
+            onClick={() => router.push('/login/form')}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ========= styles ========= */
+const styles = {
+  root: {
     position: 'relative',
     minHeight: '100dvh',
-    display: 'grid',
-    placeItems: 'center',
-    background: '#0b0b0b',
+    background: '#000',
     color: '#fff',
-    overflow: 'hidden',
+    overflow: 'hidden'
   },
-  card: {
-    position: 'relative',
-    zIndex: 10,
-    display: 'grid',
-    gap: 16,
-    textAlign: 'center',
-    padding: '28px 28px 32px',
-    borderRadius: 20,
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    backdropFilter: 'blur(2px)',
-    boxShadow: '0 10px 40px rgba(0,0,0,.35)',
-  },
-  title: { margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: '.08em' },
-  subtitle: { margin: '2px 0 8px', opacity: 0.8 },
-  row: { display: 'flex', gap: 12, justifyContent: 'center' },
   bg: {
-    position: 'fixed',
-    inset: 0,
-    zIndex: -1,           // 前面を覆わない
-    pointerEvents: 'none',
-    background: 'radial-gradient(50% 40% at 50% 60%, #112233 0%, #000 70%)',
-  },
-  aura: {
-    position: 'absolute',
-    left: '50%',
-    top: '58%',
-    width: 520,
-    height: 520,
-    transform: 'translate(-50%, -50%)',
-    borderRadius: '50%',
-    background:
-      'radial-gradient(circle, rgba(79,195,255,.28), rgba(0,0,0,0) 60%)',
-    filter: 'blur(24px)',
-    animation: 'pulse 6s ease-in-out infinite',
-  },
-  aura2: {
-    position: 'absolute',
-    left: '65%',
-    top: '28%',
-    width: 260,
-    height: 260,
-    borderRadius: '50%',
-    background:
-      'radial-gradient(circle, rgba(255,79,223,.22), rgba(0,0,0,0) 60%)',
-    filter: 'blur(18px)',
-    animation: 'drift 8s ease-in-out infinite',
-  },
-  noise: {
     position: 'absolute',
     inset: 0,
-    opacity: 0.07,
-    backgroundImage:
-      'radial-gradient(circle at 10% 20%, #fff2 0.5px, transparent 0.5px), radial-gradient(circle at 80% 60%, #fff1 0.5px, transparent 0.5px)',
-    backgroundSize: '120px 120px, 160px 160px',
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover'
   },
-}
+  bottomBlock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 'calc(env(safe-area-inset-bottom,0) + 6vh)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  buttonRow: { display: 'flex', gap: 18, transition: 'opacity .35s ease' }
+} satisfies Record<string, CSSProperties>

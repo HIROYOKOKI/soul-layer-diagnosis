@@ -3,9 +3,12 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import NextImage from 'next/image'
 
 /* ========= ドーム型ガラスボタン ========= */
-function DomeButton({ label }: { label: string }) {
+function DomeButton({ label, variant }: { label: string; variant: 'pink' | 'blue' }) {
   const [pressed, setPressed] = useState(false)
   const lift = pressed ? 0 : 2
+
+  // 発光カラーを variant で切り替え
+  const glowColor = variant === 'pink' ? 'rgba(236,72,153,.55)' : 'rgba(14,165,233,.55)'
 
   return (
     <div
@@ -17,12 +20,7 @@ function DomeButton({ label }: { label: string }) {
       style={{
         position: 'relative',
         display: 'inline-block',
-        padding: 0,
         borderRadius: 9999,
-        background: 'rgba(255,255,255,0.06)',
-        boxShadow: pressed
-          ? '0 6px 12px rgba(0,0,0,.45), 0 2px 4px rgba(0,0,0,.35)'
-          : '0 18px 28px rgba(0,0,0,.45), 0 6px 12px rgba(0,0,0,.35)',
         transform: pressed ? 'translateY(1px) scale(0.995)' : `translateY(-${lift}px)`,
         transition: 'transform .16s ease, box-shadow .18s ease, background .2s ease',
       }}
@@ -30,7 +28,6 @@ function DomeButton({ label }: { label: string }) {
       <button
         type="button"
         style={{
-          position: 'relative',
           border: 'none',
           outline: 'none',
           cursor: 'pointer',
@@ -40,50 +37,24 @@ function DomeButton({ label }: { label: string }) {
           color: '#fff',
           letterSpacing: '.18em',
           fontSize: 16,
-          // 通常は黒いドーム
-          background: 'linear-gradient(180deg, rgba(30,30,35,.65), rgba(5,5,10,.9))',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          // 内側エッジ
-          boxShadow: 'inset 0 1px 1px rgba(255,255,255,.22), inset 0 -2px 4px rgba(0,0,0,.55)',
+          // CMYK指定色に近い黒ベース
+          background: '#0a0a0a',
+          boxShadow: pressed
+            ? `0 0 12px ${glowColor}`
+            : `0 0 24px ${glowColor}, 0 0 48px ${glowColor}55`,
+          position: 'relative',
           overflow: 'hidden',
         }}
       >
-        {/* 上面ハイライト */}
-        <span
-          aria-hidden
-          style={{
-            pointerEvents: 'none',
-            position: 'absolute',
-            left: 10, right: 10, top: 5, height: 10,
-            borderRadius: 9999,
-            background: 'linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0))',
-            filter: 'blur(1px)',
-          }}
-        />
-        {/* 下面リムライト */}
-        <span
-          aria-hidden
-          style={{
-            pointerEvents: 'none',
-            position: 'absolute',
-            left: 8, right: 8, bottom: 4, height: 12,
-            borderRadius: 9999,
-            background: 'linear-gradient(180deg, rgba(56,189,248,.20), rgba(56,189,248,0))',
-            filter: 'blur(2px)', opacity: .9,
-          }}
-        />
-        {/* クリック時：内側発光 */}
+        {/* 発光エフェクト */}
         {pressed && (
           <span
             aria-hidden
             style={{
-              pointerEvents: 'none',
               position: 'absolute', inset: 0, borderRadius: 9999,
-              background:
-                'radial-gradient(120% 120% at 50% 50%, rgba(236,72,153,.55) 0%, rgba(14,165,233,.45) 45%, rgba(255,255,255,.15) 60%, rgba(255,255,255,0) 65%)',
+              background: `radial-gradient(circle at center, ${glowColor} 0%, transparent 70%)`,
               animation: 'domeFlash .35s ease-out forwards',
-            } as CSSProperties}
+            }}
           />
         )}
         {label}
@@ -98,7 +69,6 @@ function DomeButton({ label }: { label: string }) {
     </div>
   )
 }
-
 /* ========= ページ本体 ========= */
 type Phase = 'video' | 'still'
 
@@ -153,11 +123,10 @@ export default function LoginIntro() {
         />
       )}
 
-      <div style={styles.bottomBlock}>
-        <div style={{ ...styles.buttonRow, opacity: phase === 'still' ? 1 : 0 }}>
-          <DomeButton label="はじめて" />
-          <DomeButton label="ログイン" />
-        </div>
+     <div style={{ ...styles.buttonRow, opacity: phase === 'still' ? 1 : 0 }}>
+  <DomeButton label="はじめて" variant="pink" />
+  <DomeButton label="ログイン" variant="blue" />
+</div>
       </div>
     </div>
   )

@@ -141,19 +141,64 @@ export default function ProfilePage() {
 }
 
 const S: Record<string, CSSProperties> = {
-  wrap: { position:'relative', minHeight:'calc(100dvh - 0px)', display:'grid', placeItems:'start center', padding:'16px 12px 28px' },
-  bg: { position:'fixed', inset:0, zIndex:0, pointerEvents:'none', background:'radial-gradient(60% 45% at 50% 65%, #0b1522 0%, #000 72%)' },
-  auraMain: { position:'absolute', left:'50%', top:'65%', width:520, height:520, transform:'translate(-50%, -50%)', borderRadius:'50%', background:'radial-gradient(circle, rgba(79,195,255,.28), rgba(0,0,0,0) 60%)', filter:'blur(22px)' },
-  auraSide: { position:'absolute', left:'70%', top:'28%', width:260, height:260, borderRadius:'50%', background:'radial-gradient(circle, rgba(255,79,223,.22), rgba(0,0,0,0) 60%)', filter:'blur(18px)' },
-  noise: { position:'absolute', inset:0, opacity:0.07, backgroundImage:'radial-gradient(circle at 10% 20%, #fff2 0.5px, transparent 0.5px), radial-gradient(circle at 80% 60%, #fff1 0.5px, transparent 0.5px)', backgroundSize:'120px 120px, 160px 160px' },
-  card: { position:'relative', zIndex:1, width:'min(520px, 94vw)', marginTop:8, padding:'20px 16px 18px', display:'grid', gap:12, background:'rgba(0,0,0,.55)', border:'1px solid rgba(255,255,255,.10)', borderRadius:16, boxShadow:'0 10px 40px rgba(0,0,0,.35)', backdropFilter:'blur(4px)' },
-  title: { margin:'0 0 8px', fontSize:22, fontWeight:700, letterSpacing:'.04em' },
+  wrap: {
+    position:'relative',
+    minHeight:'100%',
+    display:'grid',
+    placeItems:'start center',
+    padding: '8px 12px 24px',
+  },
+  card: {
+    position:'relative', zIndex:1,
+    width:'min(560px, 92vw)',       // 380→560 / 94→92
+    marginTop: 10,
+    padding:'22px 16px 18px',       // すこし詰める
+    display:'grid', gap:12,
+    background:'rgba(8,10,14,.6)',  // ほんの少し明るく
+    border:'1px solid rgba(255,255,255,.10)',
+    borderRadius:16,
+    boxShadow:'0 10px 40px rgba(0,0,0,.35)',
+    backdropFilter:'blur(6px)',
+  },
+  title: { margin:'0 0 10px', fontSize:22, fontWeight:700, letterSpacing:'.04em' },
   form: { display:'grid', gap:10 },
   label: { fontSize:13, opacity:.85 },
-  input: { width:'100%', padding:'12px 14px', borderRadius:10, border:'1px solid #333', background:'#111', color:'#fff', outline:'none', transition:'box-shadow .15s ease, border-color .15s ease', boxShadow:'inset 0 1px 0 rgba(255,255,255,.06)' },
-  primaryBtn: { marginTop:6, padding:'12px 14px', borderRadius:9999, border:'none', background:'#1e90ff', color:'#fff', cursor:'pointer' },
+  input: {
+    width:'100%',
+    minHeight: 44,                  // タップしやすさ
+    padding:'12px 14px',
+    borderRadius:12,                // 丸み↑
+    border:'1px solid #2a2d33',
+    background:'#0e1014',
+    color:'#fff',
+    outline:'none',
+    transition:'box-shadow .15s ease, border-color .15s ease',
+    boxShadow:'inset 0 1px 0 rgba(255,255,255,.06)',
+  },
+  primaryBtn: {
+    marginTop: 6,
+    height: 48,                     // ボタンも指向け
+    padding:'0 16px',
+    borderRadius:9999,
+    border:'none',
+    background:'#1e90ff',
+    color:'#fff',
+    cursor:'pointer',
+  },
   link: { color:'#9dc9ff', textDecoration:'underline' },
   small: { margin:0, fontSize:12, opacity:.8 },
   error: { color:'#ff7a7a', margin:0 },
-  linkBtn: { display:'inline-block', padding:'10px 14px', borderRadius:9999, border:'1px solid rgba(255,255,255,.2)', color:'#fff', textDecoration:'none', background:'transparent', width:'fit-content' },
-}
+
+  // 背景はそのまま（必要なら少しだけ弱め）
+  bg: { position:'fixed', inset:0, zIndex:0, pointerEvents:'none',
+        background:'radial-gradient(60% 45% at 50% 65%, #0b1522 0%, #000 72%)'},
+  auraMain: { position:'absolute', left:'50%', top:'65%', width:520, height:520,
+    transform:'translate(-50%, -50%)', borderRadius:'50%',
+    background:'radial-gradient(circle, rgba(79,195,255,.22), rgba(0,0,0,0) 60%)', filter:'blur(22px)' },
+  auraSide: { position:'absolute', left:'72%', top:'28%', width:240, height:240,
+    borderRadius:'50%', background:'radial-gradient(circle, rgba(255,79,223,.18), rgba(0,0,0,0) 60%)',
+    filter:'blur(18px)' },
+  noise: { position:'absolute', inset:0, opacity:0.06,
+    backgroundImage:'radial-gradient(circle at 10% 20%, #fff2 0.5px, transparent 0.5px), radial-gradient(circle at 80% 60%, #fff1 0.5px, transparent 0.5px)',
+    backgroundSize:'120px 120px, 160px 160px' },
+};

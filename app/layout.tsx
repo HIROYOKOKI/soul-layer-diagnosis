@@ -12,11 +12,11 @@ function SiteHeader() {
       <div style={styles.headerInner}>
         <Link href="/" style={styles.brand}>EVΛƎ</Link>
         <nav style={styles.nav}>
-          <a href="/" style={styles.navLink}>Home</a>
-          <a href="/daily" style={styles.navLink}>Daily</a>
-          <a href="/weekly" style={styles.navLink}>Weekly</a>
-          <a href="/monthly" style={styles.navLink}>Monthly</a>
-          <a href="/mypage" style={styles.navLinkStrong}>MyPage</a>
+          <Link href="/" style={styles.navLink}>Home</Link>
+          <Link href="/daily" style={styles.navLink}>Daily</Link>
+          <Link href="/weekly" style={styles.navLink}>Weekly</Link>
+          <Link href="/monthly" style={styles.navLink}>Monthly</Link>
+          <Link href="/mypage" style={styles.navLinkStrong}>MyPage</Link>
         </nav>
       </div>
     </header>
@@ -29,9 +29,9 @@ function SiteFooter() {
       <div style={styles.footerInner}>
         <span>© {new Date().getFullYear()} EVΛƎ Project</span>
         <nav style={{ display: 'flex', gap: 16 }}>
-          <a href="/profile" style={styles.footerLink}>プロフィール</a>
-          <a href="/register" style={styles.footerLink}>登録</a>
-          <a href="/login/form" style={styles.footerLink}>ログイン</a>
+          <Link href="/profile" style={styles.footerLink}>プロフィール</Link>
+          <Link href="/register" style={styles.footerLink}>登録</Link>
+          <Link href="/login/form" style={styles.footerLink}>ログイン</Link>
         </nav>
       </div>
     </footer>

@@ -138,20 +138,27 @@ const styles: Record<string, CSSProperties> = {
     pointerEvents:'none',
   },
   bgMedia: {
-    position:'absolute',
-    inset:0,
-    width:'100%',
-    height:'100%',
-    objectFit:'cover',
-    objectPosition:'center 70%', // ← 見せたい位置に（好みで 55〜75%）
-    transform:'translateZ(0)',
-    willChange:'transform',
-  },
+  position:'absolute',
+  inset:0,
+  width:'100%',
+  height:'100%',
+  objectFit:'cover',
+  objectPosition:'center 78%',   // ← 70% → 78% に（もう少し下を見せる）
+  transform:'translateZ(0)',
+  willChange:'transform',
+},
+
   bgOverlay: {
     position:'absolute',
     inset:0,
-    background:'linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,.25) 40%, rgba(0,0,0,.45) 100%)',
-  },
+    background:'linear-gradient(180deg,
+      rgba(0,0,0,.85) 0%,     /* ← 上端は濃く */
+      rgba(0,0,0,.55) 14%,
+      rgba(0,0,0,.30) 42%,
+      rgba(0,0,0,.38) 100%
+    )
+  `,
+},
 
   // カード（中央固定）
   card: {

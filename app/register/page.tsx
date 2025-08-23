@@ -122,7 +122,16 @@ function humanizeAuthError(msg: string): string {
 /* ===== styles ===== */
 const styles: Record<string, CSSProperties> = {
   page: {
-    bgStack: {
+    position: 'relative',
+    minHeight: '100dvh',
+    display: 'grid',
+    placeItems: 'center',
+    background: '#000',
+    color: '#fff',
+    overflow: 'hidden',
+  },                             // ← ← ここを必ず閉じる！（},）
+
+  bgStack: {
     position: 'fixed',
     inset: 0,
     zIndex: 0,
@@ -134,27 +143,26 @@ const styles: Record<string, CSSProperties> = {
     width: '100%',
     height: '100%',
     objectFit: 'cover',
-    objectPosition: 'center 82%',    // ← さらに下寄せ（75–85%で微調整OK）
+    objectPosition: 'center 82%', // 75–85%で微調整OK
     transform: 'translateZ(0)',
     willChange: 'transform',
   },
-  // うっすら暗幕（全体の読みやすさ）
   bgOverlay: {
     position: 'absolute',
     inset: 0,
     background:
       'linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,.25) 40%, rgba(0,0,0,.45) 100%)',
   },
-  // ★ 追加：上部を“完全に”覆う黒マスク（タイトルを消す）
   bgTopMask: {
     position: 'absolute',
     left: 0,
     right: 0,
     top: 0,
-    height: '20vh',                 // ← 足りなければ 24vh / 28vh に上げる
+    height: '24vh', // まだ残るなら 28vh にUP
     background:
       'linear-gradient(180deg, rgba(0,0,0,.95) 0%, rgba(0,0,0,.85) 60%, rgba(0,0,0,0) 100%)',
   },
+
 
   // カード（中央固定）
   card: {

@@ -12,31 +12,25 @@ export default function RegisterPage() {
     e.preventDefault()
     setError(null)
 
-    const supabase = getBrowserSupabase()
+    // ★ ここを await で受け取る
+    const supabase = await getBrowserSupabase()
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${location.origin}/` }, // サイトURL
+      options: {
+        emailRedirectTo: `${location.origin}/auth/callback`, // ← コールバックへ
+      },
     })
     if (error) setError(error.message)
-    else alert('確認メールを送りました！受信して確認してください。')
+    else alert('確認メールを送りました！メール内のリンクを開いてください。')
   }
 
   return (
-    <main style={{ display:'grid', placeItems:'center', minHeight:'100vh' }}>
-      <form onSubmit={handleSubmit} style={{ display:'grid', gap:12 }}>
-        <h1>新規登録テスト</h1>
-        <input
-          type="email" placeholder="you@example.com"
-          value={email} onChange={(e) => setEmail(e.target.value)}
-        />
-        <input
-          type="password" placeholder="password"
-          value={password} onChange={(e) => setPassword(e.target.value)}
-        />
-        <button type="submit">登録</button>
-        {error && <p style={{ color:'red' }}>{error}</p>}
-      </form>
+    <main>
+      {/* 省略：フォームUI */}
+      <form onSubmit={handleSubmit}>{/* ... */}</form>
+      {error && <p style={{ color: 'red' }}>{error}</p>}
     </main>
   )
 }

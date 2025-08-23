@@ -1,5 +1,43 @@
-// 変更点だけ：styles と <head> 追加（頭の <html> 直下に）
-// ...
+// app/layout.tsx
+import Link from 'next/link'
+
+export const metadata = { title: 'EVΛƎ · Soul Layer' }
+
+const HEADER_H = 64
+const FOOTER_H = 64
+
+function SiteHeader() {
+  return (
+    <header style={styles.header}>
+      <div style={styles.headerInner}>
+        <Link href="/" style={styles.brand}>EVΛƎ</Link>
+        <nav style={styles.nav}>
+          <a href="/" style={styles.navLink}>Home</a>
+          <a href="/daily" style={styles.navLink}>Daily</a>
+          <a href="/weekly" style={styles.navLink}>Weekly</a>
+          <a href="/monthly" style={styles.navLink}>Monthly</a>
+          <a href="/mypage" style={styles.navLinkStrong}>MyPage</a>
+        </nav>
+      </div>
+    </header>
+  )
+}
+
+function SiteFooter() {
+  return (
+    <footer style={styles.footer}>
+      <div style={styles.footerInner}>
+        <span>© {new Date().getFullYear()} EVΛƎ Project</span>
+        <nav style={{ display: 'flex', gap: 16 }}>
+          <a href="/profile" style={styles.footerLink}>プロフィール</a>
+          <a href="/register" style={styles.footerLink}>登録</a>
+          <a href="/login/form" style={styles.footerLink}>ログイン</a>
+        </nav>
+      </div>
+    </footer>
+  )
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
@@ -13,11 +51,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <style>{globalCss}</style>
       </body>
     </html>
-  );
+  )
 }
-
-const HEADER_H = 64;   // ↑ 56→64 に
-const FOOTER_H = 64;
 
 const styles: Record<string, React.CSSProperties> = {
   body: {
@@ -45,11 +80,22 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  // ...
+  brand: { fontWeight: 800, letterSpacing: '.08em', textDecoration: 'none', color: '#fff' },
+  nav: { display: 'flex', gap: 14, alignItems: 'center', overflowX: 'auto' },
+  navLink: { color: '#cfe2ff', textDecoration: 'none', fontSize: 14, opacity: 0.9, whiteSpace: 'nowrap' },
+  navLinkStrong: {
+    color: '#fff',
+    textDecoration: 'none',
+    fontSize: 14,
+    padding: '6px 10px',
+    border: '1px solid rgba(255,255,255,.18)',
+    borderRadius: 9999,
+    background: 'rgba(255,255,255,.06)',
+    whiteSpace: 'nowrap',
+  },
   main: {
     minHeight: `calc(100dvh - ${HEADER_H}px - ${FOOTER_H}px)`,
     padding: `12px max(14px, env(safe-area-inset-left)) 20px`,
-    // ヘッダーの下に余白ライン
     borderTop: '1px solid rgba(255,255,255,.04)',
   },
   footer: {
@@ -70,11 +116,12 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     fontSize: 12,
-    opacity: .9,
+    opacity: 0.9,
   },
-};
+  footerLink: { color: '#cfe2ff', textDecoration: 'none' },
+}
+
 const globalCss = `
-  /* iOSのフォーム勝手ズーム防止 */
   input, select, button { font-size: 16px; }
   a { -webkit-tap-highlight-color: transparent; }
-`;
+`

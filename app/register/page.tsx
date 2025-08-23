@@ -39,8 +39,6 @@ export default function RegisterPage() {
     <main style={styles.page}>
       {/* CSSだけの背景（グラデ + オーラ + ノイズ） */}
       <div style={styles.bg} aria-hidden>
-        <div style={styles.auraMain} />
-        <div style={styles.auraSide} />
         <div style={styles.noise} />
       </div>
 
@@ -158,8 +156,7 @@ const styles: Record<string, CSSProperties> = {
     inset: 0,
     zIndex: 0,
     pointerEvents: 'none',
-    background:
-      'radial-gradient(60% 45% at 50% 65%, #0a1a2b 0%, #000 70%)', // ベース
+    background: 'radial-gradient(60% 45% at 50% 65%, #0b1522 0%, #000 72%)',
   },
   auraMain: {
     position: 'absolute',

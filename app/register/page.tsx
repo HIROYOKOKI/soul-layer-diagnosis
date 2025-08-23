@@ -24,7 +24,12 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       const supabase = await getBrowserSupabase()
-      const { error } = await supabase.auth.signUp({ email, password })
+     const { error } = await supabase.auth.signUp({
+  email,
+  password,
+  options: { emailRedirectTo: `${location.origin}/mypage` } // ← 追加
+})
+
       if (error) throw error
       setDone(true)
     } catch (err: unknown) {

@@ -1,5 +1,7 @@
-'use client';
+'use client'
+import { useState } from 'react'
 
-export default function Page() {
-  return <div style={{padding:24}}>REGISTER OK</div>;
+export default function RegisterPage() {
+  const [email, setEmail] = useState('')
+  return <div>REGISTER OK — {email}</div>
 }

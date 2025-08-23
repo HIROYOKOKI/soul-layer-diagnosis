@@ -1,5 +1,5 @@
+// app/register/page.tsx
 'use client'
-
-export default function RegisterPage() {
+export default function Page() {
   return <div style={{padding:24}}>REGISTER OK</div>;
 }

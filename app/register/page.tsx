@@ -201,3 +201,4 @@ const styles: Record<string, CSSProperties> = {
   small: { margin:0, fontSize:12, opacity:.8 },
   errorText: { color:'#ff7a7a', margin:0 },
 }
+}

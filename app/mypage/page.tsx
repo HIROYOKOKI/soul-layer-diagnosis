@@ -5,156 +5,36 @@ import { getBrowserSupabase } from '@/lib/supabase-browser'
 
 async function testInsertDaily() {
   const supabase = await getBrowserSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return console.error('not signed in')
+  const { data: { user }, error: userErr } = await supabase.auth.getUser()
+  if (userErr || !user) {
+    console.error('not signed in', userErr)
+    return
+  }
 
   const { error } = await supabase.from('daily_results').insert({
-    user_id: user.id,
-    theme: 'work',
+    user_id: user.id,                          // uuid
+    theme: 'work',                             // 'work' | 'love' | 'future' | 'self'
     choice: 'E',
     structure_score: { E: 1, V: 0, Λ: 0, Ǝ: 0 },
     comment: 'RLS test',
     advice: '静かに前進',
   })
-  console.log('insert error:', error)
+  console.log('insert error:', error)          // ← ここが null なら成功
 }
 
 export default function MyPage() {
-  const router = useRouter()
-  const [user, setUser] = useState<UserLite | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  // 認証チェック（未ログインは /login/form へ）
   useEffect(() => {
-    (async () => {
-      try {
-        const supabase = await getBrowserSupabase()
-        const { data, error } = await supabase.auth.getUser()
-        if (error) throw error
-        if (!data.user) {
-          router.replace('/login/form')
-          return
-        }
-        setUser({ email: data.user.email })
-      } catch (e) {
-        setError('認証状態の取得に失敗しました')
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [router])
-
-  const handleSignOut = async () => {
-    try {
-      const supabase = await getBrowserSupabase()
-      await supabase.auth.signOut()
-      router.replace('/login')
-    } catch {
-      // 表示は控えめに
-      alert('サインアウトに失敗しました。時間をおいて再試行してください。')
-    }
-  }
-
-  if (loading) {
-    return (
-      <main style={styles.page}>
-        <div style={styles.center}>
-          <div style={styles.spinner} />
-          <p style={{ opacity: .7, marginTop: 12 }}>読み込み中…</p>
-        </div>
-      </main>
-    )
-  }
-  if (error) {
-    return (
-      <main style={styles.page}>
-        <div style={styles.center}>
-          <p style={{ color: '#ff7a7a', margin: 0 }}>{error}</p>
-          <a href="/login/form" style={styles.linkBtn}>ログインへ戻る</a>
-        </div>
-      </main>
-    )
-  }
+    void testInsertDaily()
+  }, [])
 
   return (
-    <main style={styles.page}>
-      {/* 背景（CSSのみ） */}
-      <div style={styles.bg} aria-hidden>
-        <div style={styles.auraMain} />
-        <div style={styles.noise} />
-      </div>
-
-      <section style={styles.container}>
-        {/* ヘッダー */}
-        <header style={styles.header}>
-          <div>
-            <h1 style={styles.h1}>マイページ</h1>
-            <p style={styles.sub}>{user?.email ?? 'ゲスト'} さん、ようこそ</p>
-          </div>
-          <button onClick={handleSignOut} style={styles.signoutBtn}>サインアウト</button>
-        </header>
-
-        {/* クイックアクション */}
-        <div style={styles.quickGrid}>
-          <a href="/daily" style={styles.quickCard}>
-            <div style={styles.quickBadge}>今日</div>
-            <h3 style={styles.quickTitle}>Daily 診断</h3>
-            <p style={styles.quickDesc}>今日の1問・気軽に観測</p>
-          </a>
-
-          <a href="/weekly" style={styles.quickCard}>
-            <div style={styles.quickBadge}>週次</div>
-            <h3 style={styles.quickTitle}>Weekly 診断</h3>
-            <p style={styles.quickDesc}>6問で今週の傾向を把握</p>
-          </a>
-
-          <a href="/monthly" style={styles.quickCard}>
-            <div style={styles.quickBadge}>月次</div>
-            <h3 style={styles.quickTitle}>Monthly 診断</h3>
-            <p style={styles.quickDesc}>12問で深く観測する</p>
-          </a>
-        </div>
-
-        {/* 2カラム：最近の診断 / プロフィール進捗 */}
-        <div style={styles.twoCol}>
-          <section style={styles.panel}>
-            <h2 style={styles.h2}>最近の診断</h2>
-            {/* ← 実データ接続前のダミー */}
-            <ul style={styles.list}>
-              <li style={styles.listItem}>
-                <span>Daily</span>
-                <span style={styles.listMeta}>2025-08-23</span>
-              </li>
-              <li style={styles.listItem}>
-                <span>Weekly</span>
-                <span style={styles.listMeta}>2025-08-19</span>
-              </li>
-              <li style={styles.listItem}>
-                <span>Monthly</span>
-                <span style={styles.listMeta}>2025-08-01</span>
-              </li>
-            </ul>
-            <a href="/log" style={styles.linkBtn}>履歴をすべて見る</a>
-          </section>
-
-          <section style={styles.panel}>
-            <h2 style={styles.h2}>プロフィール進捗</h2>
-            <div style={styles.progressWrap}>
-              <div style={styles.progressBar}><div style={{ ...styles.progressFill, width: '60%' }} /></div>
-              <p style={styles.small}>60% 完了（基本情報 + 構造診断）</p>
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <a href="/profile" style={styles.smallBtn}>基本プロフィール</a>
-              <a href="/structure" style={styles.smallBtn}>構造診断</a>
-              <a href="/theme" style={styles.smallBtn}>テーマ設定</a>
-            </div>
-          </section>
-        </div>
-      </section>
+    <main style={{ padding: 20 }}>
+      <h1>マイページ（テスト中）</h1>
+      <p>コンソールに <code>insert error: null</code> が出ればOKです。</p>
     </main>
   )
 }
+
 
 /* ===== styles ===== */
 const styles: Record<string, CSSProperties> = {

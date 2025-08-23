@@ -10,7 +10,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SiteHeader />
         <main style={styles.main}>{children}</main>
         <SiteFooter />
-        {/* グローバル最小CSS */}
         <style>{globalCss}</style>
       </body>
     </html>
@@ -23,11 +22,11 @@ function SiteHeader() {
       <div style={styles.headerInner}>
         <Link href="/" style={styles.brand}>EVΛƎ</Link>
         <nav style={styles.nav}>
-          <a href="/" style={styles.navLink}>Home</a>
-          <a href="/daily" style={styles.navLink}>Daily</a>
-          <a href="/weekly" style={styles.navLink}>Weekly</a>
-          <a href="/monthly" style={styles.navLink}>Monthly</a>
-          <a href="/mypage" style={styles.navLinkStrong}>MyPage</a>
+          <Link href="/" style={styles.navLink}>Home</Link>
+          <Link href="/daily" style={styles.navLink}>Daily</Link>
+          <Link href="/weekly" style={styles.navLink}>Weekly</Link>
+          <Link href="/monthly" style={styles.navLink}>Monthly</Link>
+          <Link href="/mypage" style={styles.navLinkStrong}>MyPage</Link>
         </nav>
       </div>
     </header>
@@ -39,10 +38,12 @@ function SiteFooter() {
     <footer style={styles.footer}>
       <div style={styles.footerInner}>
         <span>© {new Date().getFullYear()} EVΛƎ Project</span>
-        <nav style={{display:'flex',gap:16}}>
-          <a href="/profile" style={styles.footerLink}>プロフィール</a>
-          <a href="/register" style={styles.footerLink}>登録</a>
-          <a href="/login/form" style={styles.footerLink}>ログイン</a>
+        <nav style={{ display: 'flex', gap: 16 }}>
+          <Link href="/profile" style={styles.footerLink}>プロフィール</Link>
+          <Link href="/register" style={styles.footerLink}>登録</Link>
+          <Link href="/login/form" style={styles.footerLink}>ログイン</Link>
+          {/* 外部リンクは <a> のままでOK（例） */}
+          {/* <a href="https://x.com/..." target="_blank" rel="noreferrer" style={styles.footerLink}>X</a> */}
         </nav>
       </div>
     </footer>
@@ -57,8 +58,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#fff',
     fontFamily:
       '-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,Apple Color Emoji,Segoe UI Emoji',
-    // 安全領域
-  } as React.CSSProperties,
+  },
   header: {
     position: 'sticky',
     top: 0,
@@ -89,10 +89,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 9999,
     background: 'rgba(255,255,255,.06)',
   },
-  main: {
-    minHeight: 'calc(100dvh - 56px - 56px)', // header & footer を引く
-    padding: '20px max(14px, env(safe-area-inset-left))',
-  },
+  main: { minHeight: 'calc(100dvh - 56px - 56px)', padding: '20px max(14px, env(safe-area-inset-left))' },
   footer: {
     position: 'sticky',
     bottom: 0,
@@ -117,8 +114,6 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 const globalCss = `
-  /* iOSのフォーム拡大防止（フォント16px以上） */
   input, select, button { font-size: 16px; }
-  /* リンクのタップ範囲 */
   a { -webkit-tap-highlight-color: transparent; }
 `;

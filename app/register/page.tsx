@@ -39,10 +39,11 @@ export default function RegisterPage() {
   return (
     <main style={styles.page}>
       {/* 背景（全面固定 + 暗幕） */}
-      <div style={styles.bgStack} aria-hidden>
-        <img src="/login-still.png" alt="" aria-hidden style={styles.bgMedia} />
-        <div style={styles.bgOverlay} />
-      </div>
+     <div style={styles.bgStack} aria-hidden>
+  <img src="/login-still.png" alt="" aria-hidden style={styles.bgMedia} />
+  <div style={styles.bgOverlay} />
+  <div style={styles.bgTopMask} />   {/* ← 追加：上部を確実に隠す */}
+</div>
 
       {/* 中央カード */}
       <section style={styles.card} aria-live="polite">
@@ -121,39 +122,39 @@ function humanizeAuthError(msg: string): string {
 /* ===== styles ===== */
 const styles: Record<string, CSSProperties> = {
   page: {
-    position:'relative',
-    minHeight:'100dvh',
-    display:'grid',           // ← 中央寄せ
-    placeItems:'center',      // ← 中央寄せ
-    background:'#000',
-    color:'#fff',
-    overflow:'hidden',
-  },
-
-  // 背景スタック
-  bgStack: {
-    position:'fixed',
-    inset:0,
-    zIndex:0,
-    pointerEvents:'none',
+    bgStack: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 0,
+    pointerEvents: 'none',
   },
   bgMedia: {
-  position: 'absolute',
-  inset: 0,
-  width: '100%',
-  height: '100%',
-  objectFit: 'cover',
-  objectPosition: 'center 78%', // 数字は 75–82% で好みに調整
-  transform: 'translateZ(0)',
-  willChange: 'transform',
-},
-
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    objectPosition: 'center 82%',    // ← さらに下寄せ（75–85%で微調整OK）
+    transform: 'translateZ(0)',
+    willChange: 'transform',
+  },
+  // うっすら暗幕（全体の読みやすさ）
   bgOverlay: {
-    position:'absolute',
-    inset:0,
+    position: 'absolute',
+    inset: 0,
     background:
-    'linear-gradient(180deg, rgba(0,0,0,.85) 0%, rgba(0,0,0,.55) 14%, rgba(0,0,0,.30) 42%, rgba(0,0,0,.38) 100%)',
-},
+      'linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,.25) 40%, rgba(0,0,0,.45) 100%)',
+  },
+  // ★ 追加：上部を“完全に”覆う黒マスク（タイトルを消す）
+  bgTopMask: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: '20vh',                 // ← 足りなければ 24vh / 28vh に上げる
+    background:
+      'linear-gradient(180deg, rgba(0,0,0,.95) 0%, rgba(0,0,0,.85) 60%, rgba(0,0,0,0) 100%)',
+  },
 
   // カード（中央固定）
   card: {

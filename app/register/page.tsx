@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-// まずは相対パスで安定化（後で '@/lib/...' に戻す）
 import { getBrowserSupabase } from '../../lib/supabase-browser';
 
 export default function RegisterPage() {
@@ -25,8 +24,12 @@ export default function RegisterPage() {
       });
       if (error) setError(error.message);
       else alert('確認メールを送信しました。受信箱をご確認ください。');
-    } catch (err: any) {
-      setError(err?.message ?? '予期せぬエラーが発生しました');
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message :
+        typeof err === 'string' ? err :
+        '予期せぬエラーが発生しました';
+      setError(msg);
     } finally {
       setLoading(false);
     }

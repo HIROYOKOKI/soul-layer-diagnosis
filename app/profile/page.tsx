@@ -16,14 +16,14 @@ export default function ProfilePage() {
   };
 
   return (
-    <div style={S.wrap}>
+    <div className="profile-page" style={S.wrap}>
       {/* ヘッダーにEVΛƎロゴ */}
       <header style={S.header}>
         <img src="/evae-logo.svg" alt="EVΛƎ" style={S.logoHeader}/>
       </header>
 
       {/* プロフィールカード */}
-      <div style={S.card}>
+      <div className="card" style={S.card}>
         <h1 style={S.title}>PROFILE</h1>
 
         <form onSubmit={handleSubmit} style={S.form}>
@@ -88,7 +88,7 @@ export default function ProfilePage() {
         <img src="/soul-layer-diagnosis.svg" alt="Soul Layer Diagnosis" style={S.logoFooter}/>
       </footer>
 
-      {/* iOSフォーム対策（念押しのグローバル強制） */}
+      {/* iOSフォーム対策（念押しのグローバル強制）＋ モバイル専用パディング */}
       <style jsx global>{`
         input, select, button, textarea {
           font-size: 16px !important;
@@ -96,6 +96,9 @@ export default function ProfilePage() {
         }
         @supports (-webkit-touch-callout: none) {
           select { font-size: 17px !important; }
+        }
+        @media (max-width: 390px) {
+          .profile-page .card { padding: 28px 18px !important; }
         }
       `}</style>
     </div>
@@ -146,7 +149,7 @@ const S: Record<string, CSSProperties> = {
   label: {
     fontSize: 12,
     letterSpacing: '.1em',
-    marginBottom: 4,
+    marginBottom: 6, // ← 指定どおり「6」に変更
     color: '#6bf',
   },
   input: {
@@ -157,8 +160,7 @@ const S: Record<string, CSSProperties> = {
     color: '#fff',
     outline: 'none',
     transition: 'all .2s ease',
-    // ここがiOS対策のキモ
-    fontSize: 16,
+    fontSize: 16,           // iOSで小さくならない
     lineHeight: 1.4,
     WebkitTextSizeAdjust: '100%',
   },

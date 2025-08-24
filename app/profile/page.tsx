@@ -3,13 +3,22 @@
 
 import { useState, type FormEvent, type CSSProperties } from 'react'
 
+"use client";
+
+// 関数の外に置く（OK）
 const glow = '0 0 12px rgba(0,180,255,.8), 0 0 24px rgba(150,0,255,.6)';
 
 export default function ProfilePage() {
   return (
-    <div>テスト表示</div>
+    <div>
+      テスト表示
+    </div>
   );
 }
+
+/* ===== styles ===== */
+// ここにスタイル系コメントや定数を書いてもOK
+
   return (
     <div style={{ ...S.wrap, outline: '2px dashed #0af', outlineOffset: 8 }} data-build="v-1040">
       {/* ページ内ヘッダー（EVΛƎ） */}

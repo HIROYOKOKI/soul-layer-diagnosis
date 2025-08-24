@@ -14,7 +14,7 @@ export default function ProfilePage() {
       テスト表示
     </div>
   );
-}
+
 
 /* ===== styles ===== */
 // ここにスタイル系コメントや定数を書いてもOK

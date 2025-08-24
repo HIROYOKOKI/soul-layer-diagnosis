@@ -64,13 +64,13 @@ export default function ProfilePage() {
       </section>
 
       {/* ページ内フッター（SOUL LAYER DIAGNOSIS） */}
-      <footer style={S.footer}>
-        <img
-          src="/soul-layer-diagnosis.svg?v=2"  // ← キャッシュ回避
-          alt="Soul Layer Diagnosis"
-          style={S.logoFooter}
-        />
-      </footer>
+     <footer style={S.footer}>
+  <img
+    src="/soul-layer-diagnosis.v2.svg"
+    alt="Soul Layer Diagnosis"
+    style={S.logoFooter}
+  />
+</footer>
     </div>
   )
 }

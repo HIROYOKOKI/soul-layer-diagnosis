@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, type FormEvent, type CSSProperties } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function ProfilePage() {
   const [name, setName] = useState('');
@@ -9,10 +10,18 @@ export default function ProfilePage() {
   const [blood, setBlood] = useState('A');
   const [gender, setGender] = useState('Other');
   const [preference, setPreference] = useState('Unset');
+  const router = useRouter();
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleConfirm = (e: FormEvent) => {
     e.preventDefault();
-    alert('保存しました！');
+    const q = new URLSearchParams({
+      name,
+      birthday,
+      blood,
+      gender,
+      preference,
+    }).toString();
+    router.push(`/profile/confirm?${q}`);
   };
 
   return (
@@ -26,7 +35,7 @@ export default function ProfilePage() {
       <div className="card" style={S.card}>
         <h1 style={S.title}>PROFILE</h1>
 
-        <form onSubmit={handleSubmit} style={S.form}>
+        <form onSubmit={handleConfirm} style={S.form}>
           {/* NAME：1カラム */}
           <div className="row one">
             <div className="col">
@@ -35,6 +44,7 @@ export default function ProfilePage() {
                 style={S.input}
                 value={name}
                 onChange={(e)=>setName(e.target.value)}
+                placeholder="Your name"
               />
             </div>
           </div>
@@ -96,7 +106,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <button type="submit" style={S.button}>SAVE</button>
+          <button type="submit" style={S.button}>確認</button>
         </form>
       </div>
 
@@ -105,40 +115,35 @@ export default function ProfilePage() {
         <img src="/soul-layer-diagnosis.svg" alt="Soul Layer Diagnosis" style={S.logoFooter}/>
       </footer>
 
-      {/* iOSフォーム対策＋レイアウトCSS */}
-     <style jsx global>{`
-  /* iOSフォーム対策（フォントサイズを16px以上に固定） */
-  input, select, button, textarea {
-    font-size: 16px !important;
-    line-height: 1.4 !important;
-  }
-  @supports (-webkit-touch-callout: none) {
-    select { font-size: 17px !important; }
-  }
+      {/* iOSフォーム対策＋レイアウトCSS（※1ブロックだけ） */}
+      <style jsx global>{`
+        /* iOSフォーム対策（フォントサイズを16px以上に固定） */
+        input, select, button, textarea {
+          font-size: 16px !important;
+          line-height: 1.4 !important;
+        }
+        @supports (-webkit-touch-callout: none) {
+          select { font-size: 17px !important; }
+        }
 
-  /* ベンダー外観のリセットはCSS側で（TSの型エラー回避） */
-  input[type="date"], select {
-    -webkit-appearance: none;
-    appearance: none;
-  }
+        /* ベンダー外観のリセットはCSS側で（TS型エラー回避） */
+        input[type="date"], select { -webkit-appearance: none; appearance: none; }
 
-  /* レスポンシブ行レイアウト */
-  .row { display: grid; grid-template-columns: 1fr; row-gap: 12px; }
-  .row.two { grid-template-columns: 1fr; column-gap: 16px; }
-  .col { display: flex; flex-direction: column; }
+        /* レスポンシブ行レイアウト */
+        .row { display: grid; grid-template-columns: 1fr; row-gap: 12px; }
+        .row.two { grid-template-columns: 1fr; column-gap: 16px; }
+        .col { display: flex; flex-direction: column; }
 
-  /* 幅520px以上で2カラム化 */
-  @media (min-width: 520px) {
-    .row.two { grid-template-columns: 1fr 1fr; }
-  }
+        /* 幅520px以上で2カラム化 */
+        @media (min-width: 520px) {
+          .row.two { grid-template-columns: 1fr 1fr; }
+        }
 
-  /* スマホ幅でカード左右を少し詰める */
-  @media (max-width: 430px) {
-    .profile-page .card { padding: 28px 18px !important; }
-  }
-`}</style>
-
-
+        /* スマホ幅でカード左右を少し詰める */
+        @media (max-width: 430px) {
+          .profile-page .card { padding: 28px 18px !important; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -167,7 +172,7 @@ const S: Record<string, CSSProperties> = {
     filter: 'drop-shadow(0 0 10px rgba(0,180,255,.6))',
   },
   card: {
-    width: 'min(520px, 92vw)',          // ← 520px基準に少し広げると2カラムが安定
+    width: 'min(520px, 92vw)',
     padding: '32px 24px',
     borderRadius: 20,
     background: 'rgba(10,12,20,.65)',
@@ -183,15 +188,15 @@ const S: Record<string, CSSProperties> = {
     color: '#6bf',
     textShadow: glow,
   },
-  form: { display: 'grid', gap: 14 },   // ← 16→14でタイトに
+  form: { display: 'grid', gap: 14 },
   label: {
     fontSize: 12,
     letterSpacing: '.1em',
-    marginBottom: 6,                    // ← ご希望どおり
+    marginBottom: 6,
     color: '#6bf',
   },
   input: {
-    minHeight: 56,                       // ← ボタンと高さを揃える
+    minHeight: 56,
     padding: '12px 14px',
     borderRadius: 12,
     border: '1px solid rgba(120,160,255,.3)',

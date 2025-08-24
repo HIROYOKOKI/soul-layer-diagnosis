@@ -98,14 +98,18 @@ const S: Record<string, CSSProperties> = {
     textShadow: glow,
   },
   form: { display: 'grid', gap: 16 },
-  label: {
-    fontSize: 12,
-    letterSpacing: '.1em',
-    marginBottom: 4,
+    label: {
+    fontSize: 14,              // 12 → 14
+    letterSpacing: '.08em',
+    marginBottom: 6,
     color: '#6bf',
   },
+
   input: {
-    padding: '12px 14px',
+    width: '100%',
+    minHeight: 52,             // 44 → 52（タップしやすく）
+    fontSize: 16,              // iOS拡大防止＆可読性
+    padding: '14px 16px',
     borderRadius: 12,
     border: '1px solid rgba(120,160,255,.3)',
     background: 'rgba(0,0,0,.6)',
@@ -113,9 +117,11 @@ const S: Record<string, CSSProperties> = {
     outline: 'none',
     transition: 'all .2s ease',
   },
+
   button: {
-    marginTop: 12,
-    padding: '14px 20px',
+    height: 56,                // SAVEボタンも高さUP
+    fontSize: 16,
+    padding: '0 20px',
     borderRadius: 9999,
     border: '1px solid rgba(80,150,255,.4)',
     background: 'linear-gradient(90deg,#0af,#a0f)',
@@ -125,15 +131,17 @@ const S: Record<string, CSSProperties> = {
     boxShadow: glow,
     textTransform: 'uppercase',
   },
- logoFooter: {
-  height: 48,                  // ← 大きめに
-  opacity: .9,
-  filter: 'drop-shadow(0 0 12px rgba(0,180,255,.6))',
-},
-footer: {
-  padding: '24px 0 32px',      // ← 余白を増やしてロゴが呼吸できるスペースを確保
-  display: 'flex',
-  justifyContent: 'center',
-},
+
+  footer: {
+    padding: '28px 0 36px',    // 余白広めに
+    display: 'flex',
+    justifyContent: 'center',
+  },
+  logoFooter: {
+    width: 180,                // 横幅基準で統一（見やすいサイズ）
+    height: 'auto',            // 縦横比を維持
+    opacity: .9,
+    filter: 'drop-shadow(0 0 12px rgba(0,180,255,.6))',
+  },
 
 }

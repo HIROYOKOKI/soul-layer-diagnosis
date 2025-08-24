@@ -3,18 +3,13 @@
 
 import { useState, type FormEvent, type CSSProperties } from 'react'
 
-export default function ProfilePage() {
-  const [name, setName] = useState('')
-  const [birthday, setBirthday] = useState('')
-  const [blood, setBlood] = useState('A')
-  const [gender, setGender] = useState('Other')
-  const [preference, setPreference] = useState('Unset')
-
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault()
-    alert('保存しました！')
-  }
-
+export default function Example() {
+  return (
+    <div>
+      テスト表示
+    </div>
+  );
+}
   return (
     <div style={{ ...S.wrap, outline: '2px dashed #0af', outlineOffset: 8 }} data-build="v-1040">
       {/* ページ内ヘッダー（EVΛƎ） */}

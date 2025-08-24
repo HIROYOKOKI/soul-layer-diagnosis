@@ -36,14 +36,15 @@ export default function ProfilePage() {
 
       {/* フッター（SVGロゴ） */}
       <footer style={S.footer}>
-        <img
-          src="/soul-layer-diagnosis.v2.svg?v=20250824"
-          alt="Soul Layer Diagnosis"
-          style={S.logoFooter}
-        />
-      </footer>
+  <img
+    src="/soul-layer-diagnosis.v2.svg?v=20250824k"  // ← ここを最新に
+    alt="Soul Layer Diagnosis"
+    style={S.logoFooter}
+  />
+</footer>
 
-      {/* iOSフォーム対策 */}
+
+    　{/* iOSフォーム対策 */}
       <style jsx global>{`
         input, select, button { font-size:16px !important; line-height:1.4 !important; }
         @supports (-webkit-touch-callout: none) { select { font-size:17px !important; } }
@@ -92,5 +93,8 @@ const S: Record<string, CSSProperties> = {
     cursor: "pointer",
   },
   footer: { padding: "24px 0 36px", display: "flex", justifyContent: "center" },
-  logoFooter: { width: 220, height: "auto", filter: "drop-shadow(0 0 12px rgba(0,180,255,.6))" },
-};
+  logoFooter: {
+  width: 220,
+  height: "auto",
+  filter: "drop-shadow(0 0 12px rgba(0,180,255,.6))", // ← 半角ハイフン
+},

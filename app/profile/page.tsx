@@ -35,13 +35,17 @@ export default function ProfilePage() {
       </div>
 
       {/* フッター（SVGロゴ） */}
-      <footer style={S.footer}>
+     <footer style={S.footer}>
   <img
-    src="/soul-layer-diagnosis.v2.svg?v=20250824k"  // ← ここを最新に
+    src="/soul-layer-diagnosis.v2.svg?v=20250824l"
     alt="Soul Layer Diagnosis"
     style={S.logoFooter}
+    onError={(e) => {
+      e.currentTarget.src = "/soul-layer-diagnosis.v2.png?v=1"; // SVG失敗時にPNGに切替
+    }}
   />
 </footer>
+
 
 
     　{/* iOSフォーム対策 */}

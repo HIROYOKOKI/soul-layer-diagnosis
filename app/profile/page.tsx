@@ -92,9 +92,6 @@ const S: Record<string, CSSProperties> = {
     boxShadow: `0 0 0 1px rgba(120,140,200,.15), ${glow}`,
     cursor: "pointer",
   },
-  footer: { padding: "24px 0 36px", display: "flex", justifyContent: "center" },
-  logoFooter: {
-  width: 220,
-  height: "auto",
-  filter: "drop-shadow(0 0 12px rgba(0,180,255,.6))", // ← 半角ハイフン
-},
+ footer: { padding: "24px 0 36px", display: "flex", justifyContent: "center" },
+  logoFooter: { width: 220, height: "auto", filter: "drop-shadow(0 0 12px rgba(0,180,255,.6))" },
+}; 

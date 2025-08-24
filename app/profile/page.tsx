@@ -106,8 +106,8 @@ export default function ProfilePage() {
       </footer>
 
       {/* iOSフォーム対策＋レイアウトCSS */}
-      <style jsx global>{`
-        <style jsx global>{`
+     <style jsx global>{`
+  /* iOSフォーム対策（フォントサイズを16px以上に固定） */
   input, select, button, textarea {
     font-size: 16px !important;
     line-height: 1.4 !important;
@@ -116,24 +116,28 @@ export default function ProfilePage() {
     select { font-size: 17px !important; }
   }
 
-  /* === 追加: 外観リセット（型エラー回避のためCSS側で） === */
+  /* ベンダー外観のリセットはCSS側で（TSの型エラー回避） */
   input[type="date"], select {
     -webkit-appearance: none;
     appearance: none;
   }
 
-  /* グリッド行レイアウト */
+  /* レスポンシブ行レイアウト */
   .row { display: grid; grid-template-columns: 1fr; row-gap: 12px; }
   .row.two { grid-template-columns: 1fr; column-gap: 16px; }
   .col { display: flex; flex-direction: column; }
 
+  /* 幅520px以上で2カラム化 */
   @media (min-width: 520px) {
     .row.two { grid-template-columns: 1fr 1fr; }
   }
+
+  /* スマホ幅でカード左右を少し詰める */
   @media (max-width: 430px) {
     .profile-page .card { padding: 28px 18px !important; }
   }
 `}</style>
+
 
     </div>
   );

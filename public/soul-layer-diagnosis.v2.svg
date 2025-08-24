@@ -1,3 +1,12 @@
+<!-- 例：先頭付近をこう直す -->
+<svg xmlns="http://www.w3.org/2000/svg"
+     version="1.1"
+     viewBox="0 0 1200 120"
+     fill="#e6f6ff">
+  <defs></defs>
+  <!-- 以降、path が class="st0" でも root の fill を継承して見えるようになる -->
+  ...
+</svg>
 <?xml version="1.0" encoding="UTF-8"?>
 <svg id="_レイヤー_1" data-name="レイヤー_1" xmlns="http://www.w3.org/2000/svg" xmlns:i="http://ns.adobe.com/AdobeIllustrator/10.0/" version="1.1" viewBox="0 0 1200 100">
   <!-- Generator: Adobe Illustrator 29.7.1, SVG Export Plug-In . SVG Version: 2.1.1 Build 8)  -->

@@ -15,7 +15,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div style={S.wrap}>
+   <div style={{ ...S.wrap, outline: '2px dashed #0af', outlineOffset: 8 }} data-build="v-1039" >
       {/* ヘッダーにEVΛƎロゴ */}
       <header style={S.header}>
         <img src="/evae-logo.svg" alt="EVΛƎ" style={S.logoHeader}/>

@@ -146,7 +146,10 @@ const S: Record<string, CSSProperties> = {
     color: "#e6f6ff",
     padding: "14px 16px",
     outline: "none",
-  },
+  fontSize: 16,
+  lineHeight: 1.4,
+  WebkitTextSizeAdjust: "100%", // iOSで勝手に縮小されないように
+},
   button: {
     height: 56,
     borderRadius: 28,

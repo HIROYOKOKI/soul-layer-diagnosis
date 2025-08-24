@@ -125,10 +125,15 @@ const S: Record<string, CSSProperties> = {
     boxShadow: glow,
     textTransform: 'uppercase',
   },
-  logoFooter: {
-  width: 180,      // 横幅を基準に
-  height: 'auto',  // アスペクト比維持
+ logoFooter: {
+  height: 48,                  // ← 大きめに
   opacity: .9,
   filter: 'drop-shadow(0 0 12px rgba(0,180,255,.6))',
 },
+footer: {
+  padding: '24px 0 32px',      // ← 余白を増やしてロゴが呼吸できるスペースを確保
+  display: 'flex',
+  justifyContent: 'center',
+},
+
 }

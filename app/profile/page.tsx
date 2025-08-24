@@ -107,27 +107,34 @@ export default function ProfilePage() {
 
       {/* iOSフォーム対策＋レイアウトCSS */}
       <style jsx global>{`
-        input, select, button, textarea {
-          font-size: 16px !important;
-          line-height: 1.4 !important;
-        }
-        @supports (-webkit-touch-callout: none) {
-          select { font-size: 17px !important; }
-        }
-        /* グリッド行 */
-        .row { display: grid; grid-template-columns: 1fr; row-gap: 12px; }
-        .row.two { grid-template-columns: 1fr; column-gap: 16px; }
-        .col { display: flex; flex-direction: column; }
+        <style jsx global>{`
+  input, select, button, textarea {
+    font-size: 16px !important;
+    line-height: 1.4 !important;
+  }
+  @supports (-webkit-touch-callout: none) {
+    select { font-size: 17px !important; }
+  }
 
-        /* 幅520px以上で2カラム化（タブレット/PC） */
-        @media (min-width: 520px) {
-          .row.two { grid-template-columns: 1fr 1fr; }
-        }
-        /* スマホ幅でカード左右を少し詰める */
-        @media (max-width: 430px) {
-          .profile-page .card { padding: 28px 18px !important; }
-        }
-      `}</style>
+  /* === 追加: 外観リセット（型エラー回避のためCSS側で） === */
+  input[type="date"], select {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  /* グリッド行レイアウト */
+  .row { display: grid; grid-template-columns: 1fr; row-gap: 12px; }
+  .row.two { grid-template-columns: 1fr; column-gap: 16px; }
+  .col { display: flex; flex-direction: column; }
+
+  @media (min-width: 520px) {
+    .row.two { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 430px) {
+    .profile-page .card { padding: 28px 18px !important; }
+  }
+`}</style>
+
     </div>
   );
 }
@@ -191,8 +198,6 @@ const S: Record<string, CSSProperties> = {
     fontSize: 16,
     lineHeight: 1.4,
     WebkitTextSizeAdjust: '100%',
-    WebkitAppearance: 'none' as any,     // iOSのデフォルト外観を抑える
-    appearance: 'none' as any,
   },
   button: {
     marginTop: 12,

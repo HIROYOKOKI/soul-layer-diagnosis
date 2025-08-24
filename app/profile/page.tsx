@@ -125,14 +125,10 @@ const S: Record<string, CSSProperties> = {
     boxShadow: glow,
     textTransform: 'uppercase',
   },
-  footer: {
-    padding: '14px 0 20px',
-    display: 'flex',
-    justifyContent: 'center',
-  },
   logoFooter: {
-    height: 20,
-    opacity: .85,
-    filter: 'drop-shadow(0 0 6px rgba(0,180,255,.4))',
-  },
+  width: 180,      // 横幅を基準に
+  height: 'auto',  // アスペクト比維持
+  opacity: .9,
+  filter: 'drop-shadow(0 0 12px rgba(0,180,255,.6))',
+},
 }

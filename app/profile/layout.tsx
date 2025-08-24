@@ -2,6 +2,14 @@
 
 import { useState, type FormEvent, type CSSProperties } from 'react'
 
+export default function Example() {
+  return (
+    <div>
+      テスト表示
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const [name, setName] = useState('')
   const [birthday, setBirthday] = useState('')

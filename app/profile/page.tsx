@@ -3,11 +3,11 @@
 
 import { useState, type FormEvent, type CSSProperties } from 'react'
 
-export default function Example() {
+const glow = '0 0 12px rgba(0,180,255,.8), 0 0 24px rgba(150,0,255,.6)';
+
+export default function ProfilePage() {
   return (
-    <div>
-      テスト表示
-    </div>
+    <div>テスト表示</div>
   );
 }
   return (

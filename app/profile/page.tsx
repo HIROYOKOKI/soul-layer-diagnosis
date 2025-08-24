@@ -1,5 +1,7 @@
 // app/profile/page.tsx
 'use client'
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 import { useState, type FormEvent, type CSSProperties } from 'react'
 

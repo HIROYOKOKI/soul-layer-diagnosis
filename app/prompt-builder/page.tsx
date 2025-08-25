@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import ModeSwitcher from "@/components/ModeSwitcher";
 
 /**
  * Universal Prompt Builder — Blog専用（単独ページ）
@@ -141,6 +142,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
             </div>
             <span className="text-xs text-white/50">v1.2</span>
           </header>
+          <ModeSwitcher />
 
           {/* 基本情報（カード化） */}
           <section className="rounded-2xl bg-[var(--panel)] border border-[var(--border)] shadow-lg p-5 md:p-6">

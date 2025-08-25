@@ -1,0 +1,27 @@
+/* app/globals.css */
+
+/* === Tailwind Core === */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === iOS/Safari のデフォルトUIを抑える軽リセット === */
+html, body { height: 100%; }
+button, input, textarea, select {
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+  border-radius: 0;
+  color: inherit;
+  font: inherit;
+}
+a { color: inherit; text-decoration: none; }
+
+/* スクロール（任意） */
+html { scroll-behavior: smooth; }
+
+/* ベース配色（保険。layout.tsxのclassが優先されます） */
+body { background-color: #000; color: #fff; }
+
+/* 文字レンダリング */
+* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }

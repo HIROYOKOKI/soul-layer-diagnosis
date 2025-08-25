@@ -77,7 +77,7 @@ export default function SaveTheCatPromptBuilder() {
 
     // Save the Cat 15ビートの骨子を明示したプロンプト
     const p = `
-あなたは「Save the Cat!」のビートシートを用いる編集者AIです。以下の条件で「短編プロット」と「本文」を生成してください。EVΛƎコード等の特殊理論は使わず、一般的なナラティブで構いません。
+あなたはSave the Cat!のビートシートを用いる編集者AIです。以下の条件で「短編プロット」と「本文」を生成してください。EVΛƎコード等の特殊理論は使わず、一般的なナラティブで構いません。
 
 # 作品タイトル
 「${title}」
@@ -113,7 +113,7 @@ ${characters || '（該当なしの場合は主人公の内面を掘り下げる
 5) Debate（進むべきか葛藤）
 6) Break into Two（第二幕へ。能動的選択）
 7) B Story（対話/関係性のサブライン）
-8) Fun and Games（企てと試行。ジャンルの“楽しさ”）
+8) Fun and Games（企てと試行。ジャンルの楽しさ）
 9) Midpoint（偽りの勝利/敗北 or 真の啓示）
 10) Bad Guys Close In（内外からの圧力の高まり）
 11) All Is Lost（どん底/象徴的喪失）
@@ -137,7 +137,7 @@ ${characters || '（該当なしの場合は主人公の内面を掘り下げる
 
     // ブログ版はSTCの骨子を「読者の旅路」に転用
     const p = `
-あなたはSEOとストーリーテリングに長けた編集者AIです。以下の条件で「構成案（見出し）」と「本文ドラフト」を作成してください。Save the Catの15ビートを「読者の学習ジャーニー」に転用し、流れを生みます。
+あなたはSEOとストーリーテリングに長けた編集者AIです。以下の条件で「構成案（見出し）」と「本文ドラフト」を作成してください。Save the Catの15ビートを読者の学習ジャーニーに転用し、流れを生みます。
 
 # 記事タイトル
 「${title}」
@@ -149,7 +149,7 @@ ${genre}
 ${baseReader}
 
 # 検索意図（課題/期待）
-${searchIntent || '最短で“使える”知識と手順を把握したい'}
+${searchIntent || '最短で使える知識と手順を把握したい'}
 
 # 主要キーワード
 ${keywords || '（必要に応じて選定）'}
@@ -297,7 +297,7 @@ ${platform || '自社ブログ/Note'}
             </div>
             <div className="mt-4">
               <Field label="重要人物（1行=1人）">
-                <Textarea value={characters} onChange={e=>setCharacters(e.target.value)} placeholder={'ノア：観測の相棒\n親友：実務的で支えてくれる'} />
+                <Textarea value={characters} onChange={e=>setCharacters(e.target.value)} placeholder={"ノア：観測の相棒\\n親友：実務的で支えてくれる"} />
               </Field>
             </div>
             <details className="mt-4 text-sm text-white/70">
@@ -305,78 +305,4 @@ ${platform || '自社ブログ/Note'}
               <ul className="list-disc pl-5 mt-2 space-y-1 text-white/70">
                 <li>Opening Image / Final Image が対比になっているか</li>
                 <li>Theme Stated が主人公の変化と結びつくか</li>
-                <li>Catalyst → Debate → Break into Two の能動性</li>
-                <li>Midpoint の"真実/偽り"を意識した転換</li>
-                <li>All Is Lost & Dark Night の感情の底</li>
-                <li>Finale で変化が行動で証明されているか</li>
-              </ul>
-            </details>
-          </section>
-        )}
-
-        {/* Blog */}
-        {mode === 'blog' && (
-          <section className="bg-white/5 border border-white/10 rounded-2xl p-5 md:p-6 shadow">
-            <h3 className="text-base md:text-lg font-semibold mb-3">ブログ：追加情報</h3>
-            <div className="grid md:grid-cols-2 gap-4">
-              <Field label="想定キーワード（,区切り）">
-                <Input value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="例：SEO, プロンプト, 初心者" />
-              </Field>
-              <Field label="掲載媒体 / プラットフォーム">
-                <Input value={platform} onChange={e=>setPlatform(e.target.value)} placeholder="例：Note / 自社ブログ / Medium" />
-              </Field>
-            </div>
-            <div className="mt-4">
-              <Field label="読者の検索意図">
-                <Input value={searchIntent} onChange={e=>setSearchIntent(e.target.value)} placeholder="例：最短で“使える”プロンプトが知りたい" />
-              </Field>
-            </div>
-            <details className="mt-4 text-sm text-white/70">
-              <summary className="cursor-pointer">STC適用のポイント（ブログ）</summary>
-              <ul className="list-disc pl-5 mt-2 space-y-1 text-white/70">
-                <li>Opening Image = 読者の現状描写で共感を先に</li>
-                <li>Theme Stated = 記事の主旨を早期に提示</li>
-                <li>Catalyst = “最初に知るべき核心” を1つ</li>
-                <li>Midpoint = 中間成果（小さな成功体験）を示す</li>
-                <li>Finale = チェックリスト/手順で着地</li>
-              </ul>
-            </details>
-          </section>
-        )}
-
-        {/* Actions */}
-        <div className="grid md:grid-cols-4 gap-3">
-          <button onClick={generate} className="rounded-2xl px-4 py-3 font-semibold bg-white text-black hover:opacity-90">プロンプト生成</button>
-          <button onClick={copyOut} className="rounded-2xl px-4 py-3 bg-white/10 hover:bg-white/15">コピー</button>
-          <button onClick={downloadTxt} className="rounded-2xl px-4 py-3 bg-white/10 hover:bg-white/15">.txtで保存</button>
-          <button onClick={resetAll} className="rounded-2xl px-4 py-3 bg-white/10 hover:bg-white/15">リセット</button>
-        </div>
-
-        {/* Output */}
-        <section className="bg-white/5 border border-white/10 rounded-2xl p-5 md:p-6 shadow">
-          <h2 className="text-lg md:text-xl font-semibold mb-4">生成されたプロンプト</h2>
-          <textarea
-            value={output}
-            onChange={e=>setOutput(e.target.value)}
-            placeholder="ここに生成結果が表示されます"
-            className="w-full rounded-xl bg-white/5 text-white px-3 py-2 outline-none focus:bg-white/10 placeholder:text-white/40 min-h-[220px] font-mono text-sm"
-          />
-          <p className="text-xs text-white/50 mt-2">※ このままAIに貼り付けて使えます（本ツール自体はAIを呼びません）。</p>
-        </section>
-
-        {/* 診断アプリ誘導 */}
-        <section className="bg-white/5 border border-white/10 rounded-2xl p-5 md:p-6 shadow">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-            <div>
-              <h3 className="text-base md:text-lg font-semibold">さらに深い体験へ：ソウルレイヤー診断</h3>
-              <p className="text-white/70 text-sm">意識の現在地を可視化する診断アプリ。毎日のゆらぎから自分のパターンを観測。</p>
-            </div>
-            {/* 本番URLに差し替えてください */}
-            <a href="/daily" className="rounded-2xl px-4 py-3 font-semibold bg-white text-black hover:opacity-90">ソウルレイヤー診断へ</a>
-          </div>
-          <p className="text-[11px] text-white/40 mt-2">© Universal Prompt Builder — Save the Cat Edition（EVΛƎロジック不使用）</p>
-        </section>
-      </div>
-    </div>
-  )
-}
+                <li>Catalyst → Debate → Break into

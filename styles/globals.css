@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
-*{ box-sizing:border-box }
-body{ margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif }
+/* ---- 任意のグローバル補助 ---- */
+
+:root {
+  color-scheme: dark;
+}
+
+/* iOSフォームの白化対策（必要なときだけ） */
+input, textarea, select, button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* スクロールの気持ち良さ */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 文字のにじみ軽減 */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

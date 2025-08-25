@@ -35,17 +35,13 @@
   }
 
   /* iOSフォームUIの強制スタイルを無効化 */
-  button,
-  input,
-  textarea,
-  select {
-    -webkit-appearance: none;
-    appearance: none;
-    background: transparent;
-    border-radius: 0;
-    font: inherit;
-    color: inherit;
-  }
+ button, input, textarea, select {
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+  border-radius: 0;
+}
+a { text-decoration: none; }
 
   /* フォーカスの見やすさ（デフォルト） */
   :focus-visible {

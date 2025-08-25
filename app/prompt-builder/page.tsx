@@ -258,16 +258,20 @@ ${includeCTA ? ("- 最後に明確なCTAを1つ（例：「" + ctaText + "」）
                     className="w-full rounded-xl bg-[var(--panel)] border border-[var(--border)] text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30"
                   />
                 </div>
-                <label className="flex items-center gap-3 mt-1 md:mt-6">
-                  <input
-                    id="faq"
-                    type="checkbox"
-                    checked={includeFAQ}
-                    onChange={(e) => setIncludeFAQ(e.target.checked)}
-                    className="size-4 accent-white"
-                  />
-                  <span className="text-sm">FAQを含める（3件）</span>
-                </label>
+               <label className="flex items-center gap-3 mt-1 md:mt-6">
+  <input
+    id="faq"
+    type="checkbox"
+    checked={includeFAQ}
+    onChange={(e) => setIncludeFAQ(e.target.checked)}
+    className="size-4 accent-white"
+  />
+  <span className="text-sm">FAQを含める（3件）</span>
+  {includeFAQ && (
+    <span className="text-xs text-white/60"> → 出力にFAQが追加されます</span>
+  )}
+</label>
+
                 <label className="flex items-center gap-3 mt-1 md:mt-6">
                   <input
                     id="cta"

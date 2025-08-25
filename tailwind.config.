@@ -1,0 +1,23 @@
+// tailwind.config.ts
+import type { Config } from "tailwindcss"
+
+const config: Config = {
+  content: [
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  safelist: [
+    // 白・半透明系を purge から守る
+    "text-white/50","text-white/60","text-white/70","text-white/90",
+    "bg-white/5","bg-white/10","bg-white",
+    "text-black","border-white/10","border-white",
+    "rounded-2xl","rounded-xl","shadow","font-extrabold","tracking-tight",
+  ],
+  plugins: [],
+}
+
+export default config

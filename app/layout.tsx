@@ -1,25 +1,27 @@
 // app/layout.tsx
-export const metadata = { title: 'EVΛƎ · Soul Layer' };
+import type { Metadata } from "next";
+import "../styles/globals.css";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export const metadata: Metadata = {
+  title: "EVΛƎ · Soul Layer",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    viewportFit: "cover",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="ja">
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-      </head>
-      <body style={S.body}>{children}</body>
+      {/* bodyにクラスで配色を指定（インラインstyleは全部撤去） */}
+      <body className="min-h-screen bg-black text-white antialiased">
+        {children}
+      </body>
     </html>
   );
 }
-
-const S: Record<string, React.CSSProperties> = {
-  body: {
-    margin: 0,
-    background: '#000',
-    color: '#fff',
-    fontFamily:
-      'ui-sans-serif, -apple-system, "SF Pro Text", "SF Pro JP", "Hiragino Kaku Gothic ProN", "Noto Sans JP", Segoe UI, Roboto, Helvetica, Arial',
-    WebkitFontSmoothing: 'antialiased',
-    MozOsxFontSmoothing: 'grayscale',
-  },
-};

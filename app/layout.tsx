@@ -1,15 +1,16 @@
 // app/layout.tsx
 import type { Metadata } from "next";
-import "../styles/globals.css";
+import './globals.css';            // ←これが無いと全部効かない！
 
-export const metadata: Metadata = {
-  title: "EVΛƎ · Soul Layer",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    viewportFit: "cover",
-  },
-};
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="ja">
+      <body className="bg-black text-white min-h-screen">
+        {children}
+      </body>
+    </html>
+  );
+}
 
 export default function RootLayout({
   children,

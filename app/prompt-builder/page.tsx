@@ -1,7 +1,8 @@
 "use client";
 
+import ModeSwitcher from "../components/ModeSwitcher";
 import { useState, useMemo } from "react";
-import ModeSwitcher from "@/components/ModeSwitcher";
+
 
 /**
  * Universal Prompt Builder — Blog専用（単独ページ）

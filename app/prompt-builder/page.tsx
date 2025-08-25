@@ -4,8 +4,8 @@ import { useState, useMemo } from "react";
 
 /**
  * Universal Prompt Builder — Blog専用（単独ページ）
- * ルート: /prompt-builder-blog
- * 依存: Tailwind CSS（globals.css）
+ * ルート: /prompt-builder
+ * 依存: Tailwind CSS（globals.css にテーマ変数あり）
  * 外部ライブラリ不要。コピー/保存/リセットまで完結。
  */
 export default function PromptBuilderBlog() {
@@ -127,7 +127,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
   }
 
   return (
-    <div className="bg-black text-white">
+    <div className="bg-[var(--bg)] text-[var(--fg)]">
       {/* 固定スクロール：画面は固定し、中でのみ縦スクロール */}
       <div className="fixed inset-0 overflow-y-auto overscroll-contain h-dvh [@supports(height:100svh)]:h-[100svh] -webkit-overflow-scrolling-touch">
         <div className="max-w-6xl mx-auto px-5 md:px-8 py-8 grid gap-6 text-white/80">
@@ -143,7 +143,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
           </header>
 
           {/* 基本情報（カード化） */}
-          <section className="rounded-2xl bg-white/5 shadow-lg p-5 md:p-6">
+          <section className="rounded-2xl bg-[var(--panel)] border border-[var(--border)] shadow-lg p-5 md:p-6">
             <h2 className="text-lg md:text-xl font-semibold mb-4 text-white">基本情報</h2>
             <form onSubmit={handleGenerate} className="grid gap-5">
               <div className="grid md:grid-cols-2 gap-4">
@@ -152,7 +152,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
                   <input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full rounded-xl bg-white/10 border border-white/20 text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
+                    className="w-full rounded-xl bg-[var(--panel)] border border-[var(--border)] text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
                     placeholder="例：初心者のためのプロンプト設計入門"
                   />
                 </div>
@@ -161,7 +161,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
                   <input
                     value={genre}
                     onChange={(e) => setGenre(e.target.value)}
-                    className="w-full rounded-xl bg-white/10 border border-white/20 text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
+                    className="w-full rounded-xl bg-[var(--panel)] border border-[var(--border)] text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
                     placeholder="例：SEO／生成AI／ライティング"
                   />
                 </div>
@@ -172,7 +172,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
                 <input
                   value={theme}
                   onChange={(e) => setTheme(e.target.value)}
-                  className="w-full rounded-xl bg-white/10 border border-white/20 text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
+                  className="w-full rounded-xl bg-[var(--panel)] border border-[var(--border)] text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
                   placeholder="例：観測が意味を生み、選択が未来を形づくる"
                 />
               </div>
@@ -183,7 +183,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
                   <input
                     value={audience}
                     onChange={(e) => setAudience(e.target.value)}
-                    className="w-full rounded-xl bg-white/10 border border-white/20 text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
+                    className="w-full rounded-xl bg-[var(--panel)] border border-[var(--border)] text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
                     placeholder="例：20–30代のクリエイター"
                   />
                 </div>
@@ -192,7 +192,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
                   <input
                     value={tone}
                     onChange={(e) => setTone(e.target.value)}
-                    className="w-full rounded-xl bg-white/10 border border-white/20 text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
+                    className="w-full rounded-xl bg-[var(--panel)] border border-[var(--border)] text白 px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
                     placeholder="例：明快で実務的、寄り添い系"
                   />
                 </div>
@@ -201,7 +201,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
                   <input
                     value={length}
                     onChange={(e) => setLength(e.target.value)}
-                    className="w-full rounded-xl bg-white/10 border border-white/20 text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
+                    className="w-full rounded-xl bg-[var(--panel)] border border-[var(--border)] text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
                     placeholder="例：見出し5つ＋本文1500〜2500字"
                   />
                 </div>
@@ -213,7 +213,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
                   <input
                     value={keywords}
                     onChange={(e) => setKeywords(e.target.value)}
-                    className="w-full rounded-xl bg-white/10 border border-white/20 text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
+                    className="w-full rounded-xl bg-[var(--panel)] border border-[var(--border)] text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
                     placeholder="例：プロンプト, SEO, 設計, テンプレ"
                   />
                 </div>
@@ -222,7 +222,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
                   <input
                     value={platform}
                     onChange={(e) => setPlatform(e.target.value)}
-                    className="w-full rounded-xl bg-white/10 border border-white/20 text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
+                    className="w-full rounded-xl bg-[var(--panel)] border border-[var(--border)] text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
                     placeholder="例：Note / 自社ブログ / Medium"
                   />
                 </div>
@@ -233,7 +233,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
                 <input
                   value={searchIntent}
                   onChange={(e) => setSearchIntent(e.target.value)}
-                  className="w-full rounded-xl bg-white/10 border border-white/20 text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
+                  className="w-full rounded-xl bg-[var(--panel)] border border-[var(--border)] text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
                   placeholder="例：最短で“使える”プロンプトが知りたい"
                 />
               </div>
@@ -247,7 +247,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
                     max={10}
                     value={outlineCount}
                     onChange={(e) => setOutlineCount(Number(e.target.value))}
-                    className="w-full rounded-xl bg-white/10 border border-white/20 text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30"
+                    className="w-full rounded-xl bg-[var(--panel)] border border-[var(--border)] text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30"
                   />
                 </div>
                 <label className="flex items-center gap-3 mt-1 md:mt-6">
@@ -278,23 +278,23 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
                   <input
                     value={ctaText}
                     onChange={(e) => setCtaText(e.target.value)}
-                    className="w-full rounded-xl bg-white/10 border border-white/20 text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
+                    className="w-full rounded-xl bg-[var(--panel)] border border-[var(--border)] text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40"
                     placeholder="例：ソウルレイヤー診断（無料）を試す"
                   />
                 </div>
               )}
 
               <div className="grid md:grid-cols-4 gap-3 pt-2">
-                <button type="submit" className="rounded-xl px-4 py-3 font-semibold bg-white text-black hover:opacity-90">
+                <button type="submit" className="rounded-xl px-4 py-3 font-semibold text-black bg-[var(--accent)] shadow-[var(--accent-shadow)] hover:shadow-[var(--accent-shadow-strong)] transition">
                   プロンプト生成
                 </button>
-                <button type="button" onClick={handleCopy} className="rounded-xl px-4 py-3 font-semibold bg-white/10 border border-white/20 hover:bg-white/15">
+                <button type="button" onClick={handleCopy} className="rounded-xl px-4 py-3 font-semibold text-white bg-[var(--panel)] border border-[var(--border)] hover:opacity-90 transition">
                   コピー
                 </button>
-                <button type="button" onClick={handleDownload} className="rounded-xl px-4 py-3 font-semibold bg-white/10 border border-white/20 hover:bg-white/15">
+                <button type="button" onClick={handleDownload} className="rounded-xl px-4 py-3 font-semibold text-white bg-[var(--panel)] border border-[var(--border)] hover:opacity-90 transition">
                   .txtで保存
                 </button>
-                <button type="button" onClick={handleReset} className="rounded-xl px-4 py-3 font-semibold bg-white/10 border border-white/20 hover:bg-white/15">
+                <button type="button" onClick={handleReset} className="rounded-xl px-4 py-3 font-semibold text-white bg-[var(--panel)] border border-[var(--border)] hover:opacity-90 transition">
                   リセット
                 </button>
               </div>
@@ -302,13 +302,13 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
           </section>
 
           {/* 出力 */}
-          <section className="rounded-2xl bg-white/5 shadow-lg p-5 md:p-6">
+          <section className="rounded-2xl bg-[var(--panel)] border border-[var(--border)] shadow-lg p-5 md:p-6">
             <h2 className="text-lg md:text-xl font-semibold mb-4 text-white">生成されたプロンプト</h2>
             <textarea
               id="output"
               value={output}
               onChange={(e) => setOutput(e.target.value)}
-              className="w-full rounded-xl bg-white/10 border border-white/20 text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40 min-h-[220px] font-mono text-sm"
+              className="w-full rounded-xl bg-[var(--panel)] border border-[var(--border)] text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40 min-h-[220px] font-mono text-sm"
               placeholder="ここに生成結果が表示されます"
             />
             <p className="text-xs text-white/50 mt-2">
@@ -317,7 +317,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
           </section>
 
           {/* 診断アプリ誘導 */}
-          <section className="rounded-2xl bg-white/5 shadow-lg p-5 md:p-6">
+          <section className="rounded-2xl bg-[var(--panel)] border border-[var(--border)] shadow-lg p-5 md:p-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
               <div>
                 <h3 className="text-base md:text-lg font-semibold text-white">さらに深い体験へ：ソウルレイヤー診断</h3>
@@ -327,7 +327,7 @@ ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}${includeCTA ? `- 最後に明�
               </div>
               <a
                 href={promoHref}
-                className="rounded-xl px-4 py-3 font-semibold bg-white text-black hover:opacity-90 no-underline"
+                className="rounded-xl px-4 py-3 font-semibold text-black bg-[var(--accent)] shadow-[var(--accent-shadow)] hover:shadow-[var(--accent-shadow-strong)] no-underline transition"
               >
                 ソウルレイヤー診断へ
               </a>

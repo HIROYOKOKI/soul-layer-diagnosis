@@ -2,34 +2,20 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  // ★ app/ を必ず含める。components/pages も念のため
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
   ],
-
-  // （任意）クラスでダークモードを切替える場合は "class"
-  darkMode: "class",
-
-  theme: {
-    extend: {
-      // ここに必要ならカスタムトークンを追加
-    },
-  },
-
-  // purge対策で使うクラスを固定保護
+  theme: { extend: {} },
   safelist: [
-    // 白・半透明系を purge から守る
     "text-white/50","text-white/60","text-white/70","text-white/90",
     "bg-white/5","bg-white/10","bg-white",
     "text-black","border-white/10","border-white",
     "rounded-2xl","rounded-xl","shadow","font-extrabold","tracking-tight",
-    // 追加で使いがちなユーティリティ
     "min-h-screen","max-w-6xl","mx-auto","px-5","md:px-8","py-8","grid","gap-6",
   ],
-
   plugins: [],
 };
-
 export default config;
+

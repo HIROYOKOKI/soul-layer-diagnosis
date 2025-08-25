@@ -1,51 +1,37 @@
 // app/components/ModeSwitcher.tsx
 "use client";
-import { useEffect, useState } from "react";
-
-type Mode = "blue" | "pink";
+import { useState } from "react";
 
 export default function ModeSwitcher() {
-  const [mode, setMode] = useState<Mode>("blue");
-
-  // 初期化（localStorage → <html data-mode> 反映）
-  useEffect(() => {
-    const saved = (typeof window !== "undefined" && localStorage.getItem("mode")) as Mode | null;
-    const initial: Mode = saved === "pink" ? "pink" : "blue";
-    setMode(initial);
-    document.documentElement.dataset.mode = initial === "pink" ? "pink" : "";
-  }, []);
-
-  // 切替時に保存＆反映
-  const apply = (m: Mode) => {
-    setMode(m);
-    localStorage.setItem("mode", m);
-    document.documentElement.dataset.mode = m === "pink" ? "pink" : "";
-  };
+  const [mode, setMode] = useState<"blue" | "pink">("blue");
 
   return (
     <div className="flex gap-4 mt-6">
+      {/* ブルーボタン */}
       <button
-        onClick={() => apply("blue")}
+        onClick={() => setMode("blue")}
         className={`
           flex-1 px-4 py-2 rounded-xl font-bold transition text-black
-          bg-[var(--accent)] 
-          ${mode === "blue" 
-            ? "ring-2 ring-white shadow-[var(--accent-shadow-strong)]" 
-            : "shadow-[var(--accent-shadow)] hover:shadow-[var(--accent-shadow-strong)]"}
+          bg-[#4fc3ff] 
+          ${mode === "blue"
+            ? "ring-2 ring-white shadow-[0_0_20px_#4fc3ff,0_0_40px_#4fc3ff]"
+            : "shadow-[0_0_10px_#4fc3ff,0_0_20px_#4fc3ff] hover:shadow-[0_0_20px_#4fc3ff,0_0_40px_#4fc3ff]"
+          }
         `}
       >
         未来モード（青）
       </button>
 
+      {/* ピンクボタン */}
       <button
-        onClick={() => apply("pink")}
+        onClick={() => setMode("pink")}
         className={`
           flex-1 px-4 py-2 rounded-xl font-bold transition text-black
-          /* ピンク時は :root[data-mode=pink] の変数に自動切替 */
-          bg-[var(--accent)]
-          ${mode === "pink" 
-            ? "ring-2 ring-white shadow-[var(--accent-shadow-strong)]" 
-            : "shadow-[var(--accent-shadow)] hover:shadow-[var(--accent-shadow-strong)]"}
+          bg-[#ff4fdf] 
+          ${mode === "pink"
+            ? "ring-2 ring-white shadow-[0_0_20px_#ff4fdf,0_0_40px_#ff4fdf]"
+            : "shadow-[0_0_10px_#ff4fdf,0_0_20px_#ff4fdf] hover:shadow-[0_0_20px_#ff4fdf,0_0_40px_#ff4fdf]"
+          }
         `}
       >
         情熱モード（ピンク）

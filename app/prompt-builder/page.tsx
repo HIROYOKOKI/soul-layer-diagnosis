@@ -36,6 +36,8 @@ export default function PromptBuilderBlog() {
   const header = `あなたはSEOと読者体験に強い編集者AIです...`;
 
   const body = `
+// ✅ 正しい形（ここだけ貼り替え）
+const body = `
 # 記事タイトル
 「${title.trim()}」
 
@@ -67,9 +69,10 @@ ${length.trim() || `見出し${oc}つ＋本文合計1500〜2500字`}
 - 重要箇所は**太字**で強調語を1つまで。
 - テンポの良い短文と箇条書きを織り交ぜて可読性を高める。
 - 事例/手順/チェックリストを最小1つ入れる。
-${incl${includeFAQ ? "- 最後にFAQを3件。\n" : ""}
+${includeFAQ ? "- 最後にFAQを3件。\n" : ""}
 ${includeCTA ? `- 最後に明確なCTAを1つ（例：「${ctaText}」）。\n` : ""}
-- 可能ならスキーマ化...`.trim();
+- 可能ならスキーマ化のための要約ポイント（箇条書き3-5行）も併記。
+- EVΛƎ等の特殊理論は使わず、一般的な用語で説明。`.trim();
 
   return `${header}\n\n${body}`;
 }, [

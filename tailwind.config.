@@ -1,21 +1,42 @@
-// tailwind.config.ts
-import type { Config } from "tailwindcss";
+"use client"
+import { useState } from "react";
 
-const config: Config = {
-  content: [
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
-  theme: { extend: {} },
-  safelist: [
-    "text-white/50","text-white/60","text-white/70","text-white/90",
-    "bg-white/5","bg-white/10","bg-white",
-    "text-black","border-white/10","border-white",
-    "rounded-2xl","rounded-xl","shadow","font-extrabold","tracking-tight",
-    "min-h-screen","max-w-6xl","mx-auto","px-5","md:px-8","py-8","grid","gap-6",
-  ],
-  plugins: [],
-};
-export default config;
+export default function ModeSwitcher() {
+  const [mode, setMode] = useState<"blue" | "pink">("blue");
+
+  return (
+    <div className="flex gap-4 mt-6">
+      {/* ブルーボタン */}
+      <button
+        onClick={() => setMode("blue")}
+        className={`
+          flex-1 px-4 py-2 rounded-xl font-bold transition
+          bg-[#4fc3ff] text-black
+          ${mode === "blue"
+            ? "shadow-[0_0_20px_#4fc3ff,0_0_40px_#4fc3ff] ring-2 ring-white"
+            : "shadow-[0_0_10px_#4fc3ff,0_0_20px_#4fc3ff] hover:shadow-[0_0_20px_#4fc3ff,0_0_40px_#4fc3ff]"
+          }
+        `}
+      >
+        未来モード
+      </button>
+
+      {/* ピンクボタン */}
+      <button
+        onClick={() => setMode("pink")}
+        className={`
+          flex-1 px-4 py-2 rounded-xl font-bold transition
+          bg-[#ff4fdf] text-black
+          ${mode === "pink"
+            ? "shadow-[0_0_20px_#ff4fdf,0_0_40px_#ff4fdf] ring-2 ring-white"
+            : "shadow-[0_0_10px_#ff4fdf,0_0_20px_#ff4fdf] hover:shadow-[0_0_20px_#ff4fdf,0_0_40px_#ff4fdf]"
+          }
+        `}
+      >
+        情熱モード
+      </button>
+    </div>
+  );
+}
+
 

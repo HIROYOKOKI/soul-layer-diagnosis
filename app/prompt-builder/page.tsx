@@ -29,16 +29,15 @@ export default function PromptBuilderBlog() {
   const [output, setOutput] = useState("");
 
   // ====== 生成ロジック ======
-  const generated = useMemo(() => {
+ const generated = useMemo(() => {
   if (!title.trim()) return "";
   const oc = Math.max(3, Math.min(10, outlineCount || 5));
 
-  const header = `あなたはSEOと読者体験に強い編集者AIです...`;
+  const header =
+    "あなたはSEOと読者体験に強い編集者AIです。以下の条件で「構成案（見出し）」と「本文ドラフト」を日本語で作成してください。";
 
-  const body = `
-// ✅ 正しい形（ここだけ貼り替え）
-const body = `
-# 記事タイトル
+  const body =
+`# 記事タイトル
 「${title.trim()}」
 
 # カテゴリ
@@ -60,7 +59,7 @@ ${platform.trim() || "自社ブログ"}
 ${tone.trim() || "明快で具体的。専門用語は短く補足"}
 
 # 分量ガイド
-${length.trim() || `見出し${oc}つ＋本文合計1500〜2500字`}
+${length.trim() || ("見出し" + oc + "つ＋本文合計1500〜2500字")}
 
 # 書き方・制約
 - まず120〜160字の要約（メタディスクリプション想定）。
@@ -70,14 +69,14 @@ ${length.trim() || `見出し${oc}つ＋本文合計1500〜2500字`}
 - テンポの良い短文と箇条書きを織り交ぜて可読性を高める。
 - 事例/手順/チェックリストを最小1つ入れる。
 ${includeFAQ ? "- 最後にFAQを3件。\n" : ""}
-${includeCTA ? `- 最後に明確なCTAを1つ（例：「${ctaText}」）。\n` : ""}
+${includeCTA ? ("- 最後に明確なCTAを1つ（例：「" + ctaText + "」）。\n") : ""}
 - 可能ならスキーマ化のための要約ポイント（箇条書き3-5行）も併記。
 - EVΛƎ等の特殊理論は使わず、一般的な用語で説明。`.trim();
 
   return `${header}\n\n${body}`;
 }, [
   title, genre, audience, tone, length, keywords, platform,
-  searchIntent, outlineCount, includeFAQ, includeCTA, ctaText // ←ここ必須
+  searchIntent, outlineCount, includeFAQ, includeCTA, ctaText
 ]);
 
   // フォーム送信（生成）

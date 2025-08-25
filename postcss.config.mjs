@@ -1,16 +1,6 @@
-// Tailwind v4 推奨
+// postcss.config.js  — Tailwind v4 推奨
 export default {
   plugins: {
-    "@tailwindcss/postcss": {},
+    "@tailwindcss/postcss": {}, // ← v4はこれだけでOK
   },
 };
-
-/*
-// Tailwind v3 の場合はこっち
-export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-};
-*/

@@ -22,47 +22,31 @@ type Pending = {
 export default function ConfirmClient() {
   const router = useRouter()
   const [pending, setPending] = useState<Pending | null>(null)
-  const [revealed, setRevealed] = useState(false)   // 「結果を表示」後に true
+  const [revealed, setRevealed] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Quick からの一時データを読み込み
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem('structure_quick_pending')
       if (raw) setPending(JSON.parse(raw) as Pending)
-    } catch {
-      /* noop */
-    }
+    } catch {}
   }, [])
 
   async function onSave() {
     if (!pending || saving) return
-    setSaving(true)
-    setError(null)
-
+    setSaving(true); setError(null)
     try {
       const r = await fetch('/api/structure/quick/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        // DB に無い想定の advice は送らない
-        body: JSON.stringify({
-          type: pending.type,
-          weight: pending.weight,
-          comment: pending.comment,
-        }),
+        method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ type: pending.type, weight: pending.weight, comment: pending.comment }),
       })
-      if (!r.ok) {
-        const txt = await r.text()
-        throw new Error(`API ${r.status}: ${txt.slice(0, 200)}`)
-      }
+      if (!r.ok) throw new Error(`API ${r.status}: ${await r.text()}`)
       const { id } = (await r.json()) as { id: string }
-
-      // 一時データ破棄 → 結果ページへ（DB再取得で安定表示）
       try { sessionStorage.removeItem('structure_quick_pending') } catch {}
       router.push(`/structure/quick/result?id=${encodeURIComponent(id)}`)
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'unknown error'
+      const msg = e instanceof Error ? e.message : 'unknown'
       setError(`保存に失敗しました（${msg}）`)
     } finally {
       setSaving(false)
@@ -71,53 +55,36 @@ export default function ConfirmClient() {
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">
-      {/* Header */}
       <header className="w-full p-4 flex justify-center">
-        <div className="h-8">
-          <Image src="/evae-logo.svg" alt="EVΛƎ" width={96} height={32} priority className="h-8 w-auto" />
-        </div>
+        <Image src="/evae-logo.svg" alt="EVΛƎ" width={96} height={32} priority className="h-8 w-auto" />
       </header>
 
       <main className="flex-1 flex items-center justify-center px-5">
-        <div className="w-full max-w-md bg-neutral-900/70 border border-white/10 rounded-xl p-6 shadow-[0_0_40px_rgba(255,255,255,0.05)]">
+        <div className="w-full max-w-md bg-neutral-900/80 border border-white/10 rounded-xl p-6">
           {!pending ? (
             <div className="text-center">
               <p className="text-red-400">データが見つかりません。最初からやり直してください。</p>
-              <button
-                type="button"
-                className="btn mt-4 btn-pressable btn-ripple touch-manipulation"
-                onPointerUp={() => router.push('/structure/quick')}
-              >
-                クイック判定へ戻る
-              </button>
+              <button className="btn mt-4" onPointerUp={() => router.push('/structure/quick')}>クイック判定へ戻る</button>
             </div>
           ) : !revealed ? (
             <>
               <h2 className="text-center text-lg font-bold mb-3">内容の確認</h2>
 
-              {/* 選択内容の表示 */}
-              <div className="rounded-lg border border-white/10 bg-black/30 p-4 mb-4">
+              {/* ★★★ ここが“選択内容の表示” ★★★ */}
+              <div className="rounded-lg border border-white/15 bg-black/40 p-4 mb-5">
                 <p className="text-xs text-white/60 mb-1">あなたの選択</p>
-                <p className="text-sm">{pending.choiceText}</p>
+                <p className="text-base font-medium">{pending.choiceText}</p>
               </div>
 
               <p className="text-center text-white/70 text-sm mb-5">
-                これから結果を表示します。問題なければ、その後「保存する」を押してください。
+                これから結果を表示します。内容に問題なければ、その後「保存する」を押してください。
               </p>
 
               <div className="grid gap-3">
-                <button
-                  type="button"
-                  className="btn btn-primary btn-pressable btn-ripple touch-manipulation"
-                  onPointerUp={() => setRevealed(true)}
-                >
+                <button className="btn btn-primary btn-pressable" onPointerUp={() => setRevealed(true)}>
                   結果を表示
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-pressable btn-ripple touch-manipulation"
-                  onPointerUp={() => router.push('/structure/quick')}
-                >
+                <button className="btn btn-pressable" onPointerUp={() => router.push('/structure/quick')}>
                   やり直す
                 </button>
               </div>
@@ -130,25 +97,14 @@ export default function ConfirmClient() {
               <p className="text-center text-white/60 text-sm mb-4">{pending.comment}</p>
 
               <div className="rounded-lg border border-white/10 p-4 bg-black/30 mb-4">
-                <p className="text-sm">
-                  <span className="text-white/60">今日の一手：</span>{pending.advice}
-                </p>
+                <p className="text-sm"><span className="text-white/60">今日の一手：</span>{pending.advice}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  className="btn btn-primary btn-pressable btn-ripple touch-manipulation"
-                  disabled={saving}
-                  onPointerUp={onSave}
-                >
+                <button className="btn btn-primary btn-pressable" disabled={saving} onPointerUp={onSave}>
                   {saving ? '保存中…' : '保存する'}
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-pressable btn-ripple touch-manipulation"
-                  onPointerUp={() => setRevealed(false)}
-                >
+                <button className="btn btn-pressable" onPointerUp={() => setRevealed(false)}>
                   戻る
                 </button>
               </div>

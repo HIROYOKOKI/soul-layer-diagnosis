@@ -1,3 +1,4 @@
+// app/profile/confirm/ConfirmClient.tsx
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -7,14 +8,14 @@ export default function ConfirmClient() {
   const sp = useSearchParams()
   const router = useRouter()
 
-  // URL パラメータ取得
+  // URL パラメータ
   const name = sp.get('name') || '—'
   const birthday = sp.get('birthday') || '—'
   const blood = sp.get('blood') || '—'
   const gender = sp.get('gender') || '—'
   const preference = sp.get('preference') || '—'
 
-  // すべて空（—）なら入力ページへ戻す
+  // 直リンク対策（全部—なら入力へ）
   const allEmpty = useMemo(
     () => [name, birthday, blood, gender, preference].every(v => v === '—'),
     [name, birthday, blood, gender, preference]
@@ -23,22 +24,15 @@ export default function ConfirmClient() {
     if (allEmpty) router.replace('/profile')
   }, [allEmpty, router])
 
-  // 送信中フラグ
+  // 送信制御
   const [submitting, setSubmitting] = useState(false)
-
-  // 必須の簡易バリデーション
   const isValid = useMemo(() => {
-    // 必須: name / birthday / blood / gender
-    return (
-      name !== '—' &&
-      birthday !== '—' &&
-      blood !== '—' &&
-      gender !== '—'
-    )
+    return name !== '—' && birthday !== '—' && blood !== '—' && gender !== '—'
   }, [name, birthday, blood, gender])
 
   async function handleSubmit() {
     if (!isValid || submitting) return
+
     setSubmitting(true)
     try {
       const payload = { name, birthday, blood, gender, preference }
@@ -48,10 +42,14 @@ export default function ConfirmClient() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error('save failed')
-      // 保存成功 → 結果ページへ
-      router.push('/profile/result')
-    } catch (e) {
+
+      // 結果ページでそのまま表示できるようURLとsessionStorageに残す
+      sessionStorage.setItem('profile:last', JSON.stringify(payload))
+      const q = new URLSearchParams(payload as Record<string, string>).toString()
+      router.push(`/profile/result?${q}`)
+    } catch (_err) {
       alert('保存に失敗しました。通信環境をご確認ください。')
+    } finally {
       setSubmitting(false)
     }
   }
@@ -67,7 +65,6 @@ export default function ConfirmClient() {
       <main className="flex flex-1 items-center justify-center px-4">
         <div className="bg-neutral-900/70 rounded-xl p-6 shadow-lg border border-white/10 w-full max-w-md">
           <h2 className="text-center text-lg font-bold mb-4">入力確認</h2>
-
           <ul className="space-y-2 text-sm">
             <li className="flex justify-between"><span>NAME</span><span>{name}</span></li>
             <li className="flex justify-between"><span>DATE OF BIRTH</span><span>{birthday}</span></li>
@@ -91,8 +88,7 @@ export default function ConfirmClient() {
               className={`px-4 py-2 rounded-lg transition
                 ${(!isValid || submitting)
                   ? 'bg-white/20 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-blue-500 to-pink-500 hover:opacity-90'}
-              `}
+                  : 'bg-gradient-to-r from-blue-500 to-pink-500 hover:opacity-90'}`}
             >
               {submitting ? '送信中…' : '送信'}
             </button>

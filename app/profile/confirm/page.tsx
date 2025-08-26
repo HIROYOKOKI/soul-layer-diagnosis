@@ -1,123 +1,63 @@
-// app/profile/confirm/page.tsx
-import Link from "next/link";
+'use client'
 
-type SP = {
-  name?: string;
-  birthday?: string;
-  blood?: string;
-  gender?: string;
-  preference?: string;
-};
+import { useSearchParams, useRouter } from 'next/navigation'
 
-// 事前レンダリング時の揺れを避ける
-export const dynamic = "force-dynamic";
+export default function ConfirmPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
 
-export default function ProfileConfirm({
-  searchParams,
-}: {
-  searchParams: SP;
-}) {
-  const name = (searchParams.name ?? "") as string;
-  const birthday = (searchParams.birthday ?? "") as string;
-  const blood = (searchParams.blood ?? "") as string;
-  const gender = (searchParams.gender ?? "") as string;
-  const preference = (searchParams.preference ?? "") as string;
+  const name = searchParams.get('name') || '—'
+  const birthday = searchParams.get('birthday') || '—'
+  const blood = searchParams.get('blood') || '—'
+  const gender = searchParams.get('gender') || '—'
+  const preference = searchParams.get('preference') || '—'
+
+  const handleBack = () => router.back()
+  const handleSubmit = () => {
+    alert('送信しました！')
+    // TODO: 保存処理
+  }
 
   return (
-    <div
-      style={{
-        minHeight: "100dvh",
-        background: "#000",
-        color: "#e6f6ff",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px",
-      }}
-    >
-      <div
-        style={{
-          width: "min(560px, 92vw)",
-          background: "rgba(10,12,20,.7)",
-          border: "1px solid rgba(80,150,255,.25)",
-          borderRadius: 20,
-          padding: 24,
-          boxShadow: "0 12px 40px rgba(90,0,160,.35)",
-        }}
-      >
-        <h1
-          style={{
-            margin: "0 0 16px",
-            fontSize: 20,
-            letterSpacing: 4,
-            textAlign: "center",
-          }}
-        >
-          入力確認
-        </h1>
+    <div className="min-h-screen flex flex-col bg-black text-white">
+      {/* ===== ヘッダー ===== */}
+      <header className="w-full p-4 flex justify-center items-center">
+        <img src="/evae-logo.svg" alt="EVΛƎ" className="h-8" />
+      </header>
 
-        <dl style={{ margin: 0 }}>
-          <Row label="NAME" value={name} />
-          <Row label="DATE OF BIRTH" value={birthday} />
-          <Row label="BLOOD TYPE" value={blood} />
-          <Row label="GENDER" value={gender} />
-          <Row label="PREFERENCE" value={preference} />
-        </dl>
+      {/* ===== メイン内容 ===== */}
+      <main className="flex flex-1 items-center justify-center">
+        <div className="bg-neutral-900/70 rounded-xl p-6 shadow-lg border border-white/10 w-[400px]">
+          <h2 className="text-center text-lg font-bold mb-4">入力確認</h2>
+          <ul className="space-y-2 text-sm">
+            <li className="flex justify-between"><span>NAME</span><span>{name}</span></li>
+            <li className="flex justify-between"><span>DATE OF BIRTH</span><span>{birthday}</span></li>
+            <li className="flex justify-between"><span>BLOOD TYPE</span><span>{blood}</span></li>
+            <li className="flex justify-between"><span>GENDER</span><span>{gender}</span></li>
+            <li className="flex justify-between"><span>PREFERENCE</span><span>{preference}</span></li>
+          </ul>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            justifyContent: "flex-end",
-            marginTop: 16,
-          }}
-        >
-          <Link
-            href="/profile"
-            style={{
-              padding: "12px 18px",
-              borderRadius: 9999,
-              border: "1px solid rgba(120,160,255,.35)",
-              color: "#e6f6ff",
-              textDecoration: "none",
-            }}
-          >
-            戻る
-          </Link>
-
-          {/* 送信：まずはダミー遷移。保存実装時は /api を叩く形に差し替え */}
-          <Link
-            href="/(chrome)/mypage"
-            style={{
-              padding: "12px 18px",
-              borderRadius: 9999,
-              border: "1px solid rgba(80,150,255,.4)",
-              background: "linear-gradient(90deg,#0af,#a0f)",
-              color: "#fff",
-              textDecoration: "none",
-            }}
-          >
-            送信
-          </Link>
+          <div className="mt-6 flex justify-between">
+            <button
+              onClick={handleBack}
+              className="px-4 py-2 rounded-lg bg-neutral-800"
+            >
+              戻る
+            </button>
+            <button
+              onClick={handleSubmit}
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-pink-500"
+            >
+              送信
+            </button>
+          </div>
         </div>
-      </div>
-    </div>
-  );
-}
+      </main>
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "160px 1fr",
-        gap: 12,
-        padding: "10px 0",
-        borderBottom: "1px solid rgba(120,160,255,.15)",
-      }}
-    >
-      <dt style={{ opacity: 0.8 }}>{label}</dt>
-      <dd style={{ margin: 0 }}>{value || "—"}</dd>
+      {/* ===== フッター ===== */}
+      <footer className="w-full py-4 text-center text-xs text-white/40">
+        © 2025 Soul Layer Log
+      </footer>
     </div>
-  );
+  )
 }

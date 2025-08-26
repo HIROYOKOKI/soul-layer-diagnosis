@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-interface Profile {
+type Profile = {
   id: string
   name: string
   birthday: string
@@ -25,16 +25,12 @@ export default function ResultClient() {
   useEffect(() => {
     async function fetchById() {
       try {
-        if (!id) {
-          setError('Invalid link')
-          return
-        }
+        if (!id) { setError('Invalid link'); return }
         const res = await fetch(`/api/profile/${id}`, { cache: 'no-store' })
         if (!res.ok) throw new Error('Failed to fetch profile')
-        const data: Profile = await res.json()
-        setProfile(data)
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Unknown error')
+        setProfile(await res.json())
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Unknown error')
       } finally {
         setLoading(false)
       }
@@ -42,10 +38,8 @@ export default function ResultClient() {
     fetchById()
   }, [id])
 
-  if (loading)
-    return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>
-  if (error)
-    return <div className="min-h-screen bg-black text-red-400 flex items-center justify-center">{error}</div>
+  if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>
+  if (error)   return <div className="min-h-screen bg-black text-red-400 flex items-center justify-center">{error}</div>
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">
@@ -58,7 +52,6 @@ export default function ResultClient() {
       <main className="flex flex-1 items-center justify-center px-4">
         <div className="bg-neutral-900/70 rounded-xl p-6 shadow-lg border border-white/10 w-full max-w-md">
           <h2 className="text-center text-lg font-bold mb-4">保存完了</h2>
-
           {profile ? (
             <ul className="space-y-2 text-sm">
               <li className="flex justify-between"><span>NAME</span><span>{profile.name}</span></li>

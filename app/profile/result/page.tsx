@@ -1,10 +1,13 @@
 // app/profile/result/page.tsx
+
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
-type Profile = {
-  id?: string
+// 型定義
+interface Profile {
+  id: string
   name: string
   birthday: string
   blood: string
@@ -14,33 +17,35 @@ type Profile = {
 }
 
 export default function ProfileResultPage() {
+  const sp = useSearchParams()
+  const id = sp.get('id')
+
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchLatest() {
+    async function fetchById() {
       try {
-        const res = await fetch('/api/profile/latest', { cache: 'no-store' })
-        if (!res.ok) throw new Error('Failed to fetch latest profile')
-        const data: Profile | { error?: string } = await res.json()
-        if ('error' in data && data.error) throw new Error(data.error)
-        setProfile(data as Profile)
+        if (!id) {
+          setError('Invalid link')
+          return
+        }
+        const res = await fetch(`/api/profile/${id}`, { cache: 'no-store' })
+        if (!res.ok) throw new Error('Failed to fetch profile')
+        const data: Profile = await res.json()
+        setProfile(data)
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
         setLoading(false)
       }
     }
-    fetchLatest()
-  }, [])
+    fetchById()
+  }, [id])
 
-  if (loading) {
-    return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>
-  }
-  if (error) {
-    return <div className="min-h-screen bg-black text-red-400 flex items-center justify-center">{error}</div>
-  }
+  if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>
+  if (error) return <div className="min-h-screen bg-black text-red-400 flex items-center justify-center">{error}</div>
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">
@@ -71,4 +76,36 @@ export default function ProfileResultPage() {
       </footer>
     </div>
   )
+}
+
+// app/api/profile/[id]/route.ts
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+export const runtime = 'nodejs'
+
+function getSupabase() {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return null
+  return createClient(url, key, { auth: { persistSession: false } })
+}
+
+export async function GET(
+  _req: Request,
+  { params }: { params: { id: string } }
+) {
+  const supabase = getSupabase()
+  if (!supabase) {
+    return NextResponse.json({ error: 'Server env not set' }, { status: 500 })
+  }
+
+  const { data, error } = await supabase
+    .from('profile_results')
+    .select('*')
+    .eq('id', params.id)
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
 }

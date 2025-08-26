@@ -1,33 +1,28 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
+export const dynamic = 'force-dynamic'     // ← 追加
 
 export default function ConfirmPage() {
-  const searchParams = useSearchParams()
+  const sp = useSearchParams()
   const router = useRouter()
 
-  const name = searchParams.get('name') || '—'
-  const birthday = searchParams.get('birthday') || '—'
-  const blood = searchParams.get('blood') || '—'
-  const gender = searchParams.get('gender') || '—'
-  const preference = searchParams.get('preference') || '—'
-
-  const handleBack = () => router.back()
-  const handleSubmit = () => {
-    alert('送信しました！')
-    // TODO: 保存処理
-  }
+  const name = sp.get('name') || '—'
+  const birthday = sp.get('birthday') || '—'
+  const blood = sp.get('blood') || '—'
+  const gender = sp.get('gender') || '—'
+  const preference = sp.get('preference') || '—'
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">
-      {/* ===== ヘッダー ===== */}
-      <header className="w-full p-4 flex justify-center items-center">
+      {/* header */}
+      <header className="w-full p-4 flex justify-center">
         <img src="/evae-logo.svg" alt="EVΛƎ" className="h-8" />
       </header>
 
-      {/* ===== メイン内容 ===== */}
-      <main className="flex flex-1 items-center justify-center">
-        <div className="bg-neutral-900/70 rounded-xl p-6 shadow-lg border border-white/10 w-[400px]">
+      {/* main */}
+      <main className="flex flex-1 items-center justify-center px-4">
+        <div className="bg-neutral-900/70 rounded-xl p-6 shadow-lg border border-white/10 w-full max-w-md">
           <h2 className="text-center text-lg font-bold mb-4">入力確認</h2>
           <ul className="space-y-2 text-sm">
             <li className="flex justify-between"><span>NAME</span><span>{name}</span></li>
@@ -36,25 +31,14 @@ export default function ConfirmPage() {
             <li className="flex justify-between"><span>GENDER</span><span>{gender}</span></li>
             <li className="flex justify-between"><span>PREFERENCE</span><span>{preference}</span></li>
           </ul>
-
           <div className="mt-6 flex justify-between">
-            <button
-              onClick={handleBack}
-              className="px-4 py-2 rounded-lg bg-neutral-800"
-            >
-              戻る
-            </button>
-            <button
-              onClick={handleSubmit}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-pink-500"
-            >
-              送信
-            </button>
+            <button onClick={() => router.back()} className="px-4 py-2 rounded-lg bg-neutral-800">戻る</button>
+            <button className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-pink-500">送信</button>
           </div>
         </div>
       </main>
 
-      {/* ===== フッター ===== */}
+      {/* footer */}
       <footer className="w-full py-4 text-center text-xs text-white/40">
         © 2025 Soul Layer Log
       </footer>

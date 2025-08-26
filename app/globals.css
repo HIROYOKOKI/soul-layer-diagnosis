@@ -16,6 +16,15 @@
     --accent: #4fc3ff; /* 未来モード(青) */
     --accent-shadow: 0 0 10px #4fc3ff, 0 0 20px #4fc3ff;
     --accent-shadow-strong: 0 0 20px #4fc3ff, 0 0 40px #4fc3ff;
+
+    /* テーマ用 RGB（波紋/フォーカスで使用） */
+    --accent-rgb: 79,195,255; /* #4fc3ff */
+
+    /* ── EVΛƎ 構造別カラー（RGB）── */
+    --accent-e-rgb: 255,95,95;     /* E：衝動=レッド */
+    --accent-v-rgb: 79,195,255;    /* V：夢=シアン/ブルー */
+    --accent-l-rgb: 255,209,102;   /* Λ：選択=アンバー/ゴールド */
+    --accent-eps-rgb: 192,132,252; /* Ǝ：観測=バイオレット */
   }
 
   /* 情熱モード(ピンク) */
@@ -23,6 +32,7 @@
     --accent: #ff4fdf;
     --accent-shadow: 0 0 10px #ff4fdf, 0 0 20px #ff4fdf;
     --accent-shadow-strong: 0 0 20px #ff4fdf, 0 0 40px #ff4fdf;
+    --accent-rgb: 255,79,223; /* #ff4fdf */
   }
 
   html { 
@@ -64,9 +74,9 @@
   ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius:9999px; }
   ::-webkit-scrollbar-track { background: rgba(255,255,255,.04); }
 
-  /* キーボード操作の視認性向上 */
+  /* キーボード操作の視認性向上（テーマRGB準拠） */
   :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid rgb(var(--accent-rgb));
     outline-offset: 2px;
   }
 }
@@ -104,12 +114,11 @@
     transform: scale(0.98);
   }
 
-  /* 波紋本体（白系の光） */
+  /* 波紋ベース：背景は個別クラスで与える */
   .ripple {
     position: absolute;
     border-radius: 9999px;
     pointer-events: none;
-    background: radial-gradient(closest-side, rgba(255,255,255,0.35), rgba(255,255,255,0.15), transparent);
     width: 24px;
     height: 24px;
     transform: translate(-50%, -50%) scale(0);
@@ -117,15 +126,33 @@
     mix-blend-mode: screen; /* 光感を強める */
   }
 
-  /* グラデーション版（ピンク→ブルーの未来光） */
+  /* ── 波紋の色バリエーション ── */
+  /* テーマ色（--accent-rgb） */
+  .ripple-accent {
+    background: radial-gradient(closest-side,
+      rgba(var(--accent-rgb), 0.45),
+      rgba(var(--accent-rgb), 0.25),
+      transparent);
+  }
+  /* 構造別（E/V/Λ/Ǝ） */
+  .ripple-e   { background: radial-gradient(closest-side, rgba(var(--accent-e-rgb), 0.45),   rgba(var(--accent-e-rgb), 0.25),   transparent); }
+  .ripple-v   { background: radial-gradient(closest-side, rgba(var(--accent-v-rgb), 0.45),   rgba(var(--accent-v-rgb), 0.25),   transparent); }
+  .ripple-l   { background: radial-gradient(closest-side, rgba(var(--accent-l-rgb), 0.45),   rgba(var(--accent-l-rgb), 0.25),   transparent); }
+  .ripple-eps { background: radial-gradient(closest-side, rgba(var(--accent-eps-rgb), 0.45), rgba(var(--accent-eps-rgb), 0.25), transparent); }
+
+  /* 参考：グラデーション版（ピンク→ブルーの未来光） */
   .ripple-gradient {
     background: radial-gradient(closest-side, rgba(255,79,223,0.45), rgba(79,195,255,0.35), transparent);
   }
 
-  /* 主要ボタンに未来光の外縁 */
-  .btn-glow {
-    box-shadow: var(--accent-shadow-strong);
-  }
+  /* 主要ボタンに未来光の外縁（テーマ強め） */
+  .btn-glow { box-shadow: var(--accent-shadow-strong); }
+
+  /* 構造別の外縁グロー */
+  .glow-e   { box-shadow: 0 0 20px rgba(var(--accent-e-rgb), 0.25); }
+  .glow-v   { box-shadow: 0 0 20px rgba(var(--accent-v-rgb), 0.25); }
+  .glow-l   { box-shadow: 0 0 20px rgba(var(--accent-l-rgb), 0.25); }
+  .glow-eps { box-shadow: 0 0 20px rgba(var(--accent-eps-rgb),0.25); }
 }
 
 /* =========================

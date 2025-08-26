@@ -37,22 +37,18 @@ export async function POST(req: Request) {
     const supabase = getSupabase()
 
     const { data, error } = await supabase
-      .from('profile_results')
-      .insert([{ name, birthday, blood, gender, preference }])
-      .select()
-      .single()
+  .from('profile_results')
+  .insert([{ name, birthday, blood, gender, preference }])
+  .select('id,name,birthday,blood,gender,preference,created_at')
+  .single()
 
-    if (error) {
-      // eslint-disable-next-line no-console
-      console.error('[Supabase] insert error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+if (error) { ... }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Profile saved successfully',
-      data,
-    })
+return NextResponse.json({
+  success: true,
+  id: data.id,      // ← これが重要
+  data,
+})
   } catch (err: unknown) {
     // eslint-disable-next-line no-console
     console.error('Save error:', err instanceof Error ? err.message : err)

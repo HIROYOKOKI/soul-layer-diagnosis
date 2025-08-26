@@ -13,10 +13,18 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 )
 
+type ProfilePayload = {
+  name: string
+  birthday: string
+  blood: string
+  gender: string
+  preference?: string
+}
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const { name, birthday, blood, gender, preference } = body ?? {}
+    const body: ProfilePayload = await req.json()
+    const { name, birthday, blood, gender, preference } = body
 
     // 必須チェック
     if (!name || !birthday || !blood || !gender) {
@@ -43,7 +51,7 @@ export async function POST(req: Request) {
       message: 'Profile saved successfully',
       data,
     })
-  } catch (err: any) {
+  } catch (err) {
     console.error('Save error:', err)
     return NextResponse.json({ error: 'Failed to save profile' }, { status: 500 })
   }

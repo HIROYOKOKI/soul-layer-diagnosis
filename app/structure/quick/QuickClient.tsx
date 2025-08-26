@@ -114,24 +114,46 @@ export default function QuickClient() {
   }
 
   async function onPick(choice: Choice) {
-    if (sending) return
-    setSending(true)
-    setError(null)
-    try {
-      const r = await fetch('/api/structure/quick/diagnose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ choice }),
-      })
-      if (!r.ok) throw new Error('failed')
-      const data: Result = await r.json()
-      setRes(data)
-    } catch {
-      setError('保存に失敗しました。通信環境をご確認ください。')
-    } finally {
-      setSending(false)
+  if (sending) return
+  setSending(true)
+  setError(null)
+
+  const ac = new AbortController()
+  const t = setTimeout(() => ac.abort(), 15000)
+
+  try {
+    const r = await fetch('/api/structure/quick/diagnose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ choice }),
+      cache: 'no-store',
+      signal: ac.signal,
+    })
+
+    // 失敗の詳細を表示
+    if (!r.ok) {
+      let detail = ''
+      try {
+        const txt = await r.text()
+        detail = txt?.slice(0, 200) || ''
+      } catch {}
+      throw new Error(`API ${r.status}: ${detail}`)
     }
+
+    const data: Result = await r.json()
+    try { sessionStorage.setItem('structure_quick_last', JSON.stringify(data)) } catch {}
+    router.push(`/structure/quick/confirm?id=${encodeURIComponent(data.id)}`)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'unknown error'
+    setError(`保存に失敗しました（${msg}）`)
+    // デバッグ用にコンソールにも
+    console.error('[quick/diagnose] failed:', e)
+  } finally {
+    clearTimeout(t)
+    setSending(false)
   }
+}
+
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">

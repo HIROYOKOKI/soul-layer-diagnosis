@@ -1,17 +1,9 @@
 // app/api/profile/save/route.ts
 
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-// --- Supabase Server Client (Service Roleを使用) ---
-// 環境変数に以下を設定してください（.env.local など）
-// SUPABASE_URL=...        ← https://xxxxx.supabase.co
-// SUPABASE_SERVICE_ROLE_KEY=...  ← サーバー専用のService Role Key（公開しない）
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-)
+export const runtime = 'nodejs' // EdgeではなくNodeで
 
 type ProfilePayload = {
   name: string
@@ -21,10 +13,21 @@ type ProfilePayload = {
   preference?: string
 }
 
+// 環境変数から実行時にSupabaseクライアントを作る
+function getSupabase(): SupabaseClient {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    // 実行時にわかりやすいエラーを返す
+    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+  }
+  return createClient(url, key, { auth: { persistSession: false } })
+}
+
 export async function POST(req: Request) {
   try {
     const body: ProfilePayload = await req.json()
-    const { name, birthday, blood, gender, preference } = body
+    const { name, birthday, blood, gender, preference } = body ?? {}
 
     // 必須チェック
     if (!name || !birthday || !blood || !gender) {
@@ -34,7 +37,9 @@ export async function POST(req: Request) {
       )
     }
 
-    // --- Supabase Insert ---
+    const supabase = getSupabase()
+
+    // Insert
     const { data, error } = await supabase
       .from('profile_results')
       .insert([{ name, birthday, blood, gender, preference }])
@@ -51,8 +56,11 @@ export async function POST(req: Request) {
       message: 'Profile saved successfully',
       data,
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error('Save error:', err)
-    return NextResponse.json({ error: 'Failed to save profile' }, { status: 500 })
+    const msg =
+      err?.message?.includes('Missing SUPABASE_URL') ?
+      'Server env vars not set' : 'Failed to save profile'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

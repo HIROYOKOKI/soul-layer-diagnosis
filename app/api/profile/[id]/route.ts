@@ -11,19 +11,29 @@ function getSupabase() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
+// context.params が {id:string} または Promise<{id:string}> の双方に対応
+type Ctx =
+  | { params: { id: string } }
+  | { params: Promise<{ id: string }> }
+
+export async function GET(_req: Request, context: Ctx) {
   const supabase = getSupabase()
   if (!supabase) {
     return NextResponse.json({ error: 'Server env not set' }, { status: 500 })
   }
 
+  // params を実体化
+  const raw = (context as any).params
+  const resolved = raw && typeof raw.then === 'function' ? await raw : raw
+  const id = (resolved?.id ?? '') as string
+  if (!id) {
+    return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
+  }
+
   const { data, error } = await supabase
     .from('profile_results')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (error) {

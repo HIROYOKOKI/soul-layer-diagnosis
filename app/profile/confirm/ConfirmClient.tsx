@@ -31,28 +31,31 @@ export default function ConfirmClient() {
   }, [name, birthday, blood, gender])
 
   async function handleSubmit() {
-    if (!isValid || submitting) return
+  if (!isValid || submitting) return
 
-    setSubmitting(true)
-    try {
-      const payload = { name, birthday, blood, gender, preference }
-      const res = await fetch('/api/profile/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) throw new Error('save failed')
+  setSubmitting(true)
+  try {
+    const payload = { name, birthday, blood, gender, preference }
+    const res = await fetch('/api/profile/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error('save failed')
 
-      // 結果ページでそのまま表示できるようURLとsessionStorageに残す
-      sessionStorage.setItem('profile:last', JSON.stringify(payload))
-      const q = new URLSearchParams(payload as Record<string, string>).toString()
-      router.push(`/profile/result?${q}`)
-    } catch (_err) {
-      alert('保存に失敗しました。通信環境をご確認ください。')
-    } finally {
-      setSubmitting(false)
-    }
+    const json: { id: string } = await res.json()
+
+    // （任意）速表示用の控え：直リンクでもOKだが、将来は不要にできる
+    sessionStorage.setItem('profile:last', JSON.stringify(payload))
+
+    // ← id で結果ページへ
+    router.push(`/profile/result?id=${encodeURIComponent(json.id)}`)
+  } catch (_err) {
+    alert('保存に失敗しました。通信環境をご確認ください。')
+  } finally {
+    setSubmitting(false)
   }
+}
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">

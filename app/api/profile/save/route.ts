@@ -42,13 +42,17 @@ export async function POST(req: Request) {
   .select('id,name,birthday,blood,gender,preference,created_at')
   .single()
 
-if (error) { ... }
+if (error) {
+  console.error('[Supabase] insert error:', error)
+  return NextResponse.json({ error: error.message }, { status: 500 })
+}
 
 return NextResponse.json({
   success: true,
-  id: data.id,      // ← これが重要
+  id: data.id, // ← ここで返す
   data,
 })
+
   } catch (err: unknown) {
     // eslint-disable-next-line no-console
     console.error('Save error:', err instanceof Error ? err.message : err)

@@ -2,7 +2,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'  // ← 追加
+
 
 type Profile = {
   id: string
@@ -17,7 +18,7 @@ type Profile = {
 export default function ResultClient() {
   const sp = useSearchParams()
   const id = sp.get('id')
-
+const router = useRouter()  
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -60,6 +61,21 @@ export default function ResultClient() {
               <li className="flex justify-between"><span>GENDER</span><span>{profile.gender}</span></li>
               <li className="flex justify-between"><span>PREFERENCE</span><span>{profile.preference ?? '—'}</span></li>
             </ul>
+      <div className="mt-6 grid grid-cols-2 gap-3">
+  <button
+    onClick={() => router.push('/structure/quick')}
+    className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-pink-500 hover:opacity-90 transition"
+  >
+    クイック判定へ
+  </button>
+  <button
+    onClick={() => router.push('/structure')}
+    className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition"
+  >
+    構造診断へ
+  </button>
+</div>
+
           ) : (
             <p className="text-center text-gray-400">データがありません</p>
           )}

@@ -1,8 +1,9 @@
 // app/structure/quick/QuickClient.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 type Choice = 'A'|'B'|'C'|'D'
 type Result = {
@@ -11,6 +12,64 @@ type Result = {
   weight: number
   comment: string
   advice: string
+}
+
+/* ======== モバイル安定＆押下エフェクト付きボタン ======== */
+function PressButton({
+  disabled,
+  onPress,
+  children,
+  className = '',
+}: {
+  disabled?: boolean
+  onPress: () => void
+  children: React.ReactNode
+  className?: string
+}) {
+  const [pressed, setPressed] = useState(false)
+  const pressedRef = useRef(false)
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-disabled={disabled}
+      // 300ms遅延やダブルタップ拡大の抑止
+      style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' as any }}
+      className={[
+        'relative rounded-lg border border-white/10 bg-neutral-800 px-4 py-3 text-left',
+        'transition-transform duration-100 will-change-transform',
+        'enabled:hover:bg-neutral-700',
+        pressed ? 'scale-[0.98]' : '',
+        disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+        className,
+      ].join(' ')}
+      // Pointer系で統一（iOS Safari 安定）
+      onPointerDown={() => { pressedRef.current = true; setPressed(true) }}
+      onPointerCancel={() => { pressedRef.current = false; setPressed(false) }}
+      onPointerLeave={() => { pressedRef.current = false; setPressed(false) }}
+      onPointerUp={(e) => {
+        // スクロール等で離れた場合の誤発火を抑止
+        if (!pressedRef.current || disabled) { setPressed(false); return }
+        e.preventDefault()
+        setPressed(false)
+        pressedRef.current = false
+        onPress()
+        // 軽い触覚（対応端末のみ）
+        if ('vibrate' in navigator) { try { navigator.vibrate?.(8) } catch {} }
+      }}
+      // キーボード操作（Enter/Space）
+      onKeyDown={(e) => {
+        if (disabled) return
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onPress()
+        }
+      }}
+    >
+      {children}
+    </button>
+  )
 }
 
 export default function QuickClient() {
@@ -43,55 +102,70 @@ export default function QuickClient() {
     <div className="min-h-screen flex flex-col bg-black text-white">
       {/* Header */}
       <header className="w-full p-4 flex justify-center">
-        <img src="/evae-logo.svg" alt="EVΛƎ" className="h-8" />
+        <div className="h-8">
+          <Image
+            src="/evae-logo.svg"
+            alt="EVΛƎ"
+            width={96}
+            height={32}
+            priority
+            className="h-8 w-auto"
+          />
+        </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center px-5">
-        <div className="w-full max-w-md bg-neutral-900/70 border border-white/10 rounded-xl p-6">
+      <main
+        className="flex-1 flex items-center justify-center px-5"
+        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' as any }}
+      >
+        <div className="w-full max-w-md bg-neutral-900/70 border border-white/10 rounded-xl p-6 shadow-[0_0_40px_rgba(255,255,255,0.05)]">
           {!res ? (
             <>
               <h2 className="text-center text-lg font-bold mb-4">クイック判定（1問）</h2>
               <p className="text-sm text-white/70 mb-5">
                 新しい環境に入った直後、あなたの最初の一手は？
               </p>
+
               <div className="grid gap-3">
-                <button disabled={sending} onClick={() => onPick('A')}
-                        className="rounded-lg bg-neutral-800 hover:bg-neutral-700 px-4 py-3 text-left">
-                  A. とりあえず動く。やりながら整える。
-                </button>
-                <button disabled={sending} onClick={() => onPick('B')}
-                        className="rounded-lg bg-neutral-800 hover:bg-neutral-700 px-4 py-3 text-left">
-                  B. 目的と制約を先に決め、最短の選択肢を絞る。
-                </button>
-                <button disabled={sending} onClick={() => onPick('C')}
-                        className="rounded-lg bg-neutral-800 hover:bg-neutral-700 px-4 py-3 text-left">
-                  C. まず観測して小さく試し、次に要点を選び直す。
-                </button>
-                <button disabled={sending} onClick={() => onPick('D')}
-                        className="rounded-lg bg-neutral-800 hover:bg-neutral-700 px-4 py-3 text-left">
-                  D. どちらとも言えない／状況により変える。
-                </button>
+                <PressButton disabled={sending} onPress={() => onPick('A')}>
+                  <span className="block">A. とりあえず動く。やりながら整える。</span>
+                </PressButton>
+
+                <PressButton disabled={sending} onPress={() => onPick('B')}>
+                  <span className="block">B. 目的と制約を先に決め、最短の選択肢を絞る。</span>
+                </PressButton>
+
+                <PressButton disabled={sending} onPress={() => onPick('C')}>
+                  <span className="block">C. まず観測して小さく試し、次に要点を選び直す。</span>
+                </PressButton>
+
+                <PressButton disabled={sending} onPress={() => onPick('D')}>
+                  <span className="block">D. どちらとも言えない／状況により変える。</span>
+                </PressButton>
               </div>
+
               {error && <p className="mt-4 text-xs text-red-400">{error}</p>}
             </>
           ) : (
             <>
-              <h2 className="text-center text-lg font-bold mb-1">{res.type}（weight {res.weight.toFixed(1)}）</h2>
+              <h2 className="text-center text-lg font-bold mb-1">
+                {res.type}（weight {res.weight.toFixed(1)}）
+              </h2>
               <p className="text-center text-white/60 text-sm mb-4">{res.comment}</p>
 
               <div className="rounded-lg border border-white/10 p-4 bg-black/30">
-                <p className="text-sm"><span className="text-white/60">今日の一手：</span>{res.advice}</p>
+                <p className="text-sm">
+                  <span className="text-white/60">今日の一手：</span>{res.advice}
+                </p>
               </div>
 
               <div className="mt-6 grid grid-cols-2 gap-3">
-                <button onClick={() => router.push('/structure')}
-                        className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-pink-500 hover:opacity-90">
+                <PressButton onPress={() => router.push('/structure')} className="bg-gradient-to-r from-blue-500 to-pink-500 hover:opacity-90 border-0 text-center">
                   構造診断を始める
-                </button>
-                <button onClick={() => { setRes(null); setError(null) }}
-                        className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700">
+                </PressButton>
+                <PressButton onPress={() => { setRes(null); setError(null) }} className="bg-neutral-800 enabled:hover:bg-neutral-700">
                   もう一度
-                </button>
+                </PressButton>
               </div>
             </>
           )}
@@ -99,7 +173,9 @@ export default function QuickClient() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full py-4 text-center text-xs text-white/40">© 2025 Soul Layer Log</footer>
+      <footer className="w-full py-4 text-center text-xs text-white/40">
+        © 2025 Soul Layer Log
+      </footer>
     </div>
   )
 }

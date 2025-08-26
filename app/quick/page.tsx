@@ -1,4 +1,3 @@
-// app/structure/quick/page.tsx
 import { Suspense } from 'react'
 import QuickClient from './QuickClient'
 

@@ -34,9 +34,10 @@ function PressButton({
       type="button"
       disabled={disabled}
       aria-disabled={disabled}
-      // 300ms遅延やダブルタップ拡大の抑止
-      style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' as any }}
       className={[
+        // タップ最適化
+        'touch-manipulation',
+        // 視覚
         'relative rounded-lg border border-white/10 bg-neutral-800 px-4 py-3 text-left',
         'transition-transform duration-100 will-change-transform',
         'enabled:hover:bg-neutral-700',
@@ -49,16 +50,13 @@ function PressButton({
       onPointerCancel={() => { pressedRef.current = false; setPressed(false) }}
       onPointerLeave={() => { pressedRef.current = false; setPressed(false) }}
       onPointerUp={(e) => {
-        // スクロール等で離れた場合の誤発火を抑止
         if (!pressedRef.current || disabled) { setPressed(false); return }
         e.preventDefault()
         setPressed(false)
         pressedRef.current = false
         onPress()
-        // 軽い触覚（対応端末のみ）
         if ('vibrate' in navigator) { try { navigator.vibrate?.(8) } catch {} }
       }}
-      // キーボード操作（Enter/Space）
       onKeyDown={(e) => {
         if (disabled) return
         if (e.key === 'Enter' || e.key === ' ') {
@@ -114,10 +112,7 @@ export default function QuickClient() {
         </div>
       </header>
 
-      <main
-        className="flex-1 flex items-center justify-center px-5"
-        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' as any }}
-      >
+      <main className="flex-1 flex items-center justify-center px-5 touch-manipulation">
         <div className="w-full max-w-md bg-neutral-900/70 border border-white/10 rounded-xl p-6 shadow-[0_0_40px_rgba(255,255,255,0.05)]">
           {!res ? (
             <>

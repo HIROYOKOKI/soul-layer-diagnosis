@@ -72,13 +72,14 @@ function PressButton({
       ref={ref}
       type="button"
       disabled={disabled}
+       data-structure={structure ?? ''} 
       aria-disabled={disabled}
       className={[
         'btn-ripple btn-pressable touch-manipulation no-tap-highlight',
         'relative rounded-lg border border-white/10 px-4 py-3 text-left',
         'bg-neutral-800 enabled:hover:bg-neutral-700 transition',
         disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
-        glowClass(),
+      
         className,
       ].join(' ')}
       onPointerUp={(e) => {

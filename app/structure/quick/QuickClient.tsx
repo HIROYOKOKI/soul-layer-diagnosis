@@ -14,73 +14,73 @@ type Result = {
   advice: string
 }
 
-/* ======== モバイル安定＆押下エフェクト付きボタン ======== */
-function RippleButton({
+/* -------- 波紋＋押下エフェクト付きボタン（PressButton） -------- */
+function PressButton({
   disabled,
   onPress,
   children,
   className = '',
+  gradientRipple = true, // true: ピンク→ブルーの未来光, false: 白系
 }: {
   disabled?: boolean
   onPress: () => void
   children: React.ReactNode
   className?: string
+  gradientRipple?: boolean
 }) {
-  const [ripples, setRipples] = useState<{ x: number; y: number; id: number }[]>([])
-  const nextId = useRef(0)
+  const containerRef = useRef<HTMLButtonElement | null>(null)
 
   function createRipple(e: React.PointerEvent<HTMLButtonElement>) {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const size = Math.max(rect.width, rect.height)
-    const x = e.clientX - rect.left - size / 2
-    const y = e.clientY - rect.top - size / 2
-
-    const newRipple = { x, y, id: nextId.current++ }
-    setRipples((prev) => [...prev, newRipple])
-
-    setTimeout(() => {
-      setRipples((prev) => prev.filter((r) => r.id !== newRipple.id))
-    }, 600) // ripple duration
+    const el = containerRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const span = document.createElement('span')
+    span.className = `ripple ${gradientRipple ? 'ripple-gradient' : ''}`
+    // 最大半径：ボタンの長辺 * 1.2
+    const max = Math.max(rect.width, rect.height) * 1.2
+    span.style.left = `${x}px`
+    span.style.top = `${y}px`
+    span.style.width = `${max}px`
+    span.style.height = `${max}px`
+    el.appendChild(span)
+    span.addEventListener('animationend', () => span.remove())
   }
 
   return (
     <button
+      ref={containerRef}
       type="button"
       disabled={disabled}
+      aria-disabled={disabled}
+      className={[
+        'btn-ripple btn-pressable touch-manipulation',
+        'relative rounded-lg border border-white/10 px-4 py-3 text-left',
+        'bg-neutral-800 enabled:hover:bg-neutral-700 transition',
+        disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+        className,
+      ].join(' ')}
       onPointerUp={(e) => {
         if (disabled) return
         createRipple(e)
         onPress()
+        if ('vibrate' in navigator) { try { navigator.vibrate?.(8) } catch { /* noop */ } }
       }}
-      className={[
-        'relative overflow-hidden rounded-lg px-4 py-3 text-left',
-        'bg-neutral-800 enabled:hover:bg-neutral-700 transition duration-200',
-        disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
-        className,
-      ].join(' ')}
+      onKeyDown={(e) => {
+        if (disabled) return
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onPress()
+        }
+      }}
     >
       {children}
-
-      {/* Ripple layer */}
-      <span className="absolute inset-0 pointer-events-none">
-        {ripples.map((r) => (
-          <span
-            key={r.id}
-            className="absolute rounded-full bg-white/30 animate-ripple"
-            style={{
-              left: r.x,
-              top: r.y,
-              width: Math.max(200, r.x * 2),
-              height: Math.max(200, r.y * 2),
-            }}
-          />
-        ))}
-      </span>
     </button>
   )
 }
 
-
+/* ------------------------------- 画面本体 ------------------------------- */
 export default function QuickClient() {
   const router = useRouter()
   const [sending, setSending] = useState(false)
@@ -166,10 +166,10 @@ export default function QuickClient() {
               </div>
 
               <div className="mt-6 grid grid-cols-2 gap-3">
-                <PressButton onPress={() => router.push('/structure')} className="bg-gradient-to-r from-blue-500 to-pink-500 hover:opacity-90 border-0 text-center">
+                <PressButton onPress={() => router.push('/structure')} className="btn-glow">
                   構造診断を始める
                 </PressButton>
-                <PressButton onPress={() => { setRes(null); setError(null) }} className="bg-neutral-800 enabled:hover:bg-neutral-700">
+                <PressButton onPress={() => { setRes(null); setError(null) }}>
                   もう一度
                 </PressButton>
               </div>

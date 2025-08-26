@@ -84,37 +84,8 @@
 /* =========================
    Components（フォーム・ボタン）
    ========================= */
+/* ==== 波紋ベース：明るく、押した瞬間だけ強く光る ==== */
 @layer components {
-  .form-field { 
-    @apply w-full rounded-xl bg-white/10 border border-white/20 text-white px-3 py-3 outline-none focus:ring-2 focus:ring-white/30 placeholder:text-white/40;
-  }
-
-  .btn { 
-    @apply rounded-xl px-4 py-3 font-semibold bg-white/10 text-white hover:bg-white/15 border border-white/20 transition;
-  }
-
-  .btn-primary { 
-    @apply text-black border-0;
-    background: var(--accent);
-    box-shadow: var(--accent-shadow);
-  }
-
-  /* 未来感の波紋エフェクト用：ボタンの土台 */
-  .btn-ripple {
-    position: relative;
-    overflow: hidden;
-    transform: translateZ(0); /* レイヤ促進でカクつき防止 */
-  }
-
-  /* 押下中のわずかな縮小（自然なタップ感） */
-  .btn-pressable {
-    transition: transform 120ms ease;
-  }
-  .btn-pressable:active {
-    transform: scale(0.98);
-  }
-
-  /* 波紋ベース：背景は個別クラスで与える */
   .ripple {
     position: absolute;
     border-radius: 9999px;
@@ -122,37 +93,45 @@
     width: 24px;
     height: 24px;
     transform: translate(-50%, -50%) scale(0);
-    animation: ripple 600ms linear forwards;
-    mix-blend-mode: screen; /* 光感を強める */
+    animation: ripple-bright 650ms ease-out forwards;
+    mix-blend-mode: color-dodge;          /* 明るさを加算的に */
+    filter: drop-shadow(0 0 12px rgba(255,255,255,.35));
   }
 
-  /* ── 波紋の色バリエーション ── */
-  /* テーマ色（--accent-rgb） */
+  /* テーマ色 */
   .ripple-accent {
     background: radial-gradient(closest-side,
-      rgba(var(--accent-rgb), 0.45),
-      rgba(var(--accent-rgb), 0.25),
-      transparent);
+      rgba(var(--accent-rgb), 0.85),
+      rgba(var(--accent-rgb), 0.45) 40%,
+      rgba(var(--accent-rgb), 0.12) 70%,
+      transparent 100%);
   }
-  /* 構造別（E/V/Λ/Ǝ） */
-  .ripple-e   { background: radial-gradient(closest-side, rgba(var(--accent-e-rgb), 0.45),   rgba(var(--accent-e-rgb), 0.25),   transparent); }
-  .ripple-v   { background: radial-gradient(closest-side, rgba(var(--accent-v-rgb), 0.45),   rgba(var(--accent-v-rgb), 0.25),   transparent); }
-  .ripple-l   { background: radial-gradient(closest-side, rgba(var(--accent-l-rgb), 0.45),   rgba(var(--accent-l-rgb), 0.25),   transparent); }
-  .ripple-eps { background: radial-gradient(closest-side, rgba(var(--accent-eps-rgb), 0.45), rgba(var(--accent-eps-rgb), 0.25), transparent); }
+  /* 構造別色（E/V/Λ/Ǝ） */
+  .ripple-e   { background: radial-gradient(closest-side, rgba(var(--accent-e-rgb), 0.85),   rgba(var(--accent-e-rgb), 0.45) 40%,   rgba(var(--accent-e-rgb), 0.12) 70%,   transparent); }
+  .ripple-v   { background: radial-gradient(closest-side, rgba(var(--accent-v-rgb), 0.85),   rgba(var(--accent-v-rgb), 0.45) 40%,   rgba(var(--accent-v-rgb), 0.12) 70%,   transparent); }
+  .ripple-l   { background: radial-gradient(closest-side, rgba(var(--accent-l-rgb), 0.85),   rgba(var(--accent-l-rgb), 0.45) 40%,   rgba(var(--accent-l-rgb), 0.12) 70%,   transparent); }
+  .ripple-eps { background: radial-gradient(closest-side, rgba(var(--accent-eps-rgb), 0.85), rgba(var(--accent-eps-rgb), 0.45) 40%, rgba(var(--accent-eps-rgb), 0.12) 70%, transparent); }
 
-  /* 参考：グラデーション版（ピンク→ブルーの未来光） */
-  .ripple-gradient {
-    background: radial-gradient(closest-side, rgba(255,79,223,0.45), rgba(79,195,255,0.35), transparent);
-  }
+  /* 押下中の軽い縮小（プリ効果はこれだけ・色は変えない） */
+  .btn-pressable { transition: transform 120ms ease; }
+  .btn-pressable:active { transform: scale(.985); }
 
-  /* 主要ボタンに未来光の外縁（テーマ強め） */
-  .btn-glow { box-shadow: var(--accent-shadow-strong); }
+  /* 事前の外周グローは完全OFF（プリエフェクト削除） */
+}
 
-  /* 構造別の外縁グロー */
-  .glow-e   { box-shadow: 0 0 20px rgba(var(--accent-e-rgb), 0.25); }
-  .glow-v   { box-shadow: 0 0 20px rgba(var(--accent-v-rgb), 0.25); }
-  .glow-l   { box-shadow: 0 0 20px rgba(var(--accent-l-rgb), 0.25); }
-  .glow-eps { box-shadow: 0 0 20px rgba(var(--accent-eps-rgb),0.25); }
+/* ==== 押している間だけ外周が光る（構造別） ==== */
+@layer components {
+  .btn-ripple[data-structure="E"]:active  { box-shadow: 0 0 30px rgba(var(--accent-e-rgb), .55); }
+  .btn-ripple[data-structure="V"]:active  { box-shadow: 0 0 30px rgba(var(--accent-v-rgb), .55); }
+  .btn-ripple[data-structure="Λ"]:active  { box-shadow: 0 0 30px rgba(var(--accent-l-rgb), .55); }
+  .btn-ripple[data-structure="Ǝ"]:active  { box-shadow: 0 0 30px rgba(var(--accent-eps-rgb), .55); }
+}
+
+/* ==== 波紋アニメ（拡大率UP & 少し長め） ==== */
+@keyframes ripple-bright {
+  0%   { transform: translate(-50%, -50%) scale(0);   opacity: .95; }
+  70%  { transform: translate(-50%, -50%) scale(5.2); opacity: .25; }
+  100% { transform: translate(-50%, -50%) scale(6.2); opacity: 0;   }
 }
 
 /* =========================

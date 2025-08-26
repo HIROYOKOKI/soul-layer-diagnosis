@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 
 type Choice = 'A'|'B'|'C'|'D'
+type StructureLetter = 'E'|'V'|'Λ'|'Ǝ'
 type Result = {
   id: string
   type: 'EVΛƎ型' | 'EΛVƎ型' | 'ΛƎEΛ型' | '中立'
@@ -14,31 +15,49 @@ type Result = {
   advice: string
 }
 
-/* -------- 波紋＋押下エフェクト付きボタン（PressButton） -------- */
+/* ---- 波紋＋グロー／構造色連動ボタン ---- */
 function PressButton({
   disabled,
   onPress,
   children,
   className = '',
-  gradientRipple = true, // true: ピンク→ブルーの未来光, false: 白系
+  structure, // 'E' | 'V' | 'Λ' | 'Ǝ' | undefined
 }: {
   disabled?: boolean
   onPress: () => void
   children: React.ReactNode
   className?: string
-  gradientRipple?: boolean
+  structure?: StructureLetter
 }) {
-  const containerRef = useRef<HTMLButtonElement | null>(null)
+  const ref = useRef<HTMLButtonElement | null>(null)
+
+  function rippleClass() {
+    switch (structure) {
+      case 'E':  return 'ripple-e'
+      case 'V':  return 'ripple-v'
+      case 'Λ':  return 'ripple-l'
+      case 'Ǝ':  return 'ripple-eps'
+      default:   return 'ripple-accent'
+    }
+  }
+  function glowClass() {
+    switch (structure) {
+      case 'E':  return 'glow-e'
+      case 'V':  return 'glow-v'
+      case 'Λ':  return 'glow-l'
+      case 'Ǝ':  return 'glow-eps'
+      default:   return ''
+    }
+  }
 
   function createRipple(e: React.PointerEvent<HTMLButtonElement>) {
-    const el = containerRef.current
+    const el = ref.current
     if (!el) return
     const rect = el.getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
     const span = document.createElement('span')
-    span.className = `ripple ${gradientRipple ? 'ripple-gradient' : ''}`
-    // 最大半径：ボタンの長辺 * 1.2
+    span.className = `ripple ${rippleClass()}`
     const max = Math.max(rect.width, rect.height) * 1.2
     span.style.left = `${x}px`
     span.style.top = `${y}px`
@@ -50,29 +69,27 @@ function PressButton({
 
   return (
     <button
-      ref={containerRef}
+      ref={ref}
       type="button"
       disabled={disabled}
       aria-disabled={disabled}
       className={[
-        'btn-ripple btn-pressable touch-manipulation',
+        'btn-ripple btn-pressable touch-manipulation no-tap-highlight',
         'relative rounded-lg border border-white/10 px-4 py-3 text-left',
         'bg-neutral-800 enabled:hover:bg-neutral-700 transition',
         disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+        glowClass(),
         className,
       ].join(' ')}
       onPointerUp={(e) => {
         if (disabled) return
         createRipple(e)
         onPress()
-        if ('vibrate' in navigator) { try { navigator.vibrate?.(8) } catch { /* noop */ } }
+        if ('vibrate' in navigator) { try { navigator.vibrate?.(8) } catch {} }
       }}
       onKeyDown={(e) => {
         if (disabled) return
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onPress()
-        }
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPress() }
       }}
     >
       {children}
@@ -80,12 +97,20 @@ function PressButton({
   )
 }
 
-/* ------------------------------- 画面本体 ------------------------------- */
+/* ---- 画面本体 ---- */
 export default function QuickClient() {
   const router = useRouter()
   const [sending, setSending] = useState(false)
   const [res, setRes] = useState<Result | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // ★ A/B/C/D → E/V/Λ/Ǝ の割当（必要に応じてここをあなたの設計に合わせて変更）
+  const choiceToStructure: Record<Choice, StructureLetter> = {
+    A: 'E',  // とりあえず動く → 衝動
+    B: 'Λ',  // 目的と制約 → 選択
+    C: 'Ǝ',  // まず観測 → 観測
+    D: 'V',  // どちらでも → 可能性（中庸）
+  }
 
   async function onPick(choice: Choice) {
     if (sending) return
@@ -112,14 +137,7 @@ export default function QuickClient() {
       {/* Header */}
       <header className="w-full p-4 flex justify-center">
         <div className="h-8">
-          <Image
-            src="/evae-logo.svg"
-            alt="EVΛƎ"
-            width={96}
-            height={32}
-            priority
-            className="h-8 w-auto"
-          />
+          <Image src="/evae-logo.svg" alt="EVΛƎ" width={96} height={32} priority className="h-8 w-auto" />
         </div>
       </header>
 
@@ -128,24 +146,19 @@ export default function QuickClient() {
           {!res ? (
             <>
               <h2 className="text-center text-lg font-bold mb-4">クイック判定（1問）</h2>
-              <p className="text-sm text-white/70 mb-5">
-                新しい環境に入った直後、あなたの最初の一手は？
-              </p>
+              <p className="text-sm text-white/70 mb-5">新しい環境に入った直後、あなたの最初の一手は？</p>
 
               <div className="grid gap-3">
-                <PressButton disabled={sending} onPress={() => onPick('A')}>
+                <PressButton structure={choiceToStructure.A} disabled={sending} onPress={() => onPick('A')}>
                   <span className="block">A. とりあえず動く。やりながら整える。</span>
                 </PressButton>
-
-                <PressButton disabled={sending} onPress={() => onPick('B')}>
+                <PressButton structure={choiceToStructure.B} disabled={sending} onPress={() => onPick('B')}>
                   <span className="block">B. 目的と制約を先に決め、最短の選択肢を絞る。</span>
                 </PressButton>
-
-                <PressButton disabled={sending} onPress={() => onPick('C')}>
+                <PressButton structure={choiceToStructure.C} disabled={sending} onPress={() => onPick('C')}>
                   <span className="block">C. まず観測して小さく試し、次に要点を選び直す。</span>
                 </PressButton>
-
-                <PressButton disabled={sending} onPress={() => onPick('D')}>
+                <PressButton structure={choiceToStructure.D} disabled={sending} onPress={() => onPick('D')}>
                   <span className="block">D. どちらとも言えない／状況により変える。</span>
                 </PressButton>
               </div>
@@ -160,16 +173,14 @@ export default function QuickClient() {
               <p className="text-center text-white/60 text-sm mb-4">{res.comment}</p>
 
               <div className="rounded-lg border border-white/10 p-4 bg-black/30">
-                <p className="text-sm">
-                  <span className="text-white/60">今日の一手：</span>{res.advice}
-                </p>
+                <p className="text-sm"><span className="text-white/60">今日の一手：</span>{res.advice}</p>
               </div>
 
               <div className="mt-6 grid grid-cols-2 gap-3">
-                <PressButton onPress={() => router.push('/structure')} className="btn-glow">
+                <PressButton structure="V" onPress={() => router.push('/structure')}>
                   構造診断を始める
                 </PressButton>
-                <PressButton onPress={() => { setRes(null); setError(null) }}>
+                <PressButton structure="Ǝ" onPress={() => { setRes(null); setError(null) }}>
                   もう一度
                 </PressButton>
               </div>
@@ -178,10 +189,7 @@ export default function QuickClient() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full py-4 text-center text-xs text-white/40">
-        © 2025 Soul Layer Log
-      </footer>
+      <footer className="w-full py-4 text-center text-xs text-white/40">© 2025 Soul Layer Log</footer>
     </div>
   )
 }

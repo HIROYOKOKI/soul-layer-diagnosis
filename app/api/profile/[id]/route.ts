@@ -11,10 +11,12 @@ function getSupabase() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
-// context.params が {id:string} または Promise<{id:string}> の双方に対応
-type Ctx =
-  | { params: { id: string } }
-  | { params: Promise<{ id: string }> }
+type MaybePromise<T> = T | Promise<T>
+function isPromise<T>(v: unknown): v is Promise<T> {
+  return typeof (v as Promise<T>)?.then === 'function'
+}
+
+type Ctx = { params: MaybePromise<{ id: string }> }
 
 export async function GET(_req: Request, context: Ctx) {
   const supabase = getSupabase()
@@ -22,10 +24,9 @@ export async function GET(_req: Request, context: Ctx) {
     return NextResponse.json({ error: 'Server env not set' }, { status: 500 })
   }
 
-  // params を実体化
-  const raw = (context as any).params
-  const resolved = raw && typeof raw.then === 'function' ? await raw : raw
-  const id = (resolved?.id ?? '') as string
+  const raw = context.params
+  const resolved = isPromise<{ id: string }>(raw) ? await raw : raw
+  const id = resolved?.id ?? ''
   if (!id) {
     return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
   }

@@ -113,43 +113,29 @@ export default function QuickClient() {
     D: 'V',  // どちらでも → 可能性（中庸）
   }
 
-  async function onPick(choice: Choice) {
-  if (sending) return
-  setSending(true)
-  setError(null)
+  // ... 省略（PressButton はそのまま）
 
-  const ac = new AbortController()
-  const t = setTimeout(() => ac.abort(), 15000)
+async function onPick(choice: Choice) {
+  if (sending) return
+  setSending(true); setError(null)
 
   try {
     const r = await fetch('/api/structure/quick/diagnose', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ choice }),
-      cache: 'no-store',
-      signal: ac.signal,
+      method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ choice }), cache:'no-store'
     })
+    if (!r.ok) throw new Error(`API ${r.status}: ${await r.text()}`)
+    const data = await r.json() as { type:string; weight:number; comment:string; advice:string }
 
-    // 失敗の詳細を表示
-    if (!r.ok) {
-      let detail = ''
-      try {
-        const txt = await r.text()
-        detail = txt?.slice(0, 200) || ''
-      } catch {}
-      throw new Error(`API ${r.status}: ${detail}`)
-    }
+    // 確認用キャッシュ
+    try { sessionStorage.setItem('structure_quick_pending', JSON.stringify(data)) } catch {}
 
-    const data: Result = await r.json()
-    try { sessionStorage.setItem('structure_quick_last', JSON.stringify(data)) } catch {}
-    router.push(`/structure/quick/confirm?id=${encodeURIComponent(data.id)}`)
+    // IDなしで確認へ
+    router.push('/structure/quick/confirm')
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'unknown error'
-    setError(`保存に失敗しました（${msg}）`)
-    // デバッグ用にコンソールにも
-    console.error('[quick/diagnose] failed:', e)
+    const msg = e instanceof Error ? e.message : 'unknown'
+    setError(`診断に失敗しました（${msg}）`)
   } finally {
-    clearTimeout(t)
     setSending(false)
   }
 }

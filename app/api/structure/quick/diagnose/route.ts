@@ -1,93 +1,116 @@
 // app/api/structure/quick/diagnose/route.ts
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 
-type Choice = 'A'|'B'|'C'|'D'
+type Choice = 'A' | 'B' | 'C' | 'D'
 type QuickResultType = 'EVΛƎ型' | 'EΛVƎ型' | 'ΛƎEΛ型' | '中立'
 
+type RowInsert = {
+  // Supabase 側で id は uuid default なら省略可。既にid生成するなら string を含めてもOK
+  type: QuickResultType
+  weight: number
+  comment: string
+  advice: string
+}
+
+type RowSelect = {
+  id: string
+  type: QuickResultType
+  weight: number
+  comment: string
+  advice: string
+}
+
 function getSupabase() {
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!url || !key) return null
+  // AnonキーでOK（RLSポリシーがINSERT/SELECT許可になっている前提）
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
-function mapChoice(choice: Choice): { type: QuickResultType; comment: string; advice: string; weight: number } {
+// A/B/C/D → タイプ・コメントなどを返す
+function mapChoice(choice: Choice): { type: QuickResultType; weight: number; comment: string; advice: string } {
   switch (choice) {
     case 'A':
       return {
         type: 'EVΛƎ型',
-        comment: 'まず動いて景色を変える起動型。勢いと即応で道を拓くが、振り返りの間を忘れがち。',
-        advice: '5分だけログを書く。動きの痕跡が次の加速になる。',
-        weight: 0.8
+        weight: 0.8, // A/B/C=0.8, D=0.3 の仕様
+        comment: '衝動と行動で流れを作る傾向。まず動いて学びを回収するタイプ。',
+        advice: '小さく始めて10分だけ着手。後で整える前提で前へ。'
       }
     case 'B':
       return {
-        type: 'EΛVƎ型',
-        comment: '目的と制約を先に確定し要点を選ぶ戦略型。決断が速い反面、余白を削り過ぎに注意。',
-        advice: '“遊び時間”を15分入れる。発見は余白に宿る。',
-        weight: 0.8
+        type: 'ΛƎEΛ型',
+        weight: 0.8,
+        comment: '制約と目的から最短を選ぶ傾向。判断の速さが強み。',
+        advice: '目的→制約→手順の3点をメモに落としてからGO。'
       }
     case 'C':
       return {
-        type: 'ΛƎEΛ型',
-        comment: '観測→小さく選択→点火→再選択の検証主義。精度は高いが初速は控えめ。',
-        advice: 'ミニ実験を1つ増やす。失敗基準も先に決める。',
-        weight: 0.8
+        type: 'EΛVƎ型',
+        weight: 0.8,
+        comment: '観測→小実験→選び直しの循環。状況把握が得意。',
+        advice: 'まず1回だけ試す。結果を観て次の一手を更新。'
       }
     case 'D':
     default:
       return {
         type: '中立',
-        comment: '状況に応じて回路を切替える柔軟型。芯の起動順が曖昧だと迷いやすい。',
-        advice: '今日は最初の一歩をE/V/Λ/Ǝのどれにするか宣言して始める。',
-        weight: 0.3
+        weight: 0.3,
+        comment: '状況適応型。どの構造にも寄り過ぎない柔軟さ。',
+        advice: '今は「やらない」も選択。時間を区切って再判断。'
       }
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const supabase = getSupabase()
-    if (!supabase) return NextResponse.json({ error: 'Server env not set' }, { status: 500 })
+    if (!supabase) {
+      return NextResponse.json({ error: 'Server env not set (NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY)' }, { status: 500 })
+    }
 
-    const body = await req.json() as { choice?: Choice; user_id?: string | null }
-    const choice = body.choice
-    if (!choice || !['A','B','C','D'].includes(choice)) {
+    const body = (await req.json()) as { choice?: Choice }
+    const choice = body?.choice
+    if (!choice || !['A', 'B', 'C', 'D'].includes(choice)) {
       return NextResponse.json({ error: 'Invalid choice' }, { status: 400 })
     }
 
     const mapped = mapChoice(choice as Choice)
 
-    // 保存：structure_results（なければ作成してね）
-    const { data, error } = await supabase
-      .from('structure_results')
-      .insert([{
-        kind: 'quick',              // 種別
-        choice,                     // A/B/C/D
-        type: mapped.type,          // EVΛƎ型など
-        weight: mapped.weight,      // 0.8 or 0.3
-        user_id: body.user_id ?? null
-      }])
-      .select('id,type,weight')
-      .single()
-
-    if (error) {
-      console.error('[Supabase] quick insert error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({
-      id: data.id,
+    // INSERT → id を返す
+    const payload: RowInsert = {
       type: mapped.type,
       weight: mapped.weight,
       comment: mapped.comment,
-      advice: mapped.advice
-    })
+      advice: mapped.advice,
+    }
+
+    const { data, error } = await supabase
+      .from('structure_results')
+      .insert(payload)
+      .select('id,type,weight,comment,advice')
+      .single<RowSelect>()
+
+    if (error) {
+      return NextResponse.json({ error: `supabase insert failed: ${error.message}` }, { status: 500 })
+    }
+
+    return NextResponse.json(
+      {
+        id: data.id,
+        type: data.type,
+        weight: data.weight,
+        comment: data.comment,
+        advice: data.advice,
+      },
+      { status: 200 }
+    )
   } catch (e) {
-    console.error('quick diagnose error:', e)
-    return NextResponse.json({ error: 'Failed to diagnose' }, { status: 500 })
+    const msg = e instanceof Error ? e.message : 'unknown error'
+    return NextResponse.json({ error: `unexpected: ${msg}` }, { status: 500 })
   }
 }

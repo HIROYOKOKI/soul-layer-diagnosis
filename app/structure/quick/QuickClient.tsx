@@ -1,3 +1,4 @@
+// app/structure/quick/QuickClient.tsx
 'use client'
 
 import { useState, useRef } from 'react'
@@ -65,7 +66,7 @@ function mapChoice(choice: Choice): Pending {
   }
 }
 
-/* 波紋付きボタン（省略版） */
+/* 波紋付きボタン（簡略版） */
 function PressButton({
   disabled, onPress, children, structure,
 }: { disabled?: boolean; onPress: () => void; children: React.ReactNode; structure?: StructureLetter }) {
@@ -95,7 +96,7 @@ export default function QuickClient() {
     setSending(true); setError(null)
     try {
       const pending = mapChoice(choice)
-      // ★ ここで sessionStorage に保存！
+      // ★ ここで選択内容と結果を sessionStorage に保存！
       sessionStorage.setItem('structure_quick_pending', JSON.stringify(pending))
       // 確認ページへ遷移
       router.push('/structure/quick/confirm')

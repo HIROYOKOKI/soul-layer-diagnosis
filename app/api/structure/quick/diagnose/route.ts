@@ -1,43 +1,25 @@
 // app/api/structure/quick/diagnose/route.ts
 import { NextResponse, NextRequest } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 
 type Choice = 'A' | 'B' | 'C' | 'D'
 type QuickResultType = 'EVΛƎ型' | 'EΛVƎ型' | 'ΛƎEΛ型' | '中立'
 
-type RowInsert = {
-  // Supabase 側で id は uuid default なら省略可。既にid生成するなら string を含めてもOK
+type Result = {
   type: QuickResultType
   weight: number
   comment: string
   advice: string
-}
-
-type RowSelect = {
-  id: string
-  type: QuickResultType
-  weight: number
-  comment: string
-  advice: string
-}
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !key) return null
-  // AnonキーでOK（RLSポリシーがINSERT/SELECT許可になっている前提）
-  return createClient(url, key, { auth: { persistSession: false } })
 }
 
 // A/B/C/D → タイプ・コメントなどを返す
-function mapChoice(choice: Choice): { type: QuickResultType; weight: number; comment: string; advice: string } {
+function mapChoice(choice: Choice): Result {
   switch (choice) {
     case 'A':
       return {
         type: 'EVΛƎ型',
-        weight: 0.8, // A/B/C=0.8, D=0.3 の仕様
+        weight: 0.8,
         comment: '衝動と行動で流れを作る傾向。まず動いて学びを回収するタイプ。',
         advice: '小さく始めて10分だけ着手。後で整える前提で前へ。'
       }
@@ -68,11 +50,6 @@ function mapChoice(choice: Choice): { type: QuickResultType; weight: number; com
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getSupabase()
-    if (!supabase) {
-      return NextResponse.json({ error: 'Server env not set (NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY)' }, { status: 500 })
-    }
-
     const body = (await req.json()) as { choice?: Choice }
     const choice = body?.choice
     if (!choice || !['A', 'B', 'C', 'D'].includes(choice)) {
@@ -81,31 +58,13 @@ export async function POST(req: NextRequest) {
 
     const mapped = mapChoice(choice as Choice)
 
-    // INSERT → id を返す
-    const payload: RowInsert = {
-      type: mapped.type,
-      weight: mapped.weight,
-      comment: mapped.comment,
-      advice: mapped.advice,
-    }
-
-    const { data, error } = await supabase
-      .from('structure_results')
-      .insert(payload)
-      .select('id,type,weight,comment,advice')
-      .single<RowSelect>()
-
-    if (error) {
-      return NextResponse.json({ error: `supabase insert failed: ${error.message}` }, { status: 500 })
-    }
-
+    // 保存せず、診断結果だけ返す
     return NextResponse.json(
       {
-        id: data.id,
-        type: data.type,
-        weight: data.weight,
-        comment: data.comment,
-        advice: data.advice,
+        type: mapped.type,
+        weight: mapped.weight,
+        comment: mapped.comment,
+        advice: mapped.advice,
       },
       { status: 200 }
     )

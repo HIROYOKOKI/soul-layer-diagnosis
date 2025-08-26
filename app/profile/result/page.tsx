@@ -2,7 +2,8 @@
 import { Suspense } from 'react'
 import ResultClient from './ResultClient'
 
-export const dynamic = 'force-dynamic'  // SSGを避ける
+export const dynamic = 'force-dynamic'   // 事前レンダーを避ける
+export const revalidate = 0
 
 export default function Page() {
   return (

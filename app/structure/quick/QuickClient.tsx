@@ -15,7 +15,7 @@ type Result = {
 }
 
 /* ======== モバイル安定＆押下エフェクト付きボタン ======== */
-function PressButton({
+function RippleButton({
   disabled,
   onPress,
   children,
@@ -26,49 +26,60 @@ function PressButton({
   children: React.ReactNode
   className?: string
 }) {
-  const [pressed, setPressed] = useState(false)
-  const pressedRef = useRef(false)
+  const [ripples, setRipples] = useState<{ x: number; y: number; id: number }[]>([])
+  const nextId = useRef(0)
+
+  function createRipple(e: React.PointerEvent<HTMLButtonElement>) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const size = Math.max(rect.width, rect.height)
+    const x = e.clientX - rect.left - size / 2
+    const y = e.clientY - rect.top - size / 2
+
+    const newRipple = { x, y, id: nextId.current++ }
+    setRipples((prev) => [...prev, newRipple])
+
+    setTimeout(() => {
+      setRipples((prev) => prev.filter((r) => r.id !== newRipple.id))
+    }, 600) // ripple duration
+  }
 
   return (
     <button
       type="button"
       disabled={disabled}
-      aria-disabled={disabled}
+      onPointerUp={(e) => {
+        if (disabled) return
+        createRipple(e)
+        onPress()
+      }}
       className={[
-        // タップ最適化
-        'touch-manipulation',
-        // 視覚
-        'relative rounded-lg border border-white/10 bg-neutral-800 px-4 py-3 text-left',
-        'transition-transform duration-100 will-change-transform',
-        'enabled:hover:bg-neutral-700',
-        pressed ? 'scale-[0.98]' : '',
+        'relative overflow-hidden rounded-lg px-4 py-3 text-left',
+        'bg-neutral-800 enabled:hover:bg-neutral-700 transition duration-200',
         disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
         className,
       ].join(' ')}
-      // Pointer系で統一（iOS Safari 安定）
-      onPointerDown={() => { pressedRef.current = true; setPressed(true) }}
-      onPointerCancel={() => { pressedRef.current = false; setPressed(false) }}
-      onPointerLeave={() => { pressedRef.current = false; setPressed(false) }}
-      onPointerUp={(e) => {
-        if (!pressedRef.current || disabled) { setPressed(false); return }
-        e.preventDefault()
-        setPressed(false)
-        pressedRef.current = false
-        onPress()
-        if ('vibrate' in navigator) { try { navigator.vibrate?.(8) } catch {} }
-      }}
-      onKeyDown={(e) => {
-        if (disabled) return
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onPress()
-        }
-      }}
     >
       {children}
+
+      {/* Ripple layer */}
+      <span className="absolute inset-0 pointer-events-none">
+        {ripples.map((r) => (
+          <span
+            key={r.id}
+            className="absolute rounded-full bg-white/30 animate-ripple"
+            style={{
+              left: r.x,
+              top: r.y,
+              width: Math.max(200, r.x * 2),
+              height: Math.max(200, r.y * 2),
+            }}
+          />
+        ))}
+      </span>
     </button>
   )
 }
+
 
 export default function QuickClient() {
   const router = useRouter()

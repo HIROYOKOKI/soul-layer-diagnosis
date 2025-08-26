@@ -1,108 +1,93 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 
-type Result = {
-  id: string
-  type: 'EVΛƎ型' | 'EΛVƎ型' | 'ΛƎEΛ型' | '中立'
-  weight: number
-  comment: string
-  advice: string
-}
+type QuickResultType = 'EVΛƎ型' | 'EΛVƎ型' | 'ΛƎEΛ型' | '中立'
+type Result = { type: QuickResultType; weight: number; comment: string; advice: string }
 
 export default function ConfirmClient() {
-  const sp = useSearchParams()
-  const id = sp.get('id')
   const router = useRouter()
-  const [data, setData] = useState<Result | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const cacheKey = useMemo(() => 'structure_quick_last', [])
+  const [pending, setPending] = useState<Result | null>(null)
+  const [revealed, setRevealed] = useState(false) // ← 確認ボタン後に結果を表示
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string|null>(null)
 
   useEffect(() => {
-    let mounted = true
-    async function run() {
-      if (!id) { setError('無効なリンクです'); setLoading(false); return }
+    try {
+      const raw = sessionStorage.getItem('structure_quick_pending')
+      if (raw) setPending(JSON.parse(raw) as Result)
+    } catch {}
+  }, [])
 
-      // 1) まず sessionStorage から即座に表示（あれば）
-      try {
-        const raw = sessionStorage.getItem(cacheKey)
-        if (raw) {
-          const cached: Result = JSON.parse(raw)
-          if (cached?.id === id) {
-            if (mounted) setData(cached)
-          }
-        }
-      } catch { /* ignore */ }
-
-      // 2) サーバから最新を取得
-      try {
-        const ac = new AbortController()
-        const t = setTimeout(() => ac.abort(), 15000)
-        const r = await fetch(`/api/structure/quick/result?id=${encodeURIComponent(id)}`, { signal: ac.signal })
-        clearTimeout(t)
-        if (!r.ok) throw new Error('fetch failed')
-        const fresh: Result = await r.json()
-        if (mounted) setData(fresh)
-        try { sessionStorage.setItem(cacheKey, JSON.stringify(fresh)) } catch {}
-      } catch {
-        if (!data) setError('結果の取得に失敗しました。時間をおいて再度お試しください。')
-      } finally {
-        if (mounted) setLoading(false)
-      }
+  async function onSave() {
+    if (!pending || saving) return
+    setSaving(true); setError(null)
+    try {
+      const r = await fetch('/api/structure/quick/save', {
+        method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ type: pending.type, weight: pending.weight, comment: pending.comment }),
+      })
+      if (!r.ok) throw new Error(`API ${r.status}: ${await r.text()}`)
+      const data = await r.json() as { id: string }
+      sessionStorage.removeItem('structure_quick_pending')
+      router.push(`/structure/quick/result?id=${encodeURIComponent(data.id)}`)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'unknown'
+      setError(`保存に失敗しました（${msg}）`)
+    } finally {
+      setSaving(false)
     }
-    run()
-    return () => { mounted = false }
-  }, [id, cacheKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">
-      {/* Header */}
       <header className="w-full p-4 flex justify-center">
         <div className="h-8">
-          <Image src="/evae-logo.svg" alt="EVΛƎ" width={96} height={32} priority className="h-8 w-auto" />
+          <Image src="/evae-logo.svg" alt="EVΛƎ" width={96} height={32} priority className="h-8 w-auto"/>
         </div>
       </header>
 
       <main className="flex-1 flex items-center justify-center px-5">
         <div className="w-full max-w-md bg-neutral-900/70 border border-white/10 rounded-xl p-6 shadow-[0_0_40px_rgba(255,255,255,0.05)]">
-          {loading ? (
-            <p className="text-center text-white/60">読み込み中…</p>
-          ) : error ? (
-            <p className="text-center text-red-400 text-sm">{error}</p>
-          ) : data ? (
+          {!pending ? (
+            <div className="text-center">
+              <p className="text-red-400">クイック判定データがありません。</p>
+              <button className="btn mt-4" onPointerUp={() => router.push('/structure/quick')}>クイック判定に戻る</button>
+            </div>
+          ) : !revealed ? (
             <>
-              <h2 className="text-center text-lg font-bold mb-1">
-                {data.type}（weight {data.weight.toFixed(1)}）
-              </h2>
-              <p className="text-center text-white/60 text-sm mb-4">{data.comment}</p>
-
-              <div className="rounded-lg border border-white/10 p-4 bg-black/30">
-                <p className="text-sm"><span className="text-white/60">今日の一手：</span>{data.advice}</p>
-              </div>
-
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  className="btn btn-pressable btn-ripple touch-manipulation"
-                  onPointerUp={() => router.push('/structure')}
-                >
-                  構造診断を始める
+              <h2 className="text-center text-lg font-bold mb-3">内容の確認</h2>
+              <p className="text-center text-white/70 text-sm mb-5">
+                これから結果を表示します。内容に問題なければ、その後「保存する」を押してください。
+              </p>
+              <div className="grid gap-3">
+                <button className="btn btn-primary btn-pressable btn-ripple touch-manipulation" onPointerUp={() => setRevealed(true)}>
+                  結果を表示
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-pressable btn-ripple touch-manipulation"
-                  onPointerUp={() => router.push('/structure/quick')}
-                >
-                  もう一度
+                <button className="btn btn-pressable btn-ripple touch-manipulation" onPointerUp={() => router.push('/structure/quick')}>
+                  やり直す
                 </button>
               </div>
             </>
           ) : (
-            <p className="text-center text-white/60">データが見つかりません。</p>
+            <>
+              <h2 className="text-center text-lg font-bold mb-1">{pending.type}（weight {pending.weight.toFixed(1)}）</h2>
+              <p className="text-center text-white/60 text-sm mb-4">{pending.comment}</p>
+              <div className="rounded-lg border border-white/10 p-4 bg-black/30 mb-4">
+                <p className="text-sm"><span className="text-white/60">今日の一手：</span>{pending.advice}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <button className="btn btn-primary btn-pressable btn-ripple touch-manipulation" disabled={saving} onPointerUp={onSave}>
+                  {saving ? '保存中…' : '保存する'}
+                </button>
+                <button className="btn btn-pressable btn-ripple touch-manipulation" onPointerUp={() => setRevealed(false)}>
+                  戻る
+                </button>
+              </div>
+              {error && <p className="mt-4 text-xs text-red-400">{error}</p>}
+            </>
           )}
         </div>
       </main>

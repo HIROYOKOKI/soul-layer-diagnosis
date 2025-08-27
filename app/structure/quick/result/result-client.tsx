@@ -2,99 +2,92 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
-type Row = {
-  id: number
-  type_label: string
-  comment: string | null
-  e_score: number
-  v_score: number
-  lambda_score: number
-  e_rev_score: number
-  created_at: string
+type EV = 'E'|'V'|'Λ'|'Ǝ'
+type PendingV1 = {
+  choiceText: string
+  code: EV
+  result: { type:string; weight:number; comment:string; advice?:string }
+  _meta?: { ts:number; v:'quick-v1' }
 }
 
-function adviceByType(t: string): string {
-  switch (t) {
-    case 'EVΛƎ型': return '小さく始めて10分だけ着手。後で整える前提で前へ。'
-    case 'EΛVƎ型': return 'まず1回だけ試す。結果を観て次の一手を更新。'
-    case 'ΛEƎV型': return '目的→制約→手順の3点をメモに落としてからGO。'
-    case 'ƎVΛE型': return '今日は観測者でいこう。気づきを1つだけメモする。'
-    default:        return '今は「やらない」も選択。時間を区切って再判断。'
-  }
+function getGuestId(): string {
+  if (typeof window === 'undefined') return 'guest-server'
+  try {
+    let id = localStorage.getItem('guest_id')
+    if (!id) {
+      id = crypto.randomUUID?.() ?? `g_${Math.random().toString(36).slice(2,8)}${Date.now().toString(36)}`
+      localStorage.setItem('guest_id', id)
+    }
+    return id
+  } catch { return 'guest-fallback' }
 }
 
 export default function ResultClient() {
-  const sp = useSearchParams()
   const router = useRouter()
-  const idParam = sp.get('rid') ?? sp.get('id')
-
-  const [row, setRow] = useState<Row | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [p, setP] = useState<PendingV1 | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        if (!idParam) { setError('無効なリンクです'); return }
-        const res = await fetch(`/api/structure/get?id=${encodeURIComponent(idParam)}`, { cache: 'no-store' })
-        const json = await res.json()
-        if (!json.ok) throw new Error(json.error || 'FETCH_FAILED')
-        if (mounted) setRow(json.record as Row)
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        if (mounted) setError(`取得に失敗しました（${msg}）`)
-      }
-    })()
-    return () => { mounted = false }
-  }, [idParam])
+    const raw = sessionStorage.getItem('structure_quick_pending')
+    if (!raw) { router.replace('/structure/quick'); return }
+    try { setP(JSON.parse(raw) as PendingV1) } catch { router.replace('/structure/quick') }
+  }, [router])
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-400 text-sm">{error}</p>
-          <button className="mt-4 px-4 py-2 rounded-lg bg-white text-black" onClick={() => router.push('/structure/quick')}>
-            クイック判定に戻る
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (!row) {
-    return <div className="min-h-screen bg-black text-white flex items-center justify-center">読み込み中…</div>
+  const save = async () => {
+    if (!p || saving) return
+    setSaving(true); setMsg(null)
+    try {
+      const res = await fetch('/api/structure/quick/save', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({
+          code: p.code,
+          type_label: p.result.type,
+          comment: p.result.comment,
+          user_id: getGuestId(),
+        }),
+      })
+      const json = await res.json()
+      if (!json.ok) throw new Error(json.error || 'SAVE_FAILED')
+      setMsg('保存しました。')
+      sessionStorage.removeItem('structure_quick_pending')
+    } catch (e:any) {
+      setMsg('保存に失敗：' + (e?.message ?? 'unknown'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <div className="min-h-screen bg-black text-white px-5 py-8">
-      <h1 className="text-xl font-bold mb-4">保存済み結果</h1>
+      <h1 className="text-xl font-bold mb-4">最終結果</h1>
 
       <div className="grid gap-4 max-w-md">
         <div className="rounded-xl bg-white/5 p-4 border border-white/10">
           <div className="text-sm text-white/60">判定タイプ</div>
-          <div className="mt-1 text-2xl tracking-widest">{row.type_label}</div>
+          <div className="mt-1 text-2xl tracking-widest">{p?.result.type ?? '—'}</div>
         </div>
 
-        {row.comment && (
-          <div className="rounded-xl bg-white/5 p-4 border border-white/10">
-            <div className="text-sm text-white/60">コメント</div>
-            <div className="mt-1">{row.comment}</div>
-          </div>
-        )}
-
-        <div className="rounded-xl bg-white/5 p-4 border border-white/10 text-xs text-white/60">
-          <div>E: {row.e_score}／V: {row.v_score}／Λ: {row.lambda_score}／Ǝ: {row.e_rev_score}</div>
-          <div className="mt-1">保存日時: {new Date(row.created_at).toLocaleString()}</div>
+        <div className="rounded-xl bg-white/5 p-4 border border-white/10">
+          <div className="text-sm text-white/60">コメント</div>
+          <div className="mt-1">{p?.result.comment ?? '—'}</div>
         </div>
+
+        {msg && <div className="rounded-lg bg-white/10 border border-white/20 p-3 text-sm">{msg}</div>}
 
         <div className="flex gap-3">
-          <button className="px-4 py-3 rounded-xl bg-white text-black" onClick={() => router.push('/structure')}>
-            構造診断を始める
+          <button className="px-4 py-3 rounded-xl bg-white/10" onClick={() => router.push('/structure/quick/confirm')}>
+            戻って修正
           </button>
-          <button className="px-4 py-3 rounded-xl bg-white/10 border border-white/20" onClick={() => router.push('/log')}>
-            履歴を見る
+          <button
+            className="px-5 py-3 rounded-xl bg-white text-black disabled:opacity-50"
+            onClick={save}
+            disabled={!p || saving}
+          >
+            {saving ? '保存中…' : '保存する'}
           </button>
         </div>
       </div>

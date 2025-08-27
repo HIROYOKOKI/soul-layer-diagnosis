@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-/** Quick 用の正規スキーマ（v1）— 型はローカル定義で依存を断つ */
+/** Quick 用の正規スキーマ（v1）— 依存を断つためローカル定義 */
 type PendingV1 = {
   choiceText: string;
   code: 'E' | 'V' | 'Λ' | 'Ǝ';
@@ -13,7 +13,7 @@ type PendingV1 = {
   _meta?: { ts: number; v: 'quick-v1' };
 };
 
-/** 例：コードから簡易結果を作る。既存ロジックがあるなら置き換えOK */
+/** 簡易サンプル：既存の判定ロジックがある場合は置き換えOK */
 function makeResultFrom(code: PendingV1['code']): PendingV1['result'] {
   switch (code) {
     case 'E':
@@ -48,7 +48,7 @@ function makeResultFrom(code: PendingV1['code']): PendingV1['result'] {
   }
 }
 
-/** カード風ボタン（診断結果カードと統一デザイン） */
+/** 診断結果カードと統一した「独立カードボタン」 */
 function CardOption({
   label,
   onClick,
@@ -58,6 +58,10 @@ function CardOption({
   onClick: () => void;
   disabled?: boolean;
 }) {
+  // 先頭の "A." "B." … を小さなバッジに
+  const badge = label.substring(0, 2).replace('.', '');
+  const text = label.slice(3);
+
   return (
     <button
       type="button"
@@ -66,19 +70,20 @@ function CardOption({
       className="group w-full text-left rounded-2xl bg-white/5 border border-white/12
                  px-4 py-4 transition
                  hover:bg-white/8 hover:border-white/20
+                 active:scale-[0.99]
                  focus:outline-none focus:ring-2 focus:ring-white/30
-                 active:scale-[0.99] disabled:opacity-60"
+                 disabled:opacity-60"
       aria-label={label}
     >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 inline-flex h-6 min-w-6 items-center justify-center
-                          rounded-full border border-white/25 text-xs text-white/80
-                          px-2 py-0.5">
-          {label.substring(0, 2).replace('.', '') /* “A ” “B ”…をバッジ化 */}
+        <span
+          className="mt-0.5 inline-flex h-6 min-w-6 items-center justify-center
+                     rounded-full border border-white/25 text-xs text-white/80
+                     px-2 py-0.5"
+        >
+          {badge}
         </span>
-        <span className="text-[15px] leading-relaxed text-white">
-          {label.slice(3)}
-        </span>
+        <span className="text-[15px] leading-relaxed text-white">{text}</span>
       </div>
     </button>
   );
@@ -132,15 +137,17 @@ export default function QuickClient() {
         />
       </header>
 
-      {/* 本文 */}
-      <main className="flex-1 flex items-center justify-center px-5">
-        <div className="w-full max-w-md bg-neutral-900/80 border border-white/10 rounded-2xl p-6">
-          <h2 className="text-center text-lg font-bold mb-3">クイック判定（1問）</h2>
-          <p className="text-sm text-white/70 mb-6">
+      {/* 本文（外枠カードは廃止。独立カード4枚を直接配置） */}
+      <main className="flex-1 flex items-start justify-center px-5">
+        <div className="w-full max-w-md pt-2 pb-10">
+          <h2 className="text-center text-lg font-bold mb-2">クイック判定（1問）</h2>
+          <p className="text-sm text-white/70 mb-5 text-center">
             新しい環境に入った直後、あなたの最初の一手は？
           </p>
+          {/* 仕切り線（任意） */}
+          <div className="h-px bg-white/10 mb-5" />
 
-          {/* ✅ 4択＝独立カード */}
+          {/* ✅ 独立カード 4枚 */}
           <div className="grid gap-3">
             {choices.map((c) => (
               <CardOption
@@ -152,7 +159,7 @@ export default function QuickClient() {
             ))}
           </div>
 
-          {error && <p className="mt-4 text-xs text-red-400">{error}</p>}
+          {error && <p className="mt-4 text-xs text-red-400 text-center">{error}</p>}
         </div>
       </main>
 

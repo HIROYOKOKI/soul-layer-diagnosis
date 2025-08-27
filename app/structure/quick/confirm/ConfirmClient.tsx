@@ -14,11 +14,7 @@ export default function ConfirmClient() {
 
   useEffect(() => {
     const norm = normalizePending(sessionStorage.getItem('structure_quick_pending'));
-    if (!norm) {
-      setErr('データが見つかりません。クイック判定からやり直してください。');
-      return;
-    }
-    console.log('[Confirm] normalized pending:', norm);
+    if (!norm) { setErr('データが見つかりません。クイック判定からやり直してください。'); return; }
     setPending(norm);
   }, []);
 
@@ -48,52 +44,60 @@ export default function ConfirmClient() {
 
   return (
     <div className="mx-auto max-w-md px-5 py-10">
-      <h1 className="text-center text-lg font-bold mb-4">内容の確認</h1>
+      {/* ✅ タイトルを切り替え */}
+      <h1 className="text-center text-xl font-bold mb-5">
+        {showResult ? '診断結果' : '内容の確認'}
+      </h1>
 
-      {err && <div className="mb-4 rounded bg-red-500/10 border border-red-500/30 p-3 text-sm">{err}</div>}
+      {err && (
+        <div className="mb-4 rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-sm">
+          {err}
+        </div>
+      )}
 
       {!pending ? (
         <p className="text-white/70">読み込み中…</p>
       ) : (
         <>
-          {/* ✅ 選択内容（choiceTextが無ければフォールバック文） */}
-          <div className="mb-6 rounded-xl bg-white/5 border border-white/10 p-4">
+          {/* 選択内容 */}
+          <div className="mb-5 rounded-2xl bg-white/5 border border-white/10 p-4">
             <div className="text-xs text-white/60">あなたの選択</div>
-            <div className="mt-1 text-base font-medium">
-              {pending.choiceText || '(選択内容は記録されていません)'}
-            </div>
+            <div className="mt-1 text-base font-medium">{pending.choiceText || '(選択内容は記録されていません)'}</div>
             <div className="mt-1 text-xs text-white/40">コード：{pending.code}</div>
           </div>
 
+          {/* 結果の開示 or 表示 */}
           {!showResult ? (
             <button
-              className="w-full rounded-lg border border-white/20 py-2 hover:bg-white/5"
+              className="w-full rounded-xl border-2 border-white/30 py-2 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-white/40 active:scale-[0.99] transition"
               onClick={() => setShowResult(true)}
             >
               結果を表示
             </button>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+              <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
                 <div className="text-xs text-white/60">判定タイプ</div>
-                <div className="mt-1 text-base font-semibold">{pending.result.type}</div>
+                <div className="mt-1 text-base font-semibold tracking-wide">{pending.result.type}</div>
               </div>
-              <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+              <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
                 <div className="text-xs text-white/60">コメント</div>
-                <p className="mt-1">{pending.result.comment}</p>
+                <p className="mt-1 leading-relaxed">{pending.result.comment}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-2">
+                {/* アウトラインボタン（枠あり） */}
                 <button
                   onClick={() => router.push('/structure/quick')}
-                  className="rounded-lg border border-white/20 py-2 hover:bg-white/5"
+                  className="rounded-xl border-2 border-white/30 py-2 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-white/40 active:scale-[0.99] transition"
                 >
                   やり直す
                 </button>
+                {/* ソリッドボタン（白） */}
                 <button
                   disabled={saving}
                   onClick={handleSave}
-                  className="rounded-lg bg-white text-black py-2 font-medium disabled:opacity-60"
+                  className="rounded-xl bg-white text-black py-2 font-medium hover:opacity-90 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-white/60 active:scale-[0.99] transition"
                 >
                   {saving ? '保存中…' : '保存する'}
                 </button>

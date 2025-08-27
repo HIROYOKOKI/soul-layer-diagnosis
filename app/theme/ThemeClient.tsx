@@ -34,17 +34,18 @@ export default function ThemeClient() {
     }
   }, []);
 
-  const handleSelect = (key: ThemeKey) => {
-    setSelected(key);
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("evae_theme_selected", key);
-    }
-    // 触感フィードバック（対応端末のみ）
-    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-      // @ts-expect-error: vibrate は一部型定義にない場合がある
-      navigator.vibrate?.(10);
-    }
-  };
+ const handleSelect = (key: ThemeKey) => {
+  setSelected(key);
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem("evae_theme_selected", key);
+  }
+
+  // 触感フィードバック（対応端末のみ）
+  if (typeof navigator !== "undefined" && typeof (navigator as any).vibrate === "function") {
+    (navigator as any).vibrate(10);
+  }
+};
+
 
   const handleNext = async () => {
     if (!selected) return;

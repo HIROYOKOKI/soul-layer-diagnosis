@@ -1,29 +1,66 @@
-'use client'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+// components/AppHeader.tsx
+"use client";
 
-export default function AppHeader() {
-  const pathname = usePathname()
-  // ここでヘッダーを出さないルートを定義
-  const hide =
-    pathname === '/login' ||
-    pathname?.startsWith('/intro') // ←将来の全画面ページがあれば追加
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-  if (hide) return null
+export default function AppHeader({
+  title,
+  showBack = true,
+  userImage = null, // 将来ログイン後に差し替え
+}: {
+  title?: string;
+  showBack?: boolean;
+  userImage?: string | null;
+}) {
+  const router = useRouter();
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-white/80 backdrop-blur">
-      <div className="mx-auto max-w-3xl px-4 h-12 flex items-center justify-between">
-        <button onClick={() => history.back()} className="text-sm hover:opacity-80">← 戻る</button>
-        <div className="text-sm font-medium">EVΛƎ · Daily</div>
-        <Link href="/mypage" className="text-sm hover:opacity-80">MyPage</Link>
+    <header className="sticky top-0 z-40 bg-black/80 backdrop-blur border-b border-white/10">
+      <div className="h-14 flex items-center px-3">
+        {/* 左：戻る */}
+        <div className="w-16">
+          {showBack && (
+            <button
+              onClick={() => router.back()}
+              aria-label="戻る"
+              className="inline-flex items-center gap-1 text-white/80 hover:text-white active:opacity-80"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M15 6L9 12L15 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* 中央：ロゴ */}
+        <div className="flex-1 grid place-items-center">
+          <Link href="/" className="inline-flex items-center">
+            <img src="/evae-logo.svg" alt="EVΛƎ" className="h-5 w-auto" />
+            {title && <span className="sr-only">{title}</span>}
+          </Link>
+        </div>
+
+        {/* 右：ユーザーアイコン */}
+        <div className="w-16 flex justify-end">
+          <Link href="/mypage" className="relative">
+            {userImage ? (
+              <img
+                src={userImage}
+                alt="User"
+                className="h-8 w-8 rounded-full object-cover border border-white/20"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-white/15 grid place-items-center text-white/80">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 12c2.2 0 4-1.8 4-4s-1.8-4-4-4-4 1.8-4 4 1.8 4 4 4z" fill="currentColor"/>
+                  <path d="M4 20c0-2.7 2.7-5 8-5s8 2.3 8 5v1H4v-1z" fill="currentColor"/>
+                </svg>
+              </div>
+            )}
+          </Link>
+        </div>
       </div>
-      <nav className="mx-auto max-w-3xl px-4 py-2 flex gap-4 text-sm">
-        <Link href="/">Home</Link>
-        <Link href="/daily">Daily</Link>
-        <Link href="/weekly">Weekly</Link>
-        <Link href="/monthly">Monthly</Link>
-      </nav>
     </header>
-  )
+  );
 }

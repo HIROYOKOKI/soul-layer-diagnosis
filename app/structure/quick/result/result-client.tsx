@@ -21,7 +21,9 @@ function getGuestId(): string {
       localStorage.setItem('guest_id', id)
     }
     return id
-  } catch { return 'guest-fallback' }
+  } catch {
+    return 'guest-fallback'
+  }
 }
 
 export default function ResultClient() {
@@ -54,8 +56,9 @@ export default function ResultClient() {
       if (!json.ok) throw new Error(json.error || 'SAVE_FAILED')
       setMsg('保存しました。')
       sessionStorage.removeItem('structure_quick_pending')
-    } catch (e:any) {
-      setMsg('保存に失敗：' + (e?.message ?? 'unknown'))
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e)
+      setMsg('保存に失敗：' + message)
     } finally {
       setSaving(false)
     }

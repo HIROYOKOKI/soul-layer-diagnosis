@@ -3,9 +3,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "../../components/AppHeader"; // ← 構成に合わせた相対パス
+import AppHeader from "../../components/AppHeader";
 
 type ThemeKey = "work" | "love" | "future" | "self";
+
+// navigator.vibrate を型安全に扱うための補助型
+type VibrateNavigator = Navigator & {
+  vibrate?: (pattern: number | number[]) => boolean;
+};
 
 const THEME_LABEL: Record<ThemeKey, string> = {
   work: "仕事",
@@ -28,24 +33,24 @@ export default function ThemeClient() {
 
   // 過去の選択を復元
   useEffect(() => {
-    const prev = typeof window !== "undefined" ? sessionStorage.getItem("evae_theme_selected") : null;
-    if (prev && ["work", "love", "future", "self"].includes(prev)) {
+    if (typeof window === "undefined") return;
+    const prev = sessionStorage.getItem("evae_theme_selected");
+    if (prev && (["work", "love", "future", "self"] as string[]).includes(prev)) {
       setSelected(prev as ThemeKey);
     }
   }, []);
 
- const handleSelect = (key: ThemeKey) => {
-  setSelected(key);
-  if (typeof window !== "undefined") {
-    sessionStorage.setItem("evae_theme_selected", key);
-  }
-
-  // 触感フィードバック（対応端末のみ）
-  if (typeof navigator !== "undefined" && typeof (navigator as any).vibrate === "function") {
-    (navigator as any).vibrate(10);
-  }
-};
-
+  const handleSelect = (key: ThemeKey) => {
+    setSelected(key);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("evae_theme_selected", key);
+    }
+    // 触感フィードバック（対応端末のみ）
+    const nav = (typeof navigator !== "undefined" ? navigator : undefined) as
+      | VibrateNavigator
+      | undefined;
+    nav?.vibrate?.(10);
+  };
 
   const handleNext = async () => {
     if (!selected) return;
@@ -59,10 +64,10 @@ export default function ThemeClient() {
       if (!res.ok && res.status !== 404) {
         console.warn("Failed to persist theme:", res.status);
       }
-    } catch (_e: unknown) {
-      // API未実装でもフローは継続
+    } catch {
+      // API未実装やネットワーク失敗でもフロー継続
     } finally {
-      // ✅ 保存後はマイページへ
+      // 保存後はマイページへ
       router.push("/mypage");
     }
   };
@@ -111,9 +116,7 @@ export default function ThemeClient() {
                     <div className="flex items-center gap-2">
                       <h2 className="text-base font-medium">{THEME_LABEL[key]}</h2>
                       {active && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/15">
-                          選択中
-                        </span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/15">選択中</span>
                       )}
                     </div>
                     <p className="text-sm text-white/60 mt-1">{THEME_DESC[key]}</p>

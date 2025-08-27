@@ -21,16 +21,14 @@ function getGuestId(): string {
       localStorage.setItem('guest_id', id)
     }
     return id
-  } catch {
-    return 'guest-fallback'
-  }
+  } catch { return 'guest-fallback' }
 }
 
 export default function ResultClient() {
   const router = useRouter()
   const [p, setP] = useState<PendingV1 | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
 
   useEffect(() => {
     const raw = sessionStorage.getItem('structure_quick_pending')
@@ -54,11 +52,13 @@ export default function ResultClient() {
       })
       const json = await res.json()
       if (!json.ok) throw new Error(json.error || 'SAVE_FAILED')
-      setMsg('保存しました。')
+
+      // ✅ 保存成功後にテーマ選択ページへ
       sessionStorage.removeItem('structure_quick_pending')
+      router.push('/theme')
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : String(e)
-      setMsg('保存に失敗：' + message)
+      const m = e instanceof Error ? e.message : String(e)
+      setMsg('保存に失敗：' + m)
     } finally {
       setSaving(false)
     }
@@ -66,7 +66,7 @@ export default function ResultClient() {
 
   return (
     <div className="min-h-screen bg-black text-white px-5 py-8">
-      <h1 className="text-xl font-bold mb-4">最終結果</h1>
+      <h1 className="text-xl font-bold mb-4">診断結果</h1>
 
       <div className="grid gap-4 max-w-md">
         <div className="rounded-xl bg-white/5 p-4 border border-white/10">

@@ -37,6 +37,7 @@ export default function ConfirmClient() {
           type_label: pending.type_label,
           comment: pending.comment,
           scores: pending.scores,
+           user_id: getGuestId(),
         }),
       })
       const json = (await res.json()) as { ok: boolean; error?: string }

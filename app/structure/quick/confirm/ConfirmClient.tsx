@@ -55,65 +55,64 @@ export default function ConfirmClient() {
         </div>
       )}
 
-      {!pending ? (
-        <p className="text-white/70">読み込み中…</p>
-      ) : (
-        <>
-          {/* 選択内容 */}
-          <div className="mb-5 rounded-2xl bg-white/5 border border-white/10 p-4">
-            <div className="text-xs text-white/60">あなたの選択</div>
-            <div className="mt-1 text-base font-medium">{pending.choiceText || '(選択内容は記録されていません)'}</div>
-            <div className="mt-1 text-xs text-white/40">コード：{pending.code}</div>
-          </div>
-
-         {/* 結果を表示ボタン */}
-<button
-  className="w-full rounded-xl border-2 border-white text-white py-2
-             hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white
-             active:scale-[0.99] transition"
-  onClick={() => setShowResult(true)}
->
-  結果を表示
-</button>
-
-          ) : (
-            <div className="space-y-4">
-              <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                <div className="text-xs text-white/60">判定タイプ</div>
-                <div className="mt-1 text-base font-semibold tracking-wide">{pending.result.type}</div>
-              </div>
-              <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                <div className="text-xs text-white/60">コメント</div>
-                <p className="mt-1 leading-relaxed">{pending.result.comment}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-2">
-              {/* やり直すボタン */}
-<button
-  onClick={() => router.push('/structure/quick')}
-  className="rounded-xl border-2 border-white text-white py-2
-             hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white
-             active:scale-[0.99] transition"
->
-  やり直す
-</button>
-
-              {/* 保存するボタン */}
-<button
-  disabled={saving}
-  onClick={handleSave}
-  className="rounded-xl border-2 border-white bg-white text-black py-2 font-medium
-             hover:opacity-90 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-white
-             active:scale-[0.99] transition"
->
-  {saving ? '保存中…' : '保存する'}
-</button>
-
-              </div>
-            </div>
-          )}
-        </>
-      )}
+     {!pending ? (
+  <p className="text-white/70">読み込み中…</p>
+) : (
+  <>
+    {/* 選択内容 */}
+    <div className="mb-5 rounded-2xl bg-white/5 border border-white/10 p-4">
+      <div className="text-xs text-white/60">あなたの選択</div>
+      <div className="mt-1 text-base font-medium">
+        {pending.choiceText || '(選択内容は記録されていません)'}
+      </div>
+      <div className="mt-1 text-xs text-white/40">コード：{pending.code}</div>
     </div>
-  );
-}
+
+    {/* 結果の開示 or 表示 */}
+    {!showResult ? (
+      <button
+        className="w-full rounded-xl border-2 border-white text-white py-2
+                   hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white
+                   active:scale-[0.99] transition"
+        onClick={() => setShowResult(true)}
+      >
+        結果を表示
+      </button>
+    ) : (
+      <div className="space-y-4">
+        <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+          <div className="text-xs text-white/60">判定タイプ</div>
+          <div className="mt-1 text-base font-semibold tracking-wide">
+            {pending.result.type}
+          </div>
+        </div>
+        <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+          <div className="text-xs text-white/60">コメント</div>
+          <p className="mt-1 leading-relaxed">{pending.result.comment}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 pt-2">
+          {/* 枠あり（白） */}
+          <button
+            onClick={() => router.push('/structure/quick')}
+            className="rounded-xl border-2 border-white text-white py-2
+                       hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white
+                       active:scale-[0.99] transition"
+          >
+            やり直す
+          </button>
+          {/* 白塗り */}
+          <button
+            disabled={saving}
+            onClick={handleSave}
+            className="rounded-xl bg-white text-black py-2 font-medium border-2 border-white
+                       hover:opacity-90 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-white
+                       active:scale-[0.99] transition"
+          >
+            {saving ? '保存中…' : '保存する'}
+          </button>
+        </div>
+      </div>
+    )}
+  </>
+)}

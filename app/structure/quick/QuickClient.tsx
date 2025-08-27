@@ -4,9 +4,16 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import type { PendingV1 } from './_utils/normalizePending';
 
-/** 例：コードから簡易結果を作る。既存ロジックがあるなら置き換えてOK */
+/** Quick 用の正規スキーマ（v1）— 型はローカル定義にして依存を断つ */
+type PendingV1 = {
+  choiceText: string;
+  code: 'E' | 'V' | 'Λ' | 'Ǝ';
+  result: { type: string; weight: number; comment: string; advice?: string };
+  _meta?: { ts: number; v: 'quick-v1' };
+};
+
+/** 例：コードから簡易結果を作る。既存ロジックがあるなら置き換えOK */
 function makeResultFrom(code: PendingV1['code']): PendingV1['result'] {
   switch (code) {
     case 'E':
@@ -60,7 +67,6 @@ export default function QuickClient() {
         _meta: { ts: Date.now(), v: 'quick-v1' },
       };
       sessionStorage.setItem('structure_quick_pending', JSON.stringify(payload));
-      // デバッグ：console.log('[Quick] saved v1 payload:', payload);
       router.push('/structure/quick/confirm');
     } catch (e) {
       console.error('[Quick] save error', e);
@@ -91,7 +97,7 @@ export default function QuickClient() {
             新しい環境に入った直後、あなたの最初の一手は？
           </p>
 
-          {/* ✅ 4択：診断結果カードと同じ見た目の独立カードUI */}
+          {/* 4択：診断結果カードと同じ独立カードUI */}
           <div className="space-y-4">
             <button
               disabled={sending}

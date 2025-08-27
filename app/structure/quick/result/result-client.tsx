@@ -12,16 +12,20 @@ type PendingV1 = {
   _meta?: { ts:number; v:'quick-v1' }
 }
 
-function getGuestId(): string {
-  if (typeof window === 'undefined') return 'guest-server'
-  try {
-    let id = localStorage.getItem('guest_id')
-    if (!id) {
-      id = crypto.randomUUID?.() ?? `g_${Math.random().toString(36).slice(2,8)}${Date.now().toString(36)}`
-      localStorage.setItem('guest_id', id)
-    }
-    return id
-  } catch { return 'guest-fallback' }
+// 🔑 型ごとの補足説明
+function typeDescription(type: string): string {
+  switch (type) {
+    case 'EVΛƎ型':
+      return '衝動・行動型：思い立ったらまず動くタイプ。挑戦しながら学びを積み重ねる。'
+    case 'EΛVƎ型':
+      return '夢・可能性型：広い視点で理想を描き、可能性を探るタイプ。想像力やビジョンを大事にする。'
+    case 'ΛEƎV型':
+      return '設計・計画型：基準やルールを決め、効率よく最短ルートを選ぶ。整理と取捨選択が得意。'
+    case 'ƎVΛE型':
+      return '観察・分析型：状況を観測して小さく試し、結果を見て選び直す。分析や状況把握に強い。'
+    default:
+      return ''
+  }
 }
 
 export default function ResultClient() {
@@ -47,18 +51,16 @@ export default function ResultClient() {
           code: p.code,
           type_label: p.result.type,
           comment: p.result.comment,
-          user_id: getGuestId(),
         }),
       })
       const json = await res.json()
       if (!json.ok) throw new Error(json.error || 'SAVE_FAILED')
-
-      // ✅ 保存成功後にテーマ選択ページへ
+      setMsg('保存しました。')
       sessionStorage.removeItem('structure_quick_pending')
-      router.push('/theme')
+      router.push('/theme') // 保存後テーマ選択へ
     } catch (e: unknown) {
-      const m = e instanceof Error ? e.message : String(e)
-      setMsg('保存に失敗：' + m)
+      const message = e instanceof Error ? e.message : String(e)
+      setMsg('保存に失敗：' + message)
     } finally {
       setSaving(false)
     }
@@ -69,11 +71,14 @@ export default function ResultClient() {
       <h1 className="text-xl font-bold mb-4">診断結果</h1>
 
       <div className="grid gap-4 max-w-md">
+        {/* 判定タイプ + 補足 */}
         <div className="rounded-xl bg-white/5 p-4 border border-white/10">
           <div className="text-sm text-white/60">判定タイプ</div>
           <div className="mt-1 text-2xl tracking-widest">{p?.result.type ?? '—'}</div>
+          <div className="mt-2 text-sm text-white/70">{p ? typeDescription(p.result.type) : ''}</div>
         </div>
 
+        {/* コメント */}
         <div className="rounded-xl bg-white/5 p-4 border border-white/10">
           <div className="text-sm text-white/60">コメント</div>
           <div className="mt-1">{p?.result.comment ?? '—'}</div>
@@ -82,7 +87,10 @@ export default function ResultClient() {
         {msg && <div className="rounded-lg bg-white/10 border border-white/20 p-3 text-sm">{msg}</div>}
 
         <div className="flex gap-3">
-          <button className="px-4 py-3 rounded-xl bg-white/10" onClick={() => router.push('/structure/quick/confirm')}>
+          <button
+            className="px-4 py-3 rounded-xl bg-white/10"
+            onClick={() => router.push('/structure/quick/confirm')}
+          >
             戻って修正
           </button>
           <button

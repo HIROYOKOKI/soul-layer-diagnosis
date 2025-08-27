@@ -3,11 +3,12 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function AppHeader({
   title,
   showBack = true,
-  userImage = null, // 将来ログイン後に差し替え
+  userImage = null,
 }: {
   title?: string;
   showBack?: boolean;
@@ -36,7 +37,7 @@ export default function AppHeader({
         {/* 中央：ロゴ */}
         <div className="flex-1 grid place-items-center">
           <Link href="/" className="inline-flex items-center">
-            <img src="/evae-logo.svg" alt="EVΛƎ" className="h-5 w-auto" />
+            <Image src="/evae-logo.svg" alt="EVΛƎ" width={72} height={20} priority />
             {title && <span className="sr-only">{title}</span>}
           </Link>
         </div>
@@ -45,10 +46,12 @@ export default function AppHeader({
         <div className="w-16 flex justify-end">
           <Link href="/mypage" className="relative">
             {userImage ? (
-              <img
+              <Image
                 src={userImage}
                 alt="User"
-                className="h-8 w-8 rounded-full object-cover border border-white/20"
+                width={32}
+                height={32}
+                className="rounded-full object-cover border border-white/20"
               />
             ) : (
               <div className="h-8 w-8 rounded-full bg-white/15 grid place-items-center text-white/80">

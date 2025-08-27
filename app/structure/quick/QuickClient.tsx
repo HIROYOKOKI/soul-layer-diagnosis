@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-/** Quick 用の正規スキーマ（v1）— 型はローカル定義にして依存を断つ */
+/** Quick 用の正規スキーマ（v1）— 型はローカル定義で依存を断つ */
 type PendingV1 = {
   choiceText: string;
   code: 'E' | 'V' | 'Λ' | 'Ǝ';
@@ -48,10 +48,53 @@ function makeResultFrom(code: PendingV1['code']): PendingV1['result'] {
   }
 }
 
+/** カード風ボタン（診断結果カードと統一デザイン） */
+function CardOption({
+  label,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="group w-full text-left rounded-2xl bg-white/5 border border-white/12
+                 px-4 py-4 transition
+                 hover:bg-white/8 hover:border-white/20
+                 focus:outline-none focus:ring-2 focus:ring-white/30
+                 active:scale-[0.99] disabled:opacity-60"
+      aria-label={label}
+    >
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 inline-flex h-6 min-w-6 items-center justify-center
+                          rounded-full border border-white/25 text-xs text-white/80
+                          px-2 py-0.5">
+          {label.substring(0, 2).replace('.', '') /* “A ” “B ”…をバッジ化 */}
+        </span>
+        <span className="text-[15px] leading-relaxed text-white">
+          {label.slice(3)}
+        </span>
+      </div>
+    </button>
+  );
+}
+
 export default function QuickClient() {
   const router = useRouter();
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const choices: Array<{ label: string; code: PendingV1['code'] }> = [
+    { label: 'A. とりあえず動く。やりながら整える。', code: 'E' },
+    { label: 'B. 目的と制約を先に決め、最短の選択肢を絞る。', code: 'Λ' },
+    { label: 'C. まず観測して小さく試し、次に要点を選び直す。', code: 'Ǝ' },
+    { label: 'D. どちらとも言えない／状況により変える。', code: 'V' },
+  ];
 
   const handleSelect = (choiceText: string, code: PendingV1['code']) => {
     if (sending) return;
@@ -92,60 +135,21 @@ export default function QuickClient() {
       {/* 本文 */}
       <main className="flex-1 flex items-center justify-center px-5">
         <div className="w-full max-w-md bg-neutral-900/80 border border-white/10 rounded-2xl p-6">
-          <h2 className="text-center text-lg font-bold mb-4">クイック判定（1問）</h2>
+          <h2 className="text-center text-lg font-bold mb-3">クイック判定（1問）</h2>
           <p className="text-sm text-white/70 mb-6">
             新しい環境に入った直後、あなたの最初の一手は？
           </p>
 
-          {/* 4択：診断結果カードと同じ独立カードUI */}
-          <div className="space-y-4">
-            <button
-              disabled={sending}
-              onClick={() =>
-                handleSelect('A. とりあえず動く。やりながら整える。', 'E')
-              }
-              className="w-full rounded-2xl !border-2 !border-white border-solid text-left px-4 py-3
-                         bg-black/40 text-white hover:bg-white/10 active:scale-[0.99]
-                         transition focus:outline-none focus:ring-2 focus:ring-white"
-            >
-              A. とりあえず動く。やりながら整える。
-            </button>
-
-            <button
-              disabled={sending}
-              onClick={() =>
-                handleSelect('B. 目的と制約を先に決め、最短の選択肢を絞る。', 'Λ')
-              }
-              className="w-full rounded-2xl !border-2 !border-white border-solid text-left px-4 py-3
-                         bg-black/40 text-white hover:bg-white/10 active:scale-[0.99]
-                         transition focus:outline-none focus:ring-2 focus:ring-white"
-            >
-              B. 目的と制約を先に決め、最短の選択肢を絞る。
-            </button>
-
-            <button
-              disabled={sending}
-              onClick={() =>
-                handleSelect('C. まず観測して小さく試し、次に要点を選び直す。', 'Ǝ')
-              }
-              className="w-full rounded-2xl !border-2 !border-white border-solid text-left px-4 py-3
-                         bg-black/40 text-white hover:bg-white/10 active:scale-[0.99]
-                         transition focus:outline-none focus:ring-2 focus:ring-white"
-            >
-              C. まず観測して小さく試し、次に要点を選び直す。
-            </button>
-
-            <button
-              disabled={sending}
-              onClick={() =>
-                handleSelect('D. どちらとも言えない／状況により変える。', 'V')
-              }
-              className="w-full rounded-2xl !border-2 !border-white border-solid text-left px-4 py-3
-                         bg-black/40 text-white hover:bg-white/10 active:scale-[0.99]
-                         transition focus:outline-none focus:ring-2 focus:ring-white"
-            >
-              D. どちらとも言えない／状況により変える。
-            </button>
+          {/* ✅ 4択＝独立カード */}
+          <div className="grid gap-3">
+            {choices.map((c) => (
+              <CardOption
+                key={c.label}
+                label={c.label}
+                disabled={sending}
+                onClick={() => handleSelect(c.label, c.code)}
+              />
+            ))}
           </div>
 
           {error && <p className="mt-4 text-xs text-red-400">{error}</p>}

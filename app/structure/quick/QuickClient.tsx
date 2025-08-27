@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import type { PendingV1 } from '../_utils/normalizePending';
+import type { PendingV1 } from './_utils/normalizePending';
 
 /** 例：コードから簡易結果を作る。既存ロジックがあるなら置き換えてOK */
 function makeResultFrom(code: PendingV1['code']): PendingV1['result'] {

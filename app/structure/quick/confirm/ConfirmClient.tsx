@@ -47,36 +47,39 @@ export default function ConfirmClient() {
     }
   }, [])
 
-  const handleSave = async () => {
-    if (!pending || saving) return
-    setSaving(true)
-    setMsg(null)
+  // app/structure/quick/confirm/ConfirmClient.tsx
+// …省略…
+import { useRouter } from 'next/navigation'
+// …省略…
 
-    try {
-      const res = await fetch('/api/structure/quick/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: pending.code,                    // 必須
-          type_label: pending.result.type,       // 必須（API仕様）
-          comment: pending.result.comment,       // 任意
-          user_id: getGuestId(),                 // ゲスト紐付け（テーブル側がNULL許可でもOK）
-          // scores は未送信（API側が code に1点を自動付与し係数0.5適用）
-        }),
-      })
+const handleSave = async () => {
+  if (!pending || saving) return
+  setSaving(true); setMsg(null)
 
-      const json = (await res.json()) as { ok: boolean; error?: string }
-      if (!json.ok) throw new Error(json.error || 'SAVE_FAILED')
+  try {
+    const res = await fetch('/api/structure/quick/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: pending.code,
+        type_label: pending.result.type,
+        comment: pending.result.comment,
+        user_id: getGuestId(),
+      }),
+    })
+    const json = (await res.json()) as { ok: boolean; error?: string; record?: { id: number } }
+    if (!json.ok || !json.record?.id) throw new Error(json.error || 'SAVE_FAILED')
 
-      setMsg('保存しました。')
-      sessionStorage.removeItem('structure_quick_pending')
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : String(e)
-      setMsg('保存に失敗：' + message)
-    } finally {
-      setSaving(false)
-    }
+    // ✅ 結果ページへ遷移（保存IDを渡す）
+    router.push(`/structure/quick/result?rid=${json.record.id}`)
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e)
+    setMsg('保存に失敗：' + message)
+  } finally {
+    setSaving(false)
   }
+}
+
 
   return (
     <div className="space-y-4">

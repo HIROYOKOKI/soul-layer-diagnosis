@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import AppHeader from "../../components/AppHeader"; // ← 構成に合わせた相対パス
 
 type ThemeKey = "work" | "love" | "future" | "self";
 
@@ -25,9 +26,9 @@ export default function ThemeClient() {
   const [selected, setSelected] = useState<ThemeKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // 直前の結果保存後に /theme に来る前提。過去選択があれば復元。
+  // 過去の選択を復元
   useEffect(() => {
-    const prev = sessionStorage.getItem("evae_theme_selected");
+    const prev = typeof window !== "undefined" ? sessionStorage.getItem("evae_theme_selected") : null;
     if (prev && ["work", "love", "future", "self"].includes(prev)) {
       setSelected(prev as ThemeKey);
     }
@@ -35,16 +36,19 @@ export default function ThemeClient() {
 
   const handleSelect = (key: ThemeKey) => {
     setSelected(key);
-    sessionStorage.setItem("evae_theme_selected", key);
-    // 触感フィードバックを軽く（対応端末のみ）
-    if (navigator.vibrate) navigator.vibrate(10);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("evae_theme_selected", key);
+    }
+    // 触感フィードバック（対応端末のみ）
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      // @ts-expect-error: vibrate は一部型定義にない場合がある
+      navigator.vibrate?.(10);
+    }
   };
 
   const handleNext = async () => {
     if (!selected) return;
     setSubmitting(true);
-
-    // 将来の分析に備えて API 保存（存在しなければ無視）
     try {
       const res = await fetch("/api/theme/set", {
         method: "POST",
@@ -57,70 +61,71 @@ export default function ThemeClient() {
     } catch (_e: unknown) {
       // API未実装でもフローは継続
     } finally {
-      // 次のフローへ（まずはデイリーへ接続。後で confirm-reset 導入可能）
-      router.push("/daily");
+      // ✅ 保存後はマイページへ
+      router.push("/mypage");
     }
   };
 
   return (
-    <main className="min-h-[100svh] bg-black text-white px-5 py-6">
-      {/* ヘッダー */}
-      <header className="mb-6">
+    <div className="min-h-[100svh] bg-black text-white">
+      {/* ヘッダー：戻る／中央ロゴ／右ユーザーアイコン */}
+      <AppHeader title="テーマ選択" />
+
+      <main className="px-5 pt-4 pb-28">
         <h1 className="text-xl font-semibold tracking-wide">テーマ選択</h1>
         <p className="text-white/60 text-sm mt-1">
           今のあなたに一番近いテーマを1つ選んでください。
         </p>
-      </header>
 
-      {/* 4つのカード：モバイルは1カラム / md以上で2カラム */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {(["work", "love", "future", "self"] as ThemeKey[]).map((key) => {
-          const active = selected === key;
-          return (
-            <button
-              key={key}
-              onClick={() => handleSelect(key)}
-              aria-pressed={active}
-              className={[
-                "w-full text-left rounded-2xl p-4",
-                "border transition-transform",
-                "active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
-                active
-                  ? "border-white/60 bg-white/10 shadow-[0_0_0_2px_rgba(255,255,255,0.12)_inset]"
-                  : "border-white/10 bg-white/5 hover:bg-white/8",
-              ].join(" ")}
-            >
-              <div className="flex items-start gap-3">
-                {/* シンボル（簡易） */}
-                <div className="mt-0.5 h-8 w-8 rounded-full bg-white/10 grid place-items-center">
-                  <span className="text-sm">
-                    {key === "work" && "Λ"}
-                    {key === "love" && "V"}
-                    {key === "future" && "E"}
-                    {key === "self" && "Ǝ"}
-                  </span>
-                </div>
-
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base font-medium">{THEME_LABEL[key]}</h2>
-                    {active && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-white/15">
-                        選択中
-                      </span>
-                    )}
+        {/* 4つのカード：モバイル1カラム / md以上2カラム */}
+        <section className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {(["work", "love", "future", "self"] as ThemeKey[]).map((key) => {
+            const active = selected === key;
+            return (
+              <button
+                key={key}
+                onClick={() => handleSelect(key)}
+                aria-pressed={active}
+                className={[
+                  "w-full text-left rounded-2xl p-4",
+                  "border transition-transform",
+                  "active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+                  active
+                    ? "border-white/60 bg-white/10 shadow-[0_0_0_2px_rgba(255,255,255,0.12)_inset]"
+                    : "border-white/10 bg-white/5 hover:bg-white/8",
+                ].join(" ")}
+              >
+                <div className="flex items-start gap-3">
+                  {/* 構造シンボル */}
+                  <div className="mt-0.5 h-8 w-8 rounded-full bg-white/10 grid place-items-center">
+                    <span className="text-sm">
+                      {key === "work" && "Λ"}
+                      {key === "love" && "V"}
+                      {key === "future" && "E"}
+                      {key === "self" && "Ǝ"}
+                    </span>
                   </div>
-                  <p className="text-sm text-white/60 mt-1">{THEME_DESC[key]}</p>
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </section>
 
-      {/* 下部アクション（モバイル親切：常に見える配置） */}
-      <div className="h-20" />
-      <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-5 pb-5 pt-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-medium">{THEME_LABEL[key]}</h2>
+                      {active && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/15">
+                          選択中
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-white/60 mt-1">{THEME_DESC[key]}</p>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </section>
+      </main>
+
+      {/* 固定CTA（セーフエリア対応） */}
+      <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 border-t border-white/10">
         <button
           onClick={handleNext}
           disabled={!selected || submitting}
@@ -132,9 +137,9 @@ export default function ThemeClient() {
               : "bg-white text-black active:opacity-90",
           ].join(" ")}
         >
-          {submitting ? "次へ…" : "このテーマで進む"}
+          {submitting ? "保存中…" : "このテーマで進む"}
         </button>
       </div>
-    </main>
+    </div>
   );
 }

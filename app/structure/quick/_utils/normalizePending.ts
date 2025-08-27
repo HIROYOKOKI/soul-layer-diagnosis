@@ -1,12 +1,13 @@
 // app/structure/quick/_utils/normalizePending.ts
+
 export type PendingV1 = {
   choiceText: string;
-  code: 'E'|'V'|'Λ'|'Ǝ';
+  code: 'E' | 'V' | 'Λ' | 'Ǝ';
   result: { type: string; weight: number; comment: string; advice?: string };
   _meta?: { ts: number; v: 'quick-v1' };
 };
 
-// 旧データ例: { structure:'E', type:'EVΛƎ型', weight:0.8, comment:'…', advice:'…' }
+// 旧データ例
 type Legacy = {
   structure?: 'E'|'V'|'Λ'|'Ǝ';
   type?: string;
@@ -16,15 +17,25 @@ type Legacy = {
   choiceText?: string;
   code?: 'E'|'V'|'Λ'|'Ǝ';
   result?: { type: string; weight: number; comment: string; advice?: string };
-  _meta?: { ts: number; v?: string };
+  _meta?: { ts?: number; v?: string };
 };
+
+// 正規のメタを返すヘルパー（型ガード込み）
+function toMeta(m?: Legacy['_meta']): PendingV1['_meta'] {
+  if (m && typeof m.ts === 'number' && m.v === 'quick-v1') {
+    // 既に正規ならそのまま
+    return { ts: m.ts, v: 'quick-v1' };
+  }
+  // 旧 or 不完全 → 正規値で補完
+  return { ts: Date.now(), v: 'quick-v1' };
+}
 
 export function normalizePending(raw: string | null): PendingV1 | null {
   if (!raw) return null;
   try {
     const d: Legacy = JSON.parse(raw);
 
-    // code は code or structure から決める
+    // code は code or structure
     const code = (d.code ?? d.structure) as PendingV1['code'] | undefined;
 
     // result は result or（type/weight/comment/advice）
@@ -39,10 +50,10 @@ export function normalizePending(raw: string | null): PendingV1 | null {
     }
 
     return {
-      choiceText: d.choiceText ?? '',   // 旧データは空文字で通す（UIフォールバック）
+      choiceText: d.choiceText ?? '',   // 旧データは空文字でフォールバック
       code,
       result,
-      _meta: d._meta ?? { ts: Date.now(), v: 'quick-v1' },
+      _meta: toMeta(d._meta),           // ✅ ここを正規化して型を満たす
     };
   } catch {
     return null;

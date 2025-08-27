@@ -1,6 +1,6 @@
 // app/structure/quick/result/page.tsx
 import { Suspense } from 'react'
-import ResultClient from './ResultClient'
+import ResultClient from './result-client'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

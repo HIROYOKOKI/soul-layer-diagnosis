@@ -110,10 +110,12 @@ export default function ConfirmClient() {
                        active:scale-[0.99] transition"
           >
             {saving ? '保存中…' : '保存する'}
-          </div>
-          </div>
-        )}
-      </>
-    )}
-  </div>
-);
+          </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

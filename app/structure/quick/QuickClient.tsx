@@ -1,90 +1,77 @@
-'use client'
+// app/structure/quick/QuickClient.tsx
+'use client';
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Image from 'next/image'
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { PendingV1 } from '../_utils/normalizePending';
 
-/* ========= 型定義（v1 正規スキーマ） ========= */
-type Choice = 'A' | 'B' | 'C' | 'D'
-type QuickResultType = 'EVΛƎ型' | 'EΛVƎ型' | 'ΛƎEΛ型' | '中立'
-type StructureLetter = 'E' | 'V' | 'Λ' | 'Ǝ'
+export default function QuickClient() {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
 
-type Result = {
-  type: QuickResultType
-  weight: number
-  comment: string
-  advice?: string
+  const handleSelect = (choiceText: string, code: PendingV1['code']) => {
+    const result = makeResultFrom(code); // ← 既存の判定ロジックに置き換え
+
+    const payload: PendingV1 = {
+      choiceText,
+      code,
+      result,
+      _meta: { ts: Date.now(), v: 'quick-v1' },
+    };
+
+    sessionStorage.setItem('structure_quick_pending', JSON.stringify(payload));
+    router.push('/structure/quick/confirm');
+  };
+
+  return (
+    <div className="mx-auto max-w-md px-5 py-10">
+      <h1 className="text-center text-xl font-bold mb-6">クイック判定（1問）</h1>
+      <p className="text-sm text-white/70 mb-6">
+        新しい環境に入った直後、あなたの最初の一手は？
+      </p>
+
+      {/* ✅ 選択肢を「診断結果カード」と同じカードUIに */}
+      <div className="space-y-4">
+        <button
+          onClick={() => handleSelect("A. とりあえず動く。やりながら整える。", "E")}
+          className="w-full rounded-2xl border-2 border-white text-left px-4 py-3
+                     bg-black/40 text-white hover:bg-white/10 active:scale-[0.99]
+                     transition focus:outline-none focus:ring-2 focus:ring-white"
+        >
+          A. とりあえず動く。やりながら整える。
+        </button>
+
+        <button
+          onClick={() => handleSelect("B. 目的と制約を先に決め、最短の選択肢を絞る。", "Λ")}
+          className="w-full rounded-2xl border-2 border-white text-left px-4 py-3
+                     bg-black/40 text-white hover:bg-white/10 active:scale-[0.99]
+                     transition focus:outline-none focus:ring-2 focus:ring-white"
+        >
+          B. 目的と制約を先に決め、最短の選択肢を絞る。
+        </button>
+
+        <button
+          onClick={() => handleSelect("C. まず観測して小さく試し、次に要点を選び直す。", "Ǝ")}
+          className="w-full rounded-2xl border-2 border-white text-left px-4 py-3
+                     bg-black/40 text-white hover:bg-white/10 active:scale-[0.99]
+                     transition focus:outline-none focus:ring-2 focus:ring-white"
+        >
+          C. まず観測して小さく試し、次に要点を選び直す。
+        </button>
+
+        <button
+          onClick={() => handleSelect("D. どちらとも言えない／状況により変える。", "V")}
+          className="w-full rounded-2xl border-2 border-white text-left px-4 py-3
+                     bg-black/40 text-white hover:bg-white/10 active:scale-[0.99]
+                     transition focus:outline-none focus:ring-2 focus:ring-white"
+        >
+          D. どちらとも言えない／状況により変える。
+        </button>
+      </div>
+    </div>
+  );
 }
 
-type PendingV1 = {
-  choiceText: string
-  code: StructureLetter
-  result: Result
-  _meta: { ts: number; v: 'quick-v1' }
-}
-
-/* ========= 文言 ========= */
-const TEXT: Record<Choice, string> = {
-  A: 'A. とりあえず動く。やりながら整える。',
-  B: 'B. 目的と制約を先に決め、最短の選択肢を絞る。',
-  C: 'C. まず観測して小さく試し、次に要点を選び直す。',
-  D: 'D. どちらとも言えない／状況により変える。',
-}
-
-/* ========= 選択肢→v1ペイロード変換 ========= */
-function mapChoiceToPendingV1(choice: Choice): PendingV1 {
-  switch (choice) {
-    case 'A':
-      return {
-        choiceText: TEXT.A,
-        code: 'E',
-        result: {
-          type: 'EVΛƎ型',
-          weight: 0.8,
-          comment: '衝動と行動で流れを作る傾向。まず動いて学びを回収するタイプ。',
-          advice: '小さく始めて10分だけ着手。後で整える前提で前へ。',
-        },
-        _meta: { ts: Date.now(), v: 'quick-v1' },
-      }
-    case 'B':
-      return {
-        choiceText: TEXT.B,
-        code: 'Λ',
-        result: {
-          type: 'ΛƎEΛ型',
-          weight: 0.8,
-          comment: '制約と目的から最短を選ぶ傾向。判断の速さが強み。',
-          advice: '目的→制約→手順の3点をメモに落としてからGO。',
-        },
-        _meta: { ts: Date.now(), v: 'quick-v1' },
-      }
-    case 'C':
-      return {
-        choiceText: TEXT.C,
-        code: 'Ǝ',
-        result: {
-          type: 'EΛVƎ型',
-          weight: 0.8,
-          comment: '観測→小実験→選び直しの循環。状況把握が得意。',
-          advice: 'まず1回だけ試す。結果を観て次の一手を更新。',
-        },
-        _meta: { ts: Date.now(), v: 'quick-v1' },
-      }
-    case 'D':
-    default:
-      return {
-        choiceText: TEXT.D,
-        code: 'V',
-        result: {
-          type: '中立',
-          weight: 0.3,
-          comment: '状況適応型。どの構造にも寄り過ぎない柔軟さ。',
-          advice: '今は「やらない」も選択。時間を区切って再判断。',
-        },
-        _meta: { ts: Date.now(), v: 'quick-v1' },
-      }
-  }
-}
 
 /* ========= コンポーネント ========= */
 export default function QuickClient() {

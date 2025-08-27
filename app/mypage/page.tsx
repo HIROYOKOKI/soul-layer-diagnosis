@@ -1,31 +1,11 @@
-'use client'
-import { useEffect } from 'react'
-import { getBrowserSupabase } from '@/lib/supabase-browser'
-
-async function testInsertDaily() {
-  const supabase = await getBrowserSupabase()
-
-  // ① セッション確認（未ログインなら /login/form へ）
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
-    window.location.href = '/login/form'
-    return
-  }
-
-  // ② 挿入テスト
-  const uid = session.user.id
-  const { error } = await supabase.from('daily_results').insert({
-    user_id: uid,
-    theme: 'work',
-    choice: 'E',
-    structure_score: { E: 1, V: 0, Λ: 0, Ǝ: 0 },
-    comment: 'RLS test',
-    advice: '静かに前進',
-  })
-  console.log('insert error:', error)
-}
-
+// app/mypage/page.tsx
 export default function MyPage() {
-  useEffect(() => { void testInsertDaily() }, [])
-  return <main style={{ padding: 20 }}>マイページ（挿入テスト中）</main>
+  return (
+    <main className="min-h-screen bg-black text-white p-6">
+      <h1 className="text-xl font-semibold">MYPAGE</h1>
+      <p className="text-white/60 mt-2">
+        ここに選択したテーマや診断履歴を表示します（仮）。
+      </p>
+    </main>
+  )
 }

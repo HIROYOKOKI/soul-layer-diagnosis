@@ -66,14 +66,16 @@ export default function ConfirmClient() {
             <div className="mt-1 text-xs text-white/40">コード：{pending.code}</div>
           </div>
 
-          {/* 結果の開示 or 表示 */}
-          {!showResult ? (
-            <button
-              className="w-full rounded-xl border-2 border-white/30 py-2 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-white/40 active:scale-[0.99] transition"
-              onClick={() => setShowResult(true)}
-            >
-              結果を表示
-            </button>
+         {/* 結果を表示ボタン */}
+<button
+  className="w-full rounded-xl border-2 border-white text-white py-2
+             hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white
+             active:scale-[0.99] transition"
+  onClick={() => setShowResult(true)}
+>
+  結果を表示
+</button>
+
           ) : (
             <div className="space-y-4">
               <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
@@ -86,21 +88,27 @@ export default function ConfirmClient() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-2">
-                {/* アウトラインボタン（枠あり） */}
-                <button
-                  onClick={() => router.push('/structure/quick')}
-                  className="rounded-xl border-2 border-white/30 py-2 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-white/40 active:scale-[0.99] transition"
-                >
-                  やり直す
-                </button>
-                {/* ソリッドボタン（白） */}
-                <button
-                  disabled={saving}
-                  onClick={handleSave}
-                  className="rounded-xl bg-white text-black py-2 font-medium hover:opacity-90 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-white/60 active:scale-[0.99] transition"
-                >
-                  {saving ? '保存中…' : '保存する'}
-                </button>
+              {/* やり直すボタン */}
+<button
+  onClick={() => router.push('/structure/quick')}
+  className="rounded-xl border-2 border-white text-white py-2
+             hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white
+             active:scale-[0.99] transition"
+>
+  やり直す
+</button>
+
+              {/* 保存するボタン */}
+<button
+  disabled={saving}
+  onClick={handleSave}
+  className="rounded-xl border-2 border-white bg-white text-black py-2 font-medium
+             hover:opacity-90 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-white
+             active:scale-[0.99] transition"
+>
+  {saving ? '保存中…' : '保存する'}
+</button>
+
               </div>
             </div>
           )}

@@ -4,6 +4,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppHeader from '@/app/components/AppHeader'      // ← 追加
+import AppSubHeaderTheme from '@/app/components/AppSubHeaderTheme' // ← 追加
+
 import { luneaSpeech, type StructureCode } from '@/app/_data/characters/lunea'
 
 type Choice = { code: StructureCode; label: string; hint?: string }
@@ -63,6 +65,7 @@ export default function DailyQuestionPage() {
   return (
     <>
       <AppHeader />
+        <AppSubHeaderTheme />  {/* ← 追加 */}
       <main className="mx-auto w-full max-w-screen-sm px-4 py-8">
         <header className="mb-4">
           <h1 className="h1">デイリー診断</h1>

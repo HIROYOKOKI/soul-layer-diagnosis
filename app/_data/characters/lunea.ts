@@ -6,6 +6,8 @@
 
 export type StructureCode = 'E' | 'V' | 'Λ' | 'Ǝ'
 export type LuneaMode = 'friend' | 'lover' | 'boss' | 'self'
+export const DEFAULT_LUNEA_MODE: LuneaMode = 'friend'
+
 
 export type Character = {
   id: 'lunea'

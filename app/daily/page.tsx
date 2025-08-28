@@ -1,19 +1,27 @@
 // app/daily/page.tsx
 'use client'
+
 import { useRef, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  LUNEA, selectLuneaIntoSession, setLuneaMode, type LuneaMode,
+  LUNEA,
+  selectLuneaIntoSession,
+  setLuneaMode,
+  type LuneaMode,
 } from '@/app/_data/characters/lunea'
+
+// vibrate を型安全に使うための Navigator 拡張
+interface NavigatorWithVibrate extends Navigator {
+  vibrate?: (pattern: number | number[]) => boolean
+}
 
 export default function DailyCharacterPage() {
   const router = useRouter()
   const [mode, setMode] = useState<LuneaMode>('friend')
-  const [ready, setReady] = useState(false)       // DOM準備完了フラグ
+  const [ready, setReady] = useState(false) // デバッグ表示用フラグ
   const busyRef = useRef(false)
 
   useEffect(() => {
-    // 上に被ってる透明要素があれば pointer-events を落とすためのデバッグ
     setReady(true)
   }, [])
 
@@ -23,48 +31,55 @@ export default function DailyCharacterPage() {
     try {
       selectLuneaIntoSession()
       setLuneaMode(mode)
-      // 触覚フィードバック（対応端末）
-      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-        try { (navigator as any).vibrate?.(15) } catch {}
+
+      // 触覚フィードバック（対応端末のみ）
+      if (typeof window !== 'undefined') {
+        const nav = navigator as NavigatorWithVibrate
+        try { nav.vibrate?.(15) } catch {}
       }
+
       router.push('/daily/question')
-      // ログ（開発用）
       console.log('[daily] start clicked', { mode })
     } finally {
-      setTimeout(() => (busyRef.current = false), 600)
+      // 画面遷移が走らなかった場合でも再クリック可能にする軽いロック
+      setTimeout(() => { busyRef.current = false }, 600)
     }
   }
 
   // Enter/Space でも押せるように
   const onKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault(); start()
+      e.preventDefault()
+      start()
     }
   }
 
+  // ラジオ選択肢（型を固定）
+  const options: ReadonlyArray<{ v: LuneaMode; label: string }> = [
+    { v: 'friend', label: '友達設定（親しい友人・同僚のように語りかけます）' },
+    { v: 'lover',  label: '恋人設定（恋人のように語りかけます）' },
+    { v: 'boss',   label: '上司設定（上司・先生のように語りかけます）' },
+    { v: 'self',   label: '自分設定（自身の心の声をルネアが代わって語りかけます）' },
+  ] as const
+
   return (
-    <div className="container-narrow py-8 relative z-20"> {/* ← z-20 で前面に */}
+    <div className="container-narrow py-8 relative z-20">
       <h1 className="h1 mb-2">{LUNEA.persona.displayName}</h1>
       <p className="sub mb-4">{LUNEA.persona.tagline}</p>
 
-      {/* 外枠カードなし → ガラス枠を外し、余白だけにする */}
+      {/* 外枠カードなし（ガラスなし・線なし） */}
       <section className="rounded-xl p-0 mb-5">
         <p className="text-sm font-semibold mb-3">スタイルを選んでください</p>
 
         <div className="flex flex-col gap-3 text-sm">
-          {[
-            { v:'friend', label:'友達設定（親しい友人・同僚のように語りかけます）' },
-            { v:'lover',  label:'恋人設定（恋人のように語りかけます）' },
-            { v:'boss',   label:'上司設定（上司・先生のように語りかけます）' },
-            { v:'self',   label:'自分設定（自身の心の声をルネアが代わって語りかけます）' },
-          ].map(opt => (
+          {options.map((opt) => (
             <label key={opt.v} className="flex items-center gap-3 cursor-pointer select-none">
               <input
                 type="radio"
                 name="lunea-mode"
                 value={opt.v}
                 checked={mode === opt.v}
-                onChange={() => setMode(opt.v as LuneaMode)}
+                onChange={() => setMode(opt.v)}
                 className="accent-white/90 w-4 h-4"
               />
               <span>{opt.label}</span>
@@ -81,19 +96,15 @@ export default function DailyCharacterPage() {
         className="tap btn btn-blue glow-shadow-blue relative z-30"
         style={{
           minWidth: 180,
-          touchAction: 'manipulation',   // 300ms遅延回避
+          touchAction: 'manipulation', // 300ms遅延回避（モバイル）
           cursor: 'pointer',
         }}
       >
         診断を始める
       </button>
 
-      {/* デバッグ: クリックブロッカーがあれば警告（開発時のみ目視用） */}
-      {ready && (
-        <div className="sr-only">
-          {/* ここに将来、重なり要素検出が必要なら入れる */}
-        </div>
-      )}
+      {/* デバッグ用：必要になったらここに重なり検出ロジックを追加 */}
+      {ready && <div className="sr-only">ready</div>}
     </div>
   )
 }

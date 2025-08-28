@@ -1,5 +1,5 @@
-FILE: app/profile/confirm/page.tsx（変更なし）
-// -------------------------------------------------------------
+FILE: app/profile/confirm/page.tsx
+
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'

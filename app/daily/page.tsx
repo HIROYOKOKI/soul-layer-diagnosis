@@ -4,6 +4,8 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppHeader from '@/app/components/AppHeader' // ← これを使う
+import AppSubHeaderTheme from '@/app/components/AppSubHeaderTheme' // ← 追加
+
 import {
   LUNEA,
   selectLuneaIntoSession,
@@ -36,6 +38,7 @@ export default function DailyCharacterPage() {
     <>
       {/* 共通ヘッダー */}
       <AppHeader />
+       <AppSubHeaderTheme /> 
 
       {/* 中央寄せコンテナ（左右余白・最大幅・上余白） */}
       <main className="mx-auto w-full max-w-screen-sm px-4 py-8">

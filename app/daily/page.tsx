@@ -43,7 +43,7 @@ export default function DailyCharacterPage() {
               checked={mode === 'friend'}
               onChange={() => setMode('friend')}
             />
-            <span>友達設定（親しい友人・同僚のように語りかけます）</span>
+            <span>友達設定（親しい友人・同僚のようにルネアが語りかけます）</span>
           </label>
 
           <label className="flex items-center gap-2 cursor-pointer">
@@ -54,7 +54,7 @@ export default function DailyCharacterPage() {
               checked={mode === 'lover'}
               onChange={() => setMode('lover')}
             />
-            <span>恋人設定（恋人のように語りかけます）</span>
+            <span>恋人設定（恋人のようにルネアが語りかけます）</span>
           </label>
 
           <label className="flex items-center gap-2 cursor-pointer">
@@ -65,7 +65,7 @@ export default function DailyCharacterPage() {
               checked={mode === 'boss'}
               onChange={() => setMode('boss')}
             />
-            <span>上司設定（上司・先生のように語りかけます）</span>
+            <span>上司設定（上司・先生のようにルネアが語りかけます）</span>
           </label>
 
           <label className="flex items-center gap-2 cursor-pointer">

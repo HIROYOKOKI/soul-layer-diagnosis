@@ -57,6 +57,16 @@ function luneaClosing(code: string) {
   }
 }
 
+async function fetchJSON<T>(url: string): Promise<T> {
+  const res = await fetch(url, { cache: 'no-store' })
+  const ct = res.headers.get('content-type') || ''
+  if (!ct.includes('application/json')) {
+    const text = await res.text().catch(() => '')
+    throw new Error(text || `HTTP ${res.status}`)
+  }
+  return (await res.json()) as T
+}
+
 export default function MyPage() {
   const [rows, setRows] = useState<DailyRow[] | null>(null)
   const [theme, setTheme] = useState<string>('—')
@@ -66,7 +76,6 @@ export default function MyPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // navigator 名（sessionStorage）
     try {
       const v = sessionStorage.getItem('daily_character') || 'ルネア'
       setNavName(v)
@@ -74,19 +83,17 @@ export default function MyPage() {
 
     const run = async () => {
       try {
-        const [listRes, themeRes] = await Promise.all([
-          fetch('/api/daily/list?limit=30', { cache: 'no-store' }),
-          fetch('/api/theme/get', { cache: 'no-store' }),
+        const [listJson, themeJson] = await Promise.all([
+          fetchJSON<ListResp>('/api/daily/list?limit=30'),
+          fetchJSON<ThemeResp>('/api/theme/get'),
         ])
-        const listJson = (await listRes.json()) as ListResp
-        const themeJson = (await themeRes.json()) as ThemeResp
         if (!listJson.ok) throw new Error(listJson.error || 'list_failed')
         setRows(listJson.data)
         setTheme(themeJson.theme || '仕事')
         setThemeSetAt(themeJson.setAt || '')
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : typeof e === 'string' ? e : 'failed'
-        setError(msg)
+        setError(`読み込みに失敗しました: ${msg}`)
       } finally {
         setLoading(false)
       }
@@ -198,7 +205,7 @@ export default function MyPage() {
         {loading ? (
           <div style={{ padding: 16, fontSize: 12, opacity: 0.7 }}>読み込み中...</div>
         ) : error ? (
-          <div style={{ padding: 16, fontSize: 12, color: '#ffa2a2' }}>読み込みに失敗しました：{error}</div>
+          <div style={{ padding: 16, fontSize: 12, color: '#ffa2a2' }}>{error}</div>
         ) : !rows || rows.length === 0 ? (
           <div style={{ padding: 16, fontSize: 12, opacity: 0.7 }}>まだ保存された診断がありません。</div>
         ) : (

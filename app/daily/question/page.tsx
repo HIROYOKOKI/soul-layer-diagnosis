@@ -3,9 +3,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import AppHeader from '@/app/components/AppHeader'      // ← 追加
-import AppSubHeaderTheme from '@/app/components/AppSubHeaderTheme' // ← 追加
-
+import AppHeader from '@/app/components/AppHeader'
+import AppSubHeaderTheme from '@/app/components/AppSubHeaderTheme'
 import { luneaSpeech, type StructureCode } from '@/app/_data/characters/lunea'
 
 type Choice = { code: StructureCode; label: string; hint?: string }
@@ -48,8 +47,11 @@ export default function DailyQuestionPage() {
           setChoices(DEFAULT_CHOICES)
         }
       } catch {
-        setChoices(DEFAULT_CHOICES); setError('ネットワークエラーによりローカル問題を使用します')
-      } finally { if (!ignore) setLoading(false) }
+        setChoices(DEFAULT_CHOICES)
+        setError('ネットワークエラーによりローカル問題を使用します')
+      } finally {
+        if (!ignore) setLoading(false)
+      }
     })()
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -65,42 +67,47 @@ export default function DailyQuestionPage() {
   return (
     <>
       <AppHeader />
-        <AppSubHeaderTheme />  {/* ← 追加 */}
+      <AppSubHeaderTheme />
+
+      {/* ▼ 外枠カードを排除：素のコンテナでシンプルに */}
       <main className="mx-auto w-full max-w-screen-sm px-4 py-8">
         <header className="mb-4">
           <h1 className="h1">デイリー診断</h1>
           <p className="sub mt-1">{luneaSpeech('beforeQuestion')}</p>
         </header>
 
-        <section className="glass rounded-2xl p-4 border border-white/10">
-          <h2 className="h2">{question}</h2>
-          {error && <p className="text-xs text-white/60 mt-1">{error}</p>}
+        {/* 質問文（枠なし） */}
+        <h2 className="h2">{question}</h2>
+        {error && <p className="text-xs text-white/60 mt-1">{error}</p>}
 
-          <div className="grid gap-3 mt-4 sm:grid-cols-2">
-            {(loading ? DEFAULT_CHOICES : choices).map((c) => (
-              <button
-                key={c.code}
-                onClick={() => setSel(c)}
-                className="glass rounded-xl p-4 text-left transition-all"
-                style={{ border: '1px solid',
-                         borderColor: sel?.code === c.code ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.1)' }}
-              >
-                <div className="text-base font-semibold">{c.label}</div>
-                <div className="text-xs text-white/60 mt-1">{c.hint}</div>
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-5 flex items-center justify-end">
+        {/* 選択肢：各ボタンのみガラス感を維持（外枠カードはなし） */}
+        <div className="grid gap-3 mt-4 sm:grid-cols-2">
+          {(loading ? DEFAULT_CHOICES : choices).map((c) => (
             <button
-              onClick={onProceed}
-              className="btn btn-blue glow-shadow-blue h-12 px-6 rounded-2xl"
-              disabled={!sel}
+              key={c.code}
+              onClick={() => setSel(c)}
+              className="glass rounded-xl p-4 text-left transition-all"
+              style={{
+                border: '1px solid',
+                borderColor: sel?.code === c.code ? 'rgba(255,255,255,.4)' : 'rgba(255,255,255,.1)',
+              }}
             >
-              {sel ? '確認へ進む' : '選択してください'}
+              <div className="text-base font-semibold">{c.label}</div>
+              <div className="text-xs text-white/60 mt-1">{c.hint}</div>
             </button>
-          </div>
-        </section>
+          ))}
+        </div>
+
+        {/* アクション（枠なしで右寄せ） */}
+        <div className="mt-5 flex items-center justify-end">
+          <button
+            onClick={onProceed}
+            className="btn btn-blue glow-shadow-blue h-12 px-6 rounded-2xl"
+            disabled={!sel}
+          >
+            {sel ? '確認へ進む' : '選択してください'}
+          </button>
+        </div>
       </main>
     </>
   )

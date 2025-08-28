@@ -2,7 +2,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import AppShell from '@/app/_components/AppShell'        // ← 追加
+import AppHeader from '@/app/_components/AppHeader'        // ← 追加
 import {
   LUNEA, selectLuneaIntoSession, setLuneaMode,
   type LuneaMode, DEFAULT_LUNEA_MODE,
@@ -26,7 +26,7 @@ export default function DailyCharacterPage() {
   }
 
   return (
-    <AppShell>
+    <AppHeader>
       <div className="mx-auto w-full max-w-screen-sm px-4 py-8">
         <header className="mb-4">
           <h1 className="text-xl font-extrabold tracking-tight">ルネア（Lunea）</h1>
@@ -44,6 +44,6 @@ export default function DailyCharacterPage() {
           診断を始める
         </button>
       </div>
-    </AppShell>
+    </AppHeader>
   )
 }

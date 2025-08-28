@@ -91,4 +91,4 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(
     { stored: true, id: rec?.id ?? null, record },
     { status: 200 }
-}
+ )

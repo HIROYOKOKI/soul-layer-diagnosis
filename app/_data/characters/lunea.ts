@@ -1,11 +1,11 @@
-// app/_data/characters/lunea.ts
-// ルネアの人物設定ファイル（型・口調モード・UI接続ヘルパ込み）
+// =============================================================
+// LUNEA Character Spec — ルネア人物設定ファイル（完全版 修正版 最終）
+// Project: ソウルレイヤー診断 / EVΛƎ
+// Placement: app/_data/characters/lunea.ts
+// =============================================================
 
-/* =======================
- * 基本の型
- * ===================== */
 export type StructureCode = 'E' | 'V' | 'Λ' | 'Ǝ'
-export type LuneaMode = 'friend' | 'lover' | 'boss' // 友達/恋人/上司
+export type LuneaMode = 'friend' | 'lover' | 'boss' | 'self'
 
 export type Character = {
   id: 'lunea'
@@ -36,9 +36,6 @@ export type Character = {
   }
 }
 
-/* =======================
- * 本体定義
- * ===================== */
 export const LUNEA: Character = {
   id: 'lunea',
   persona: {
@@ -78,27 +75,29 @@ export const LUNEA: Character = {
   },
 }
 
-/* =======================
- * UI接続ヘルパ
- * ===================== */
+// =============================================================
+// UI接続ヘルパ
+// =============================================================
 
-// ルネア選択を保存
+/** キャラ選択保存 */
 export function selectLuneaIntoSession(): void {
   if (typeof window === 'undefined') return
   sessionStorage.setItem(LUNEA.runtime.storageKey, LUNEA.id)
 }
 
-// 口調モードの保存/取得
+/** モード保存 */
 export function setLuneaMode(mode: LuneaMode): void {
   if (typeof window === 'undefined') return
   sessionStorage.setItem(LUNEA.runtime.modeKey, mode)
 }
+
+/** モード取得 */
 export function getLuneaMode(): LuneaMode {
   if (typeof window === 'undefined') return 'friend'
   return (sessionStorage.getItem(LUNEA.runtime.modeKey) as LuneaMode) || 'friend'
 }
 
-// 簡易口調変換（友達/恋人/上司）
+// 口調変換ロジック
 function applyMode(text: string, mode: LuneaMode): string {
   switch (mode) {
     case 'friend':
@@ -116,13 +115,19 @@ function applyMode(text: string, mode: LuneaMode): string {
       return text
         .replace(/してください/g, 'しなさい')
         .replace(/してみてください/g, '観測しなさい')
+    case 'self':
+      return '（あなた自身の心の声）' + text
+        .replace(/です。/g, 'な気がする。')
+        .replace(/してください/g, 'してみよう。')
+        .replace(/してみてください/g, 'してみよう。')
     default:
       return text
   }
 }
 
-// 画面ごとのセリフ（質問：常時表示／確認：名言も出す）
 export type LuneaSpeechKind = 'start' | 'beforeQuestion' | 'afterResult' | 'closing'
+
+/** 各画面ごとのセリフ取得 */
 export function luneaSpeech(kind: LuneaSpeechKind, code?: StructureCode): string {
   const mode = getLuneaMode()
   switch (kind) {
@@ -144,7 +149,7 @@ export function luneaSpeech(kind: LuneaSpeechKind, code?: StructureCode): string
   }
 }
 
-// MYPAGE：直近コードに応じて変動（締め＋励まし）
+/** MYPAGE 締めコメント（直近コード反映） */
 export function luneaMypageClosing(latestCode?: StructureCode): string {
   const mode = getLuneaMode()
   const base = LUNEA.speechPatterns.closing
@@ -153,14 +158,20 @@ export function luneaMypageClosing(latestCode?: StructureCode): string {
   return applyMode(`${base}\n${tip}`, mode)
 }
 
-/* =======================
- * スモーク（型・漏れチェック）
- * ===================== */
+/** ナビゲータID取得 */
+export function getNavigatorIdFromSession(): 'lunea' {
+  if (typeof window === 'undefined') return 'lunea'
+  return (sessionStorage.getItem(LUNEA.runtime.storageKey) as 'lunea') || 'lunea'
+}
+
+// =============================================================
+// 簡易チェック
+// =============================================================
 function __assert(cond: boolean, msg: string): void {
   if (!cond) throw new Error(`[LUNEA Spec] ${msg}`)
 }
 __assert(LUNEA.persona.idCode === 'AI-002', 'IDコードが不正')
-;(['E','V','Λ','Ǝ'] as StructureCode[]).forEach((k) => {
+;(['E','V','Λ','Ǝ'] as StructureCode[]).forEach((k)=>{
   __assert(!!LUNEA.messages.encouragementByCode[k], `encouragement ${k} 未定義`)
   __assert(!!LUNEA.messages.quoteByCode[k], `quote ${k} 未定義`)
 })

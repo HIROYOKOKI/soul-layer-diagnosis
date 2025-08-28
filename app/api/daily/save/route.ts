@@ -73,10 +73,22 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) {
-    // RLS ポリシーが無い場合などはここに来る
     const detail = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ stored: false, error: 'supabase_insert_failed', detail }, { status: 500 })
   }
 
-  return NextResponse.json({ stored: true, id: (data as any)?.id ?? null, record }, { status: 200 })
+  type InsertedRecord = {
+    id: number
+    code: string
+    navigator: string
+    mode: string
+    choice?: string | null
+    created_at: string
+  }
+
+  const rec = data as InsertedRecord | null
+
+  return NextResponse.json(
+    { stored: true, id: rec?.id ?? null, record },
+    { status: 200 }
 }

@@ -2,7 +2,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import AppHeader from '@/app/_components/AppHeader'        // ← 追加
+import AppHeader from '@/app/components/AppHeader' // ← これを使う
 import {
   LUNEA, selectLuneaIntoSession, setLuneaMode,
   type LuneaMode, DEFAULT_LUNEA_MODE,

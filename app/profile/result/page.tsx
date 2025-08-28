@@ -1,5 +1,5 @@
-FILE: app/profile/result/page.tsx（変更なし）
-// -------------------------------------------------------------
+FILE: app/profile/result/page.tsx
+
 'use client'
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'

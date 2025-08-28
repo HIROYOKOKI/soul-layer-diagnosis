@@ -14,7 +14,6 @@ type SaveBody = {
   navigator: 'lunea'
   mode?: Mode
   meta?: { label?: string | null; hint?: string | null }
-  // 将来: theme, user_id なども追加可
 }
 
 function isCode(v: unknown): v is Code {
@@ -24,15 +23,26 @@ function isMode(v: unknown): v is Mode {
   return v === 'friend' || v === 'lover' || v === 'boss' || v === 'self'
 }
 
+// Supabase 戻り値（使う最小限のフィールドだけ）
+type InsertedRecord = {
+  id: number
+  code: string
+  navigator: string
+  mode: string
+  choice?: string | null
+  created_at: string
+}
+
+// ── ハンドラ ────────────────────────────────
 export async function POST(req: NextRequest) {
   // 1) 入力パース
-  let payload: unknown
+  let payloadUnknown: unknown
   try {
-    payload = await req.json()
+    payloadUnknown = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
-  const p = payload as Partial<SaveBody>
+  const p = payloadUnknown as Partial<SaveBody>
 
   // 2) バリデーション
   if (!isCode(p.code)) return NextResponse.json({ error: 'Invalid code' }, { status: 400 })
@@ -41,28 +51,27 @@ export async function POST(req: NextRequest) {
   const choiceLabel = p.meta?.label ?? null
 
   // 3) 保存レコード（あなたのテーブル構成に合わせてマップ）
-  //    Supabase 側のカラム例（あなたのUIに合わせて追加済み）:
-  //      code (text, CHECK制約), navigator (text), mode (text default 'friend'),
-  //      choice (text), created_at (timestamptz default now()), weight (numeric default 0.1)
   const record = {
     code: p.code,
     navigator: 'lunea',
     mode,
-    choice: choiceLabel,           // ← meta.label を choice カラムに保存
+    choice: choiceLabel,
     created_at: new Date().toISOString(),
   }
 
-  // 4) Supabase 環境変数（未設定でもビルドを落とさない）
+  // 4) 環境変数（未設定でもビルドを落とさない）
   const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
   const SUPABASE_ANON_KEY =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    // フォールバック：環境未設定でも 200 を返す（開発/プレビュー用）
-    return NextResponse.json({ stored: false, reason: 'no_supabase_env', record }, { status: 200 })
+    return NextResponse.json(
+      { stored: false, reason: 'no_supabase_env', record },
+      { status: 200, headers: { 'x-storage': 'fallback' } },
+    )
   }
 
-  // 5) 挿入（RLSオンの場合は insert ポリシーが必要）
+  // 5) Supabase へ保存（RLS 有効時は insert ポリシーが必要）
   const { createClient } = await import('@supabase/supabase-js')
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
@@ -73,22 +82,22 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) {
-    const detail = error instanceof Error ? error.message : String(error)
-    return NextResponse.json({ stored: false, error: 'supabase_insert_failed', detail }, { status: 500 })
+    const detail = error instanceof Error ? error.message : safeStringify(error)
+    return NextResponse.json(
+      { stored: false, error: 'supabase_insert_failed', detail },
+      { status: 500 },
+    )
   }
 
-  type InsertedRecord = {
-    id: number
-    code: string
-    navigator: string
-    mode: string
-    choice?: string | null
-    created_at: string
-  }
-
-  const rec = data as InsertedRecord | null
+  const rec = (data ?? null) as InsertedRecord | null
 
   return NextResponse.json(
     { stored: true, id: rec?.id ?? null, record },
-    { status: 200 }
- )
+    { status: 200, headers: { 'x-storage': 'supabase' } },
+  )
+}
+
+// ── util ───────────────────────────────────
+function safeStringify(e: unknown): string {
+  try { return JSON.stringify(e) } catch { return String(e) }
+}

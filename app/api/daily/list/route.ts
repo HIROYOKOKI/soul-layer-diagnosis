@@ -1,17 +1,16 @@
-// =============================================================
+// -------------------------------------------------------------
 // FILE: app/api/daily/list/route.ts
-// =============================================================
-/**
-* Canvas単一ファイル対応のため、`GET` ではなく固有名にしています。
-* 本番では `export async function GET(req: Request)` に戻してください。
-*/
-export async function GET_API_DAILY_LIST(req: Request) {
-try {
+// -------------------------------------------------------------
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+export async function GET(req: Request) {
 const supabase = createClient(
 process.env.NEXT_PUBLIC_SUPABASE_URL!,
 process.env.SUPABASE_ANON_KEY!
 )
 
+try {
 const { searchParams } = new URL(req.url)
 const limitRaw = searchParams.get('limit') ?? '20'
 const user_id = searchParams.get('user_id')
@@ -40,7 +39,8 @@ return (['E', 'V', 'Λ', 'Ǝ'].includes(x) ? x : x) as string
 const normalized = (data || []).map((r) => ({ ...r, code: norm(r.code) }))
 
 return NextResponse.json({ ok: true, data: normalized }, { status: 200 })
-} catch (err: any) {
-return NextResponse.json({ ok: false, error: err?.message ?? 'unknown_error' }, { status: 500 })
+} catch (err: unknown) {
+const message = err instanceof Error ? err.message : typeof err === 'string' ? err : 'unknown_error'
+return NextResponse.json({ ok: false, error: message }, { status: 500 })
 }
 }

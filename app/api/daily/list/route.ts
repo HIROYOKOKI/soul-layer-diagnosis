@@ -1,78 +1,91 @@
------------------------------------------------------------------
-
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+// app/api/daily/list/route.ts
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 export async function GET(req: Request) {
-try {
-const { searchParams } = new URL(req.url)
-const limitRaw = searchParams.get('limit') ?? '20'
-const user_id = searchParams.get('user_id')
-const diag = searchParams.get('diag') === '1'
+  try {
+    const urlObj = new URL(req.url)
+    const limitRaw = urlObj.searchParams.get('limit') ?? '20'
+    const userId = urlObj.searchParams.get('user_id')
+    const diag = urlObj.searchParams.get('diag') === '1'
 
-// --- ENV 取得（名称ゆらぎにも対応） ---
-const urlRaw = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
-const svcRaw = process.env.SUPABASE_SERVICE_ROLE_KEY
-const anonRaw = process.env.SUPABASE_ANON_KEY
-const url = urlRaw?.trim()
-const svc = svcRaw?.trim()
-const anon = anonRaw?.trim()
-const usingServiceRole = Boolean(svc && svc.length > 0)
-const key = usingServiceRole ? svc! : (anon || '')
+    // ENV 読み取り（名称ゆらぎ対応）
+    const supabaseUrl =
+      (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim()
+    const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
+    const anonKey = (process.env.SUPABASE_ANON_KEY || '').trim()
 
-if (!url || !key) {
-return NextResponse.json(
-{
-ok: false,
-error: 'env_missing: SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_(SERVICE_ROLE_KEY|ANON_KEY)',
-diag: diag ? { urlVarUsed: url ? (process.env.SUPABASE_URL ? 'SUPABASE_URL' : 'NEXT_PUBLIC_SUPABASE_URL') : null, hasServiceRole: Boolean(svc), hasAnon: Boolean(anon), region: process.env.VERCEL_REGION } : undefined,
-},
-{ status: 500 }
-)
-}
+    const usingServiceRole = serviceKey.length > 0
+    const supabaseKey = usingServiceRole ? serviceKey : anonKey
 
-const supabase = createClient(url, key, { global: { headers: { 'X-Client-Info': 'mypage-list-v1.8' } } })
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'env_missing: SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL or SUPABASE_(SERVICE_ROLE_KEY|ANON_KEY)',
+          diag: diag
+            ? {
+                hasUrl: Boolean(supabaseUrl),
+                hasServiceRole: Boolean(serviceKey),
+                hasAnon: Boolean(anonKey),
+              }
+            : undefined,
+        },
+        { status: 500 },
+      )
+    }
 
-const limit = Math.max(1, Math.min(parseInt(limitRaw, 10) || 20, 100))
+    const supabase = createClient(supabaseUrl, supabaseKey)
 
-let query = supabase
-.from('daily_results')
-.select('id, user_id, code, navigator, mode, choice, theme, created_at')
-.order('created_at', { ascending: false })
-.limit(limit)
+    const limit = Math.max(1, Math.min(parseInt(limitRaw, 10) || 20, 100))
 
-if (user_id) query = query.eq('user_id', user_id)
+    let query = supabase
+      .from('daily_results')
+      .select('id, user_id, code, navigator, mode, choice, theme, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limit)
 
-const { data, error } = await query
-if (error) {
-const payload = {
-ok: false as const,
-error: error.message || 'supabase_error',
-diag: diag ? {
-code: (error as any)?.code ?? null,
-details: (error as any)?.details ?? null,
-hint: (error as any)?.hint ?? null,
-usingServiceRole,
-urlVarUsed: process.env.SUPABASE_URL ? 'SUPABASE_URL' : 'NEXT_PUBLIC_SUPABASE_URL',
-} : undefined,
-}
-const status = (error as any)?.code === 'PGRST301' || /permission denied/i.test(String(error.message)) ? 403 : 500
-return NextResponse.json(payload, { status })
-}
+    if (userId) query = query.eq('user_id', userId)
 
-// 表示用正規化（"ヨ"/"∃" → "Ǝ"、"A" → "Λ" など）
-const norm = (c: string) => {
-const x = (c || '').trim()
-if (x === '∃' || x === 'ヨ') return 'Ǝ'
-if (x === 'A') return 'Λ'
-return (['E', 'V', 'Λ', 'Ǝ'].includes(x) ? x : x) as string
-}
+    const { data, error } = await query
+    if (error) {
+      const status =
+        /permission denied/i.test(error.message) || (error as any)?.code === 'PGRST301'
+          ? 403
+          : 500
+      return NextResponse.json(
+        {
+          ok: false,
+          error: error.message || 'supabase_error',
+          diag: diag
+            ? {
+                usingServiceRole,
+                code: (error as any)?.code ?? null,
+                details: (error as any)?.details ?? null,
+                hint: (error as any)?.hint ?? null,
+              }
+            : undefined,
+        },
+        { status },
+      )
+    }
 
-const normalized = (data || []).map((r) => ({ ...r, code: norm(r.code) }))
+    // コード正規化
+    const norm = (c: string) => {
+      const x = (c || '').trim()
+      if (x === '∃' || x === 'ヨ') return 'Ǝ'
+      if (x === 'A') return 'Λ'
+      return ['E', 'V', 'Λ', 'Ǝ'].includes(x) ? x : x
+    }
+    const normalized = (data || []).map((r) => ({ ...r, code: norm(r.code as string) }))
 
-return NextResponse.json({ ok: true, data: normalized, diag: diag ? { count: normalized.length, usingServiceRole } : undefined }, { status: 200 })
-} catch (err: unknown) {
-const message = err instanceof Error ? err.message : typeof err === 'string' ? err : 'unknown_error'
-return NextResponse.json({ ok: false, error: message }, { status: 500 })
-}
+    return NextResponse.json(
+      { ok: true, data: normalized, diag: diag ? { usingServiceRole } : undefined },
+      { status: 200 },
+    )
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
+  }
 }

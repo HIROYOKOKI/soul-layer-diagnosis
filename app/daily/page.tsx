@@ -1,6 +1,7 @@
 // app/daily/page.tsx
 'use client'
-import { useState, useRef } from 'react'
+
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   LUNEA,
@@ -22,7 +23,7 @@ export default function DailyCharacterPage() {
       setLuneaMode(mode)
       router.push('/daily/question')
     } finally {
-      // 画面遷移が走らないケースでも再クリック可に
+      // 画面遷移しなかった場合にも再クリックできるように軽くロック解除
       setTimeout(() => (busyRef.current = false), 600)
     }
   }
@@ -34,6 +35,7 @@ export default function DailyCharacterPage() {
 
       <section className="glass rounded-xl p-4 mb-5 border border-white/10">
         <p className="text-sm font-semibold mb-3">スタイルを選んでください</p>
+
         <div className="flex flex-col gap-2 text-sm">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -43,7 +45,7 @@ export default function DailyCharacterPage() {
               checked={mode === 'friend'}
               onChange={() => setMode('friend')}
             />
-            <span>友達設定（親しい友人・同僚のようにルネアが語りかけます）</span>
+            <span>友達設定（親しい友人・同僚のように語りかけます）</span>
           </label>
 
           <label className="flex items-center gap-2 cursor-pointer">
@@ -54,7 +56,7 @@ export default function DailyCharacterPage() {
               checked={mode === 'lover'}
               onChange={() => setMode('lover')}
             />
-            <span>恋人設定（恋人のようにルネアが語りかけます）</span>
+            <span>恋人設定（恋人のように語りかけます）</span>
           </label>
 
           <label className="flex items-center gap-2 cursor-pointer">
@@ -65,7 +67,7 @@ export default function DailyCharacterPage() {
               checked={mode === 'boss'}
               onChange={() => setMode('boss')}
             />
-            <span>上司設定（上司・先生のようにルネアが語りかけます）</span>
+            <span>上司設定（上司・先生のように語りかけます）</span>
           </label>
 
           <label className="flex items-center gap-2 cursor-pointer">
@@ -82,7 +84,7 @@ export default function DailyCharacterPage() {
       </section>
 
       <button
-        type="button"                         // ← フォーム送信抑止
+        type="button"
         className="btn btn-blue glow-shadow-blue tap relative z-10"
         onClick={start}
         style={{ minWidth: 160 }}

@@ -4,6 +4,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppHeader from '@/app/components/AppHeader'     // ← 追加
+import AppSubHeaderTheme from '@/app/components/AppSubHeaderTheme' // ← 追加
+
 import {
   luneaSpeech,
   getLuneaMode,
@@ -56,6 +58,7 @@ export default function DailyConfirmPage() {
   return (
     <>
       <AppHeader />
+      <AppSubHeaderTheme />  {/* ← 追加 */}
       <main className="mx-auto w-full max-w-screen-sm px-4 py-8">
         <header className="mb-4">
           <h1 className="h1">確認</h1>

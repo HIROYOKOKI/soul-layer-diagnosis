@@ -1,100 +1,82 @@
 // app/api/daily/save/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 
-// ─────────────────────────────
-// 型
-// ─────────────────────────────
+// ── ランタイム設定 ───────────────────────────
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+// ── 型（no-explicit-any を避ける） ─────────────
 type Code = 'E' | 'V' | 'Λ' | 'Ǝ'
-type LuneaMode = 'friend' | 'lover' | 'boss' | 'self'
+type Mode = 'friend' | 'lover' | 'boss' | 'self'
 
 type SaveBody = {
   code: Code
-  navigator: 'lunea'            // 将来拡張可
-  mode?: LuneaMode              // デフォルトは 'friend'
-  meta?: {
-    questionId?: string
-  }
+  navigator: 'lunea'
+  mode?: Mode
+  meta?: { label?: string | null; hint?: string | null }
+  // 将来: theme, user_id なども追加可
 }
 
 function isCode(v: unknown): v is Code {
   return v === 'E' || v === 'V' || v === 'Λ' || v === 'Ǝ'
 }
-function isMode(v: unknown): v is LuneaMode {
+function isMode(v: unknown): v is Mode {
   return v === 'friend' || v === 'lover' || v === 'boss' || v === 'self'
 }
 
-// ─────────────────────────────
-// ランタイム設定（NodeでOK）
-// ─────────────────────────────
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
-
-// ─────────────────────────────
-// POST /api/daily/save
-// ─────────────────────────────
 export async function POST(req: NextRequest) {
-  // 1) 入力を安全にパース
-  let payloadUnknown: unknown
+  // 1) 入力パース
+  let payload: unknown
   try {
-    payloadUnknown = await req.json()
+    payload = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
+  const p = payload as Partial<SaveBody>
 
-  // 2) バリデーション（no-explicit-any 回避）
-  const p = payloadUnknown as Partial<SaveBody>
-  if (!isCode(p.code)) {
-    return NextResponse.json({ error: 'Invalid code' }, { status: 400 })
-  }
-  if (p.navigator !== 'lunea') {
-    return NextResponse.json({ error: 'Invalid navigator' }, { status: 400 })
-  }
-  const mode: LuneaMode = isMode(p.mode) ? p.mode : 'friend'
+  // 2) バリデーション
+  if (!isCode(p.code)) return NextResponse.json({ error: 'Invalid code' }, { status: 400 })
+  if (p.navigator !== 'lunea') return NextResponse.json({ error: 'Invalid navigator' }, { status: 400 })
+  const mode: Mode = isMode(p.mode) ? p.mode : 'friend'
+  const choiceLabel = p.meta?.label ?? null
 
-  // 3) 保存用レコード
+  // 3) 保存レコード（あなたのテーブル構成に合わせてマップ）
+  //    Supabase 側のカラム例（あなたのUIに合わせて追加済み）:
+  //      code (text, CHECK制約), navigator (text), mode (text default 'friend'),
+  //      choice (text), created_at (timestamptz default now()), weight (numeric default 0.1)
   const record = {
     code: p.code,
-    navigator: p.navigator,
+    navigator: 'lunea',
     mode,
-    meta: p.meta ?? null,
+    choice: choiceLabel,           // ← meta.label を choice カラムに保存
     created_at: new Date().toISOString(),
-    // 参考情報（あれば）
-    ip: req.headers.get('x-forwarded-for') ?? null,
-    ua: req.headers.get('user-agent') ?? null,
   }
 
-  // 4) Supabase へ保存（環境変数が無い場合はフォールバックで成功レス）
+  // 4) Supabase 環境変数（未設定でもビルドを落とさない）
   const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
   const SUPABASE_ANON_KEY =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    // フォールバック：ビルド/実行を絶対に落とさない
-    return NextResponse.json(
-      { stored: false, reason: 'no_supabase_env', record },
-      { status: 200, headers: { 'x-storage': 'fallback' } },
-    )
+    // フォールバック：環境未設定でも 200 を返す（開発/プレビュー用）
+    return NextResponse.json({ stored: false, reason: 'no_supabase_env', record }, { status: 200 })
   }
 
-  // 動的インポート（ビルド時評価を避ける）
+  // 5) 挿入（RLSオンの場合は insert ポリシーが必要）
   const { createClient } = await import('@supabase/supabase-js')
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-  // 5) テーブル名：daily_results（必要に応じて変更OK）
-  const { data, error } = await supabase.from('daily_results').insert([record]).select().single()
+  const { data, error } = await supabase
+    .from('daily_results')
+    .insert([record])
+    .select()
+    .single()
 
   if (error) {
-    return NextResponse.json({ error: 'Supabase insert failed', detail: stringifyError(error) }, { status: 500 })
+    // RLS ポリシーが無い場合などはここに来る
+    const detail = error instanceof Error ? error.message : String(error)
+    return NextResponse.json({ stored: false, error: 'supabase_insert_failed', detail }, { status: 500 })
   }
 
-  return NextResponse.json(
-    { stored: true, id: data?.id ?? null, record },
-    { status: 200, headers: { 'x-storage': 'supabase' } },
-  )
-}
-
-// エラー表示（型安全）
-function stringifyError(e: unknown): string {
-  if (e instanceof Error) return e.message
-  try { return JSON.stringify(e) } catch { return String(e) }
+  return NextResponse.json({ stored: true, id: (data as any)?.id ?? null, record }, { status: 200 })
 }

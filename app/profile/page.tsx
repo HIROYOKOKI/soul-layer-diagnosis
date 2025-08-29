@@ -1,233 +1,131 @@
-// app/profile/page.tsx
-'use client';
+'use client'
 
-import { useState, type FormEvent, type CSSProperties } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, type FormEvent } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function ProfilePage() {
-  const [name, setName] = useState('');
-  const [birthday, setBirthday] = useState('');
-  const [blood, setBlood] = useState('A');
-  const [gender, setGender] = useState('Other');
-  const [preference, setPreference] = useState('Unset');
-  const router = useRouter();
+  const router = useRouter()
+  const [name, setName] = useState('')
+  const [birthday, setBirthday] = useState('')
+  const [blood, setBlood] = useState<'A'|'B'|'O'|'AB'|'Other'>('A')
+  const [gender, setGender] = useState('Other')
+  const [preference, setPreference] = useState('Unset')
 
   const handleConfirm = (e: FormEvent) => {
-    e.preventDefault();
-    const q = new URLSearchParams({
-      name,
-      birthday,
-      blood,
-      gender,
-      preference,
-    }).toString();
-    router.push(`/profile/confirm?${q}`);
-  };
+    e.preventDefault()
+    const pending = { name, birthday, blood, gender, preference }
+    sessionStorage.setItem('profile_pending', JSON.stringify(pending))
+    router.push('/profile/confirm')
+  }
 
   return (
-    <div className="profile-page" style={S.wrap}>
-      {/* ヘッダーにEVΛƎロゴ */}
-      <header style={S.header}>
-        <img src="/evae-logo.svg" alt="EVΛƎ" style={S.logoHeader}/>
+    <main className="min-h-[100dvh] relative text-white">
+      {/* 背景（ヒーローと同系の闇＋光筋） */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute inset-0 bg-black" />
+        <div className="absolute inset-x-0 top-0 h-[40%] bg-[radial-gradient(600px_400px_at_50%_0%,rgba(60,120,255,0.15),transparent)]" />
+        <div className="absolute inset-x-0 bottom-[40%] h-px bg-gradient-to-r from-transparent via-sky-400/60 to-transparent" />
+      </div>
+
+      {/* ヘッダー（ロゴ） */}
+      <header className="py-6">
+        <div className="mx-auto max-w-5xl px-5 flex items-center">
+          <img src="/evae-logo.svg" alt="EVΛƎ" className="h-6 opacity-90" />
+        </div>
       </header>
 
-      {/* プロフィールカード */}
-      <div className="card" style={S.card}>
-        <h1 style={S.title}>PROFILE</h1>
+      {/* コンテンツ：カードなし・フォームだけ */}
+      <div className="mx-auto max-w-5xl px-5">
+        <div className="mx-auto w-full max-w-xl">
+          <h1 className="mb-6 text-center text-2xl font-extrabold tracking-[0.15em] text-white/90">
+            PROFILE
+          </h1>
 
-        <form onSubmit={handleConfirm} style={S.form}>
-          {/* NAME：1カラム */}
-          <div className="row one">
-            <div className="col">
-              <label style={S.label}>NAME</label>
+          <form onSubmit={handleConfirm} className="grid gap-5">
+            {/* NAME */}
+            <label className="grid gap-2">
+              <span className="text-xs tracking-wide opacity-80">NAME</span>
               <input
-                style={S.input}
                 value={name}
                 onChange={(e)=>setName(e.target.value)}
                 placeholder="Your name"
+                className="h-12 w-full rounded-md bg-white/5 px-4 outline-none border border-white/10 focus:border-white/30"
               />
-            </div>
-          </div>
+            </label>
 
-          {/* DATE / BLOOD：2カラム（520px以上で横並び） */}
-          <div className="row two">
-            <div className="col">
-              <label style={S.label}>DATE OF BIRTH</label>
-              <input
-                style={S.input}
-                type="date"
-                value={birthday}
-                onChange={(e)=>setBirthday(e.target.value)}
-              />
-            </div>
-            <div className="col">
-              <label style={S.label}>BLOOD TYPE</label>
-              <select
-                style={S.input}
-                value={blood}
-                onChange={(e)=>setBlood(e.target.value)}
-              >
-                <option>A</option>
-                <option>B</option>
-                <option>O</option>
-                <option>AB</option>
-              </select>
-            </div>
-          </div>
+            {/* DATE / BLOOD */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <label className="grid gap-2">
+                <span className="text-xs tracking-wide opacity-80">DATE OF BIRTH</span>
+                <input
+                  type="date"
+                  value={birthday}
+                  onChange={(e)=>setBirthday(e.target.value)}
+                  className="h-12 w-full rounded-md bg-white/5 px-4 outline-none border border-white/10 focus:border-white/30"
+                />
+              </label>
 
-          {/* GENDER / PREFERENCE：2カラム */}
-          <div className="row two">
-            <div className="col">
-              <label style={S.label}>GENDER</label>
-              <select
-                style={S.input}
-                value={gender}
-                onChange={(e)=>setGender(e.target.value)}
-              >
-                <option>Male</option>
-                <option>Female</option>
-                <option>Other</option>
-                <option>Secret</option>
-              </select>
+              <label className="grid gap-2">
+                <span className="text-xs tracking-wide opacity-80">BLOOD TYPE</span>
+                <select
+                  value={blood}
+                  onChange={(e)=>setBlood(e.target.value as any)}
+                  className="h-12 w-full rounded-md bg-white/5 px-4 outline-none border border-white/10 focus:border-white/30"
+                >
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="O">O</option>
+                  <option value="AB">AB</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
             </div>
-            <div className="col">
-              <label style={S.label}>PREFERENCE</label>
-              <select
-                style={S.input}
-                value={preference}
-                onChange={(e)=>setPreference(e.target.value)}
-              >
-                <option>Unset</option>
-                <option>Hetero</option>
-                <option>Homo</option>
-                <option>Bi</option>
-                <option>Asexual</option>
-              </select>
-            </div>
-          </div>
 
-          <button type="submit" style={S.button}>確認</button>
-        </form>
+            {/* GENDER / PREFERENCE */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <label className="grid gap-2">
+                <span className="text-xs tracking-wide opacity-80">GENDER</span>
+                <select
+                  value={gender}
+                  onChange={(e)=>setGender(e.target.value)}
+                  className="h-12 w-full rounded-md bg-white/5 px-4 outline-none border border-white/10 focus:border-white/30"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-xs tracking-wide opacity-80">PREFERENCE</span>
+                <select
+                  value={preference}
+                  onChange={(e)=>setPreference(e.target.value)}
+                  className="h-12 w-full rounded-md bg-white/5 px-4 outline-none border border-white/10 focus:border-white/30"
+                >
+                  <option value="Unset">Unset</option>
+                  <option value="男性">男性</option>
+                  <option value="女性">女性</option>
+                  <option value="どちらも">どちらも</option>
+                </select>
+              </label>
+            </div>
+
+            {/* 確認ボタン（グラデのみ・外枠なし） */}
+            <button
+              type="submit"
+              className="mt-2 h-12 rounded-full bg-gradient-to-r from-sky-500 to-fuchsia-500 font-semibold tracking-wider hover:opacity-95 active:opacity-90"
+            >
+              確認
+            </button>
+          </form>
+
+          {/* フッタラベル（薄く） */}
+          <div className="mt-10 text-center text-[11px] tracking-[0.2em] opacity-60">
+            † SOUL LAYER DIAGNOSIS
+          </div>
+        </div>
       </div>
-
-      {/* フッター：ロゴ */}
-      <footer style={S.footer}>
-        <img src="/soul-layer-diagnosis.svg" alt="Soul Layer Diagnosis" style={S.logoFooter}/>
-      </footer>
-
-      {/* iOSフォーム対策＋レイアウトCSS（※1ブロックだけ） */}
-      <style jsx global>{`
-        /* iOSフォーム対策（フォントサイズを16px以上に固定） */
-        input, select, button, textarea {
-          font-size: 16px !important;
-          line-height: 1.4 !important;
-        }
-        @supports (-webkit-touch-callout: none) {
-          select { font-size: 17px !important; }
-        }
-
-        /* ベンダー外観のリセットはCSS側で（TS型エラー回避） */
-        input[type="date"], select { -webkit-appearance: none; appearance: none; }
-
-        /* レスポンシブ行レイアウト */
-        .row { display: grid; grid-template-columns: 1fr; row-gap: 12px; }
-        .row.two { grid-template-columns: 1fr; column-gap: 16px; }
-        .col { display: flex; flex-direction: column; }
-
-        /* 幅520px以上で2カラム化 */
-        @media (min-width: 520px) {
-          .row.two { grid-template-columns: 1fr 1fr; }
-        }
-
-        /* スマホ幅でカード左右を少し詰める */
-        @media (max-width: 430px) {
-          .profile-page .card { padding: 28px 18px !important; }
-        }
-      `}</style>
-    </div>
-  );
+    </main>
+  )
 }
-
-const glow = '0 0 12px rgba(0,180,255,.8), 0 0 24px rgba(150,0,255,.6)';
-
-const S: Record<string, CSSProperties> = {
-  wrap: {
-    minHeight: '100dvh',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    background: 'radial-gradient(circle at top, #05060a, #000 80%)',
-    color: '#fff',
-    fontFamily: 'ui-sans-serif, SF Pro Text, Helvetica, Arial',
-    overflowX: 'hidden',
-  },
-  header: {
-    padding: '28px 0 12px',
-    display: 'flex',
-    justifyContent: 'center',
-  },
-  logoHeader: {
-    height: 32,
-    filter: 'drop-shadow(0 0 10px rgba(0,180,255,.6))',
-  },
-  card: {
-    width: 'min(520px, 92vw)',
-    padding: '32px 24px',
-    borderRadius: 20,
-    background: 'rgba(10,12,20,.65)',
-    border: '1px solid rgba(80,150,255,.25)',
-    boxShadow: glow,
-  },
-  title: {
-    margin: '0 0 24px',
-    textAlign: 'center',
-    fontSize: 24,
-    letterSpacing: '.12em',
-    fontWeight: 700,
-    color: '#6bf',
-    textShadow: glow,
-  },
-  form: { display: 'grid', gap: 14 },
-  label: {
-    fontSize: 12,
-    letterSpacing: '.1em',
-    marginBottom: 6,
-    color: '#6bf',
-  },
-  input: {
-    minHeight: 56,
-    padding: '12px 14px',
-    borderRadius: 12,
-    border: '1px solid rgba(120,160,255,.3)',
-    background: 'rgba(0,0,0,.6)',
-    color: '#fff',
-    outline: 'none',
-    transition: 'all .2s ease',
-    fontSize: 16,
-    lineHeight: 1.4,
-    WebkitTextSizeAdjust: '100%',
-  },
-  button: {
-    marginTop: 12,
-    height: 56,
-    borderRadius: 9999,
-    border: '1px solid rgba(80,150,255,.4)',
-    background: 'linear-gradient(90deg,#0af,#a0f)',
-    color: '#fff',
-    fontWeight: 600,
-    cursor: 'pointer',
-    boxShadow: glow,
-    textTransform: 'uppercase',
-  },
-  footer: {
-    padding: '20px 0 28px',
-    display: 'flex',
-    justifyContent: 'center',
-  },
-  logoFooter: {
-    height: 22,
-    opacity: .9,
-    filter: 'drop-shadow(0 0 6px rgba(0,180,255,.4))',
-  },
-};

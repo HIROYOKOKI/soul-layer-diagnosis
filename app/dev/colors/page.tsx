@@ -49,6 +49,8 @@ function Grid({ title, items }: { title: string; items: Swatch[] }) {
     </section>
   )
 }
+<div style={{background:'var(--color-brand)', width: 40, height: 40}} />
+
 
 export default function ColorPreview() {
   return (

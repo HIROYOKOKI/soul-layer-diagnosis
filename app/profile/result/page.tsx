@@ -1,6 +1,3 @@
-// app/profile/result/page.tsx
-'use client'
-
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'

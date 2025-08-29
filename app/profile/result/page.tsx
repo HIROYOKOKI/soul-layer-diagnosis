@@ -85,10 +85,3 @@ function ResultBody() {
   )
 }
 
-export default function ProfileResultPage() {
-  return (
-    <Suspense fallback={<div className="p-6 text-sm opacity-75">読み込み中…</div>}>
-      <ResultBody />
-    </Suspense>
-  )
-}

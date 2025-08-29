@@ -26,37 +26,23 @@ function normalizeCode(code?: string) {
 }
 
 /* =========================
-   NEON ICON (発光スタイル)
+   FLAT POP ICON (単色カラフル)
    ========================= */
 type TypeKey = 'E' | 'V' | 'Λ' | 'Ǝ'
-const NEON_BG: Record<TypeKey, string> = {
-  E: '#f15a24',  // 指定: E
-  V: '#44ffff',  // 指定: V
-  Λ: '#fcee21',  // 指定: Λ
-  Ǝ: '#812b8c',  // 指定: Ǝ
+const FLAT_BG: Record<TypeKey, string> = {
+  E: '#f15a24',  // オレンジ
+  V: '#44ffff',  // シアン
+  Λ: '#fcee21',  // イエロー
+  Ǝ: '#812b8c',  // パープル
 }
-// 視認性：紫のみ白文字、それ以外は黒
-const NEON_FG: Record<TypeKey, string> = { E: '#111', V: '#111', Λ: '#111', Ǝ: '#fff' }
-const BADGE_RADIUS_PX = 14
+// 文字色（見やすさ優先：紫のみ白、それ以外は黒）
+const FLAT_FG: Record<TypeKey, string> = { E: '#111', V: '#111', Λ: '#111', Ǝ: '#fff' }
+const BADGE_RADIUS_PX = 12
 const BADGE_SIZE = 40
 
-function NeonIcon({ type }: { type: TypeKey }) {
-  const bg = NEON_BG[type]
-  const fg = NEON_FG[type]
-
-  const baseShadow = `
-    0 0 10px ${bg}AA,
-    0 0 22px ${bg}66,
-    inset 0 1px 6px #ffffff40,
-    inset 0 -3px 8px #00000030
-  `
-  const hoverShadow = `
-    0 0 12px ${bg}CC,
-    0 0 30px ${bg}88,
-    inset 0 1px 8px #ffffff55,
-    inset 0 -4px 10px #00000045
-  `
-
+function FlatIcon({ type }: { type: TypeKey }) {
+  const bg = FLAT_BG[type]
+  const fg = FLAT_FG[type]
   return (
     <div
       aria-label={`構造 ${type}`}
@@ -64,21 +50,15 @@ function NeonIcon({ type }: { type: TypeKey }) {
         width: BADGE_SIZE,
         height: BADGE_SIZE,
         borderRadius: BADGE_RADIUS_PX,
-        // 左上ハイライト＋本色で発光
-        background: `radial-gradient(120% 120% at 30% 20%, #ffffff40 0%, ${bg} 35%)`,
+        background: bg,
         display: 'grid',
         placeItems: 'center',
         color: fg,
         fontWeight: 900,
         letterSpacing: '0.02em',
-        boxShadow: baseShadow,
-        transition: 'box-shadow 180ms ease, transform 180ms ease',
-        willChange: 'box-shadow, transform',
+        // シンプルに軽い影だけ
+        boxShadow: '0 2px 6px rgba(0,0,0,.25)',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = hoverShadow }}
-      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = baseShadow }}
-      onTouchStart={(e) => { e.currentTarget.style.boxShadow = hoverShadow }}
-      onTouchEnd={(e) => { e.currentTarget.style.boxShadow = baseShadow }}
     >
       {type}
     </div>
@@ -184,7 +164,7 @@ export default function MyPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {latestCode ? (
-              <NeonIcon type={latestCode as TypeKey} />
+              <FlatIcon type={latestCode as TypeKey} />
             ) : (
               <div
                 style={{
@@ -229,7 +209,7 @@ export default function MyPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <NeonIcon type={(latestCode || 'E') as TypeKey} />
+          <FlatIcon type={(latestCode || 'E') as TypeKey} />
           <div style={{ fontSize: 14, lineHeight: 1.6 }}>{closing}</div>
         </div>
       </section>
@@ -274,7 +254,7 @@ export default function MyPage() {
                   }}
                 >
                   {code ? (
-                    <NeonIcon type={code as TypeKey} />
+                    <FlatIcon type={code as TypeKey} />
                   ) : (
                     <div
                       style={{

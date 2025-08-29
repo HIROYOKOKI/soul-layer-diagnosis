@@ -1,29 +1,6 @@
-FILE: app/api/profile/diagnose/route.ts
+app/api/profile/diagnose/route.ts 
 
-const seasonLine = season==='春' ? '始動期。小さな着手が大きな波及を生みます'
-: season==='夏' ? '拡張期。視野を広げた投資が実を結びます'
-: season==='秋' ? '収穫期。積み重ねを収めて次に備える好機です'
-: season==='冬' ? '整備期。基礎を整えるほど次の芽が育ちます'
-: '安定期。無理のない歩幅で整えていけます'
-const bloodLine = blood==='A' ? '丁寧さと継続力が静かに運を押し上げます'
-: blood==='B' ? '軽やかな好奇心が扉を開きます'
-: blood==='O' ? '腹の据わった決断が追い風を呼びます'
-: blood==='AB'? '二面性を活かす柔軟さが突破口になります'
-: '素のペースが流れを整えます'
-
-const p1 = `${who}の今期は「${seasonLine}」。${bloodLine}。既存の関係や習慣を磨くほど、静かな上昇気流に乗れます。`
-const p2 = `${wday}は「${wg.key}」の色が濃い日（${wg.tip}）。体調・睡眠・情報のノイズを整え、点検→改善→共有の短いサイクルを回すと、必要な縁が自然に重なります。`
-return toRange2para(p1, p2)
-}
-
-function personalityText(name: string, gender: string, birthday: string){
-const who = name || 'あなた'
-const wday = weekdayOf(birthday); const wg = weekdayGroup(wday)
-const view = gender?.toLowerCase()==='male' ? '俯瞰視点と胆力'
-: gender?.toLowerCase()==='female' ? '感受性と調整力'
-: '観察力と機動力'
-const p1 = `${who}は、事実と感情の距離感を保ちながら最適解を探るタイプ。${view}が同居し、状況が揺れても拠り所を失いません。課題を小さく切るほど集中が続きます。`
-const p2 = `${wday}は「${wg.key}」のリズム。午前/午後で役割を分け（例：${wg.key==='集中'?'午前=深い作業、午後=レビュー':'午前=情報収集、午後=検証・共有'}）、抱え込みを避けるため“頼る相手”を先に決めておくと安定します。`
+const p2 = `${wday}は「${wg.key}」のリズム。午前/午後で役割を分け（例：${examplePlan}）、抱え込みを避けるため“頼る相手”を先に決めておくと安定します。`
 return toRange2para(p1, p2)
 }
 
@@ -40,8 +17,9 @@ return `NG相性/避けたいコミュニケーション${pref2}：${base}`
 function partnerText(name: string, preference: string, birthday: string){
 const who = name || 'あなた'
 const season = seasonOf(birthday)
+const wday = weekdayOf(birthday)
+const wg = weekdayGroup(wday)
 const pref = preference && preference!=='Unset' ? preference : '価値観の相性'
-const wday = weekdayOf(birthday); const wg = weekdayGroup(wday)
 const seasonHint = season==='春' ? '始動を支え合う'
 : season==='夏' ? '拡張を楽しむ'
 : season==='秋' ? '収穫を分かち合う'
@@ -75,6 +53,7 @@ partnerLen: ideal_partner.length,
 season: seasonOf(birthday),
 weekday: weekdayOf(birthday),
 weekdayGroup: weekdayGroup(weekdayOf(birthday)).key,
+ng: ngLine(preference, weekdayGroup(weekdayOf(birthday)).key),
 } : undefined
 
 return NextResponse.json({ ok: true, fortune, personality, ideal_partner, meta }, { status: 200 })

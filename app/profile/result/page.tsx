@@ -1,4 +1,10 @@
+// app/profile/result/page.tsx
 'use client'
+
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
@@ -15,7 +21,7 @@ type Result = {
   created_at: string
 }
 
-export default function ProfileResultPage() {
+function ResultBody() {
   const sp = useSearchParams()
   const id = sp.get('id')
   const [r, setR] = useState<Result | null>(null)
@@ -69,5 +75,13 @@ export default function ProfileResultPage() {
         保存日時：{new Date(r.created_at).toLocaleString('ja-JP')}
       </footer>
     </div>
+  )
+}
+
+export default function ProfileResultPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm opacity-75">読み込み中…</div>}>
+      <ResultBody />
+    </Suspense>
   )
 }

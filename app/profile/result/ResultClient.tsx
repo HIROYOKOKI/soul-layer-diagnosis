@@ -30,8 +30,11 @@ export default function ResultClient() {
         const j = await res.json()
         if (!j.ok) throw new Error(j.error || 'failed')
         setR(j.data as Result)
-      } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
-      finally { setLoading(false) }
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e))
+      } finally {
+        setLoading(false)
+      }
     }
     run()
   }, [id])
@@ -52,11 +55,11 @@ export default function ResultClient() {
           <h2 className="font-semibold mb-2 text-sm">総合運勢</h2>
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{r.fortune}</p>
         </article>
-        <article className="rounded-xl border border白/10 bg-white/5 p-4">
+        <article className="rounded-xl border border-white/10 bg-white/5 p-4">
           <h2 className="font-semibold mb-2 text-sm">性格傾向</h2>
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{r.personality}</p>
         </article>
-        <article className="rounded-xl border border白/10 bg-white/5 p-4">
+        <article className="rounded-xl border border-white/10 bg-white/5 p-4">
           <h2 className="font-semibold mb-2 text-sm">理想のパートナー像</h2>
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{r.ideal_partner}</p>
         </article>

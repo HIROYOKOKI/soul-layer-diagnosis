@@ -25,40 +25,60 @@ function normalizeCode(code?: string) {
   return (['E', 'V', 'Λ', 'Ǝ'].includes(x) ? x : '') as 'E' | 'V' | 'Λ' | 'Ǝ' | ''
 }
 
-// ---- 常時カラフル用の色（背景色） ----
+/* =========================
+   NEON ICON (発光スタイル)
+   ========================= */
 type TypeKey = 'E' | 'V' | 'Λ' | 'Ǝ'
-const SOLID_BG: Record<TypeKey, string> = {
+const NEON_BG: Record<TypeKey, string> = {
   E: '#f15a24',  // 指定: E
   V: '#44ffff',  // 指定: V
   Λ: '#fcee21',  // 指定: Λ
   Ǝ: '#812b8c',  // 指定: Ǝ
 }
-// 文字色（見やすさ優先：紫のみ白、それ以外は黒）
-const SOLID_FG: Record<TypeKey, string> = { E: '#111', V: '#111', Λ: '#111', Ǝ: '#fff' }
+// 視認性：紫のみ白文字、それ以外は黒
+const NEON_FG: Record<TypeKey, string> = { E: '#111', V: '#111', Λ: '#111', Ǝ: '#fff' }
+const BADGE_RADIUS_PX = 14
+const BADGE_SIZE = 40
 
-// 角を「もう少し丸く」→ 12px（前より柔らかい）
-const BADGE_RADIUS_PX = 12
+function NeonIcon({ type }: { type: TypeKey }) {
+  const bg = NEON_BG[type]
+  const fg = NEON_FG[type]
 
-// 常時カラフルの四角バッジ
-function SolidIcon({ type }: { type: TypeKey }) {
-  const bg = SOLID_BG[type]
-  const fg = SOLID_FG[type]
+  const baseShadow = `
+    0 0 10px ${bg}AA,
+    0 0 22px ${bg}66,
+    inset 0 1px 6px #ffffff40,
+    inset 0 -3px 8px #00000030
+  `
+  const hoverShadow = `
+    0 0 12px ${bg}CC,
+    0 0 30px ${bg}88,
+    inset 0 1px 8px #ffffff55,
+    inset 0 -4px 10px #00000045
+  `
+
   return (
     <div
       aria-label={`構造 ${type}`}
       style={{
-        width: 36,
-        height: 36,
+        width: BADGE_SIZE,
+        height: BADGE_SIZE,
         borderRadius: BADGE_RADIUS_PX,
-        background: `linear-gradient(135deg, ${bg}, ${bg}33)`,
+        // 左上ハイライト＋本色で発光
+        background: `radial-gradient(120% 120% at 30% 20%, #ffffff40 0%, ${bg} 35%)`,
         display: 'grid',
         placeItems: 'center',
-        fontWeight: 900,
         color: fg,
-        // ほんのり奥行き
-        boxShadow: 'inset 0 0 0 1px #00000020, 0 8px 24px rgba(0,0,0,.25)',
+        fontWeight: 900,
         letterSpacing: '0.02em',
+        boxShadow: baseShadow,
+        transition: 'box-shadow 180ms ease, transform 180ms ease',
+        willChange: 'box-shadow, transform',
       }}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = hoverShadow }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = baseShadow }}
+      onTouchStart={(e) => { e.currentTarget.style.boxShadow = hoverShadow }}
+      onTouchEnd={(e) => { e.currentTarget.style.boxShadow = baseShadow }}
     >
       {type}
     </div>
@@ -164,12 +184,12 @@ export default function MyPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {latestCode ? (
-              <SolidIcon type={latestCode as TypeKey} />
+              <NeonIcon type={latestCode as TypeKey} />
             ) : (
               <div
                 style={{
-                  width: 36,
-                  height: 36,
+                  width: BADGE_SIZE,
+                  height: BADGE_SIZE,
                   borderRadius: BADGE_RADIUS_PX,
                   display: 'grid',
                   placeItems: 'center',
@@ -209,7 +229,7 @@ export default function MyPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <SolidIcon type={(latestCode || 'E') as TypeKey} />
+          <NeonIcon type={(latestCode || 'E') as TypeKey} />
           <div style={{ fontSize: 14, lineHeight: 1.6 }}>{closing}</div>
         </div>
       </section>
@@ -254,12 +274,12 @@ export default function MyPage() {
                   }}
                 >
                   {code ? (
-                    <SolidIcon type={code as TypeKey} />
+                    <NeonIcon type={code as TypeKey} />
                   ) : (
                     <div
                       style={{
-                        width: 36,
-                        height: 36,
+                        width: BADGE_SIZE,
+                        height: BADGE_SIZE,
                         borderRadius: BADGE_RADIUS_PX,
                         display: 'grid',
                         placeItems: 'center',

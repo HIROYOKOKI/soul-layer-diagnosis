@@ -1,64 +1,73 @@
-app/profile/confirm/page.tsx — 
-
 'use client'
+import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 
-type Pending = { name: string; birthday: string; blood: string; gender: string; preference: string }
-type DiagnoseResp = { ok: true; fortune: string; personality: string; ideal_partner: string } | { ok: false; error: string }
-type SaveResp = { ok: true; id: string } | { ok: false; error: string }
-
-export default function ProfileConfirmPage() {
-const router = useRouter()
-const [p, setP] = useState<Pending | null>(null)
-const [loading, setLoading] = useState(false)
-const [error, setError] = useState<string | null>(null)
-
-useEffect(() => {
-try { const raw = sessionStorage.getItem('profile_pending'); if (raw) setP(JSON.parse(raw) as Pending) } catch {}
-}, [])
-
-const goBack = () => router.push('/profile')
-
-const runDiagnose = async () => {
-if (!p) return
-setLoading(true); setError(null)
-try {
-const res1 = await fetch('/api/profile/diagnose', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
-const j1 = await res1.json() as DiagnoseResp
-if (!j1.ok) throw new Error(j1.error)
-
-const res2 = await fetch('/api/profile/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...p, ...j1 }) })
-const j2 = await res2.json() as SaveResp
-if (!j2.ok) throw new Error(j2.error)
-
-sessionStorage.removeItem('profile_pending')
-router.push(`/profile/result?id=${encodeURIComponent(j2.id)}`)
-} catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-finally { setLoading(false) }
+type Result = {
+  id: string
+  name: string
+  birthday: string
+  blood: string
+  gender: string
+  preference: string
+  fortune: string
+  personality: string
+  ideal_partner: string
+  created_at: string
 }
 
-return (
-<div className="mx-auto max-w-md grid gap-4 p-4">
-<h1 className="text-lg font-bold">入力内容の確認</h1>
-{!p ? (
-<div className="text-sm opacity-75">入力内容が見つかりません。<a href="/profile" className="underline">プロフィールに戻る</a></div>
-) : (
-<>
-<ul className="text-sm grid gap-1">
-<li>名前：{p.name}</li>
-<li>生年月日：{p.birthday}</li>
-<li>血液型：{p.blood}</li>
-<li>性別：{p.gender}</li>
-<li>恋愛対象：{p.preference}</li>
-</ul>
-{error && <p className="text-red-400 text-sm">エラー：{error}</p>}
-<div className="flex gap-8">
-<button onClick={goBack} className="underline">修正する</button>
-<button onClick={runDiagnose} disabled={loading} className="rounded bg-white/10 px-4 py-2 disabled:opacity-50">{loading ? '診断中…' : '診断する'}</button>
-</div>
-</>
-)}
-</div>
-)
+export default function ProfileResultPage() {
+  const sp = useSearchParams()
+  const id = sp.get('id')
+  const [r, setR] = useState<Result | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        if (!id) throw new Error('リンクが無効です')
+        const res = await fetch(`/api/profile/get?id=${encodeURIComponent(id)}`, { cache: 'no-store' })
+        const j = await res.json()
+        if (!j.ok) throw new Error(j.error || 'failed')
+        setR(j.data as Result)
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e))
+      } finally {
+        setLoading(false)
+      }
+    }
+    run()
+  }, [id])
+
+  if (loading) return <div className="p-6 text-sm opacity-75">読み込み中…</div>
+  if (err) return <div className="p-6 text-sm text-red-400">エラー：{err}</div>
+  if (!r) return null
+
+  return (
+    <div className="mx-auto max-w-2xl p-4 grid gap-4">
+      <header className="flex items-center justify-between">
+        <h1 className="text-lg font-bold">プロフィール診断結果</h1>
+        <a href="/profile" className="text-xs underline opacity-90">編集</a>
+      </header>
+
+      <section className="grid md:grid-cols-3 gap-3">
+        <article className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <h2 className="font-semibold mb-2 text-sm">総合運勢</h2>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{r.fortune}</p>
+        </article>
+        <article className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <h2 className="font-semibold mb-2 text-sm">性格傾向</h2>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{r.personality}</p>
+        </article>
+        <article className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <h2 className="font-semibold mb-2 text-sm">理想のパートナー像</h2>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{r.ideal_partner}</p>
+        </article>
+      </section>
+
+      <footer className="text-xs opacity-70">
+        保存日時：{new Date(r.created_at).toLocaleString('ja-JP')}
+      </footer>
+    </div>
+  )
 }

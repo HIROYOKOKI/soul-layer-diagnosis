@@ -1,4 +1,4 @@
-FILE: app/profile/confirm/page.tsx
+app/profile/confirm/page.tsx 
 
 'use client'
 import { useEffect, useState } from 'react'

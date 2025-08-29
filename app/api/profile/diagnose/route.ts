@@ -1,4 +1,5 @@
-FILE: app/api/profile/diagnose/route.ts（更新）
+FILE: app/api/profile/diagnose/route.ts
+
 const seasonLine = season==='春' ? '始動期。小さな着手が大きな波及を生みます'
 : season==='夏' ? '拡張期。視野を広げた投資が実を結びます'
 : season==='秋' ? '収穫期。積み重ねを収めて次に備える好機です'

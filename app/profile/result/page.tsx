@@ -1,9 +1,18 @@
 import { Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import ResultClient from './ResultClient'
 
+// SSGせず実行時描画にする
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm opacity-75">読み込み中…</div>}>
+      <ResultClient />
+    </Suspense>
+  )
+}
+
 
 type Result = {
   id: string

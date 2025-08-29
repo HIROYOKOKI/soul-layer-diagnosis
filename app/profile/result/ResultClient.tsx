@@ -1,119 +1,69 @@
-// app/profile/result/ResultClient.tsx
 'use client'
-
+import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
 
-type Profile = {
+type Result = {
   id: string
   name: string
   birthday: string
   blood: string
   gender: string
-  preference?: string | null
-  created_at?: string
+  preference: string
+  fortune: string
+  personality: string
+  ideal_partner: string
+  created_at: string
 }
 
 export default function ResultClient() {
   const sp = useSearchParams()
   const id = sp.get('id')
-  const router = useRouter()
-
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const [r, setR] = useState<Result | null>(null)
+  const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchById() {
+    const run = async () => {
       try {
-        if (!id) {
-          setError('Invalid link')
-          return
-        }
-        const res = await fetch(`/api/profile/${id}`, { cache: 'no-store' })
-        if (!res.ok) throw new Error('Failed to fetch profile')
-        setProfile(await res.json())
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Unknown error')
-      } finally {
-        setLoading(false)
-      }
+        if (!id) throw new Error('リンクが無効です')
+        const res = await fetch(`/api/profile/get?id=${encodeURIComponent(id)}`, { cache: 'no-store' })
+        const j = await res.json()
+        if (!j.ok) throw new Error(j.error || 'failed')
+        setR(j.data as Result)
+      } catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
+      finally { setLoading(false) }
     }
-    fetchById()
+    run()
   }, [id])
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        Loading...
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-black text-red-400 flex items-center justify-center">
-        {error}
-      </div>
-    )
-  }
+  if (loading) return <div className="p-6 text-sm opacity-75">読み込み中…</div>
+  if (err) return <div className="p-6 text-sm text-red-400">エラー：{err}</div>
+  if (!r) return null
 
   return (
-    <div className="min-h-screen flex flex-col bg-black text-white">
-      {/* Header */}
-      <header className="w-full p-4 flex justify-center">
-        <img src="/evae-logo.svg" alt="EVΛƎ" className="h-8" />
+    <div className="mx-auto max-w-2xl p-4 grid gap-4">
+      <header className="flex items-center justify-between">
+        <h1 className="text-lg font-bold">プロフィール診断結果</h1>
+        <a href="/profile" className="text-xs underline opacity-90">編集</a>
       </header>
 
-      {/* Main */}
-      <main className="flex flex-1 items-center justify-center px-4">
-        <div className="bg-neutral-900/70 rounded-xl p-6 shadow-lg border border-white/10 w-full max-w-md">
-          <h2 className="text-center text-lg font-bold mb-4">保存完了</h2>
+      <section className="grid md:grid-cols-3 gap-3">
+        <article className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <h2 className="font-semibold mb-2 text-sm">総合運勢</h2>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{r.fortune}</p>
+        </article>
+        <article className="rounded-xl border border白/10 bg-white/5 p-4">
+          <h2 className="font-semibold mb-2 text-sm">性格傾向</h2>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{r.personality}</p>
+        </article>
+        <article className="rounded-xl border border白/10 bg-white/5 p-4">
+          <h2 className="font-semibold mb-2 text-sm">理想のパートナー像</h2>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{r.ideal_partner}</p>
+        </article>
+      </section>
 
-          {profile ? (
-            <>
-              <ul className="space-y-2 text-sm">
-                <li className="flex justify-between">
-                  <span>NAME</span><span>{profile.name}</span>
-                </li>
-                <li className="flex justify-between">
-                  <span>DATE OF BIRTH</span><span>{profile.birthday}</span>
-                </li>
-                <li className="flex justify-between">
-                  <span>BLOOD TYPE</span><span>{profile.blood}</span>
-                </li>
-                <li className="flex justify-between">
-                  <span>GENDER</span><span>{profile.gender}</span>
-                </li>
-                <li className="flex justify-between">
-                  <span>PREFERENCE</span><span>{profile.preference ?? '—'}</span>
-                </li>
-              </ul>
-
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => router.push('/structure/quick')}
-                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-pink-500 hover:opacity-90 transition"
-                >
-                  クイック判定へ
-                </button>
-                <button
-                  onClick={() => router.push('/structure')}
-                  className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition"
-                >
-                  構造診断へ
-                </button>
-              </div>
-            </>
-          ) : (
-            <p className="text-center text-gray-400">データがありません</p>
-          )}
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="w-full py-4 text-center text-xs text-white/40">
-        © 2025 Soul Layer Log
+      <footer className="text-xs opacity-70">
+        保存日時：{new Date(r.created_at).toLocaleString('ja-JP')}
       </footer>
     </div>
   )

@@ -4,6 +4,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { HistoryIcon, type TypeKey } from '@/app/components/HistoryIcon'
+
 
 type DailyRow = {
   id: string
@@ -138,8 +140,11 @@ export default function MyPage() {
           backdropFilter: 'blur(10px) saturate(120%)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
-          <div>
+        {result.structure_code
+  ? <HistoryIcon type={result.structure_code as TypeKey} />
+  : <div className="w-10 h-10 rounded-md bg-surface text-muted flex items-center justify-center">-</div>
+}
+
             <div style={{ fontSize: 12, opacity: 0.8 }}>現在のテーマ</div>
             <div style={{ fontSize: 18, fontWeight: 800, marginTop: 4 }}>{theme}</div>
             {themeSetAt ? (

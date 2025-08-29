@@ -1,9 +1,7 @@
-//  app/mypage/page.tsx
-
+// app/mypage/page.tsx
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { HistoryIcon, type TypeKey } from '@/app/components/HistoryIcon'
 
 type DailyRow = {
   id: string
@@ -17,8 +15,9 @@ type DailyRow = {
 }
 
 type ThemeResp = { ok: boolean; theme: string; setAt?: string }
-type ListResp = { ok: boolean; data: DailyRow[]; error?: string }
+type ListResp  = { ok: boolean; data: DailyRow[]; error?: string }
 
+// 表示用：記号の正規化
 function normalizeCode(code?: string) {
   const x = (code || '').trim()
   if (x === '∃' || x === 'ヨ') return 'Ǝ'
@@ -26,19 +25,44 @@ function normalizeCode(code?: string) {
   return (['E', 'V', 'Λ', 'Ǝ'].includes(x) ? x : '') as 'E' | 'V' | 'Λ' | 'Ǝ' | ''
 }
 
-function luneaClosing(code: string) {
-  switch (code) {
-    case 'E':
-      return '今日は“勢い”が鍵。小さな一歩をもう一つ踏み出してみよう。'
-    case 'V':
-      return '視野を広げる日。選択肢を3つ書き出して、直感で面白い方へ。'
-    case 'Λ':
-      return '決めることで世界は動く。締め切りを自分にプレゼントしよう。'
-    case 'Ǝ':
-      return '観測は力になる。今夜5分、今日のハイライトを言語化してみて。'
-    default:
-      return '今日の記録を残すと、ここにルネアの一言が表示されます。'
-  }
+// ---- 常時カラフル用の色（背景色） ----
+type TypeKey = 'E' | 'V' | 'Λ' | 'Ǝ'
+const SOLID_BG: Record<TypeKey, string> = {
+  E: '#f15a24',  // 指定: E
+  V: '#44ffff',  // 指定: V
+  Λ: '#fcee21',  // 指定: Λ
+  Ǝ: '#812b8c',  // 指定: Ǝ
+}
+// 文字色（見やすさ優先：紫のみ白、それ以外は黒）
+const SOLID_FG: Record<TypeKey, string> = { E: '#111', V: '#111', Λ: '#111', Ǝ: '#fff' }
+
+// 角を「もう少し丸く」→ 12px（前より柔らかい）
+const BADGE_RADIUS_PX = 12
+
+// 常時カラフルの四角バッジ
+function SolidIcon({ type }: { type: TypeKey }) {
+  const bg = SOLID_BG[type]
+  const fg = SOLID_FG[type]
+  return (
+    <div
+      aria-label={`構造 ${type}`}
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: BADGE_RADIUS_PX,
+        background: `linear-gradient(135deg, ${bg}, ${bg}33)`,
+        display: 'grid',
+        placeItems: 'center',
+        fontWeight: 900,
+        color: fg,
+        // ほんのり奥行き
+        boxShadow: 'inset 0 0 0 1px #00000020, 0 8px 24px rgba(0,0,0,.25)',
+        letterSpacing: '0.02em',
+      }}
+    >
+      {type}
+    </div>
+  )
 }
 
 async function fetchJSON<T>(url: string): Promise<T> {
@@ -87,6 +111,21 @@ export default function MyPage() {
   }, [])
 
   const latestCode = useMemo(() => normalizeCode(rows?.[0]?.code), [rows])
+
+  const luneaClosing = (code: string) => {
+    switch (code) {
+      case 'E':
+        return '今日は“勢い”が鍵。小さな一歩をもう一つ踏み出してみよう。'
+      case 'V':
+        return '視野を広げる日。選択肢を3つ書き出して、直感で面白い方へ。'
+      case 'Λ':
+        return '決めることで世界は動く。締め切りを自分にプレゼントしよう。'
+      case 'Ǝ':
+        return '観測は力になる。今夜5分、今日のハイライトを言語化してみて。'
+      default:
+        return '今日の記録を残すと、ここにルネアの一言が表示されます。'
+    }
+  }
   const closing = useMemo(() => luneaClosing(latestCode || ''), [latestCode])
 
   const fmt = (iso?: string) => {
@@ -125,9 +164,22 @@ export default function MyPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {latestCode ? (
-              <HistoryIcon type={latestCode as TypeKey} />
+              <SolidIcon type={latestCode as TypeKey} />
             ) : (
-              <div className="w-10 h-10 rounded-md bg-surface text-muted flex items-center justify-center">-</div>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: BADGE_RADIUS_PX,
+                  display: 'grid',
+                  placeItems: 'center',
+                  background: '#c7c9d1',
+                  color: '#000',
+                  fontWeight: 900,
+                }}
+              >
+                —
+              </div>
             )}
             <div>
               <div style={{ fontSize: 12, opacity: 0.8 }}>現在のテーマ</div>
@@ -157,7 +209,7 @@ export default function MyPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <HistoryIcon type={(latestCode || 'E') as TypeKey} />
+          <SolidIcon type={(latestCode || 'E') as TypeKey} />
           <div style={{ fontSize: 14, lineHeight: 1.6 }}>{closing}</div>
         </div>
       </section>
@@ -202,9 +254,23 @@ export default function MyPage() {
                   }}
                 >
                   {code ? (
-                    <HistoryIcon type={code as TypeKey} />
+                    <SolidIcon type={code as TypeKey} />
                   ) : (
-                    <div className="w-10 h-10 rounded-md bg-surface text-muted flex items-center justify-center">-</div>
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: BADGE_RADIUS_PX,
+                        display: 'grid',
+                        placeItems: 'center',
+                        background: '#c7c9d1',
+                        color: '#000',
+                        fontWeight: 900,
+                      }}
+                      title={code}
+                    >
+                      —
+                    </div>
                   )}
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 700 }}>デイリー診断 {code || ''}</div>

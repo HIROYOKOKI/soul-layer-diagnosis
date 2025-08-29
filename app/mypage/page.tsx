@@ -1,11 +1,9 @@
-// -----------------------------------------------------------------
-// FILE: app/mypage/page.tsx
-// -----------------------------------------------------------------
+//  app/mypage/page.tsx
+
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { HistoryIcon, type TypeKey } from '@/app/components/HistoryIcon'
-
 
 type DailyRow = {
   id: string
@@ -19,7 +17,6 @@ type DailyRow = {
 }
 
 type ThemeResp = { ok: boolean; theme: string; setAt?: string }
-
 type ListResp = { ok: boolean; data: DailyRow[]; error?: string }
 
 function normalizeCode(code?: string) {
@@ -27,21 +24,6 @@ function normalizeCode(code?: string) {
   if (x === '∃' || x === 'ヨ') return 'Ǝ'
   if (x === 'A') return 'Λ'
   return (['E', 'V', 'Λ', 'Ǝ'].includes(x) ? x : '') as 'E' | 'V' | 'Λ' | 'Ǝ' | ''
-}
-
-function codeBadgeColor(c: string) {
-  switch (c) {
-    case 'E':
-      return '#ff7a7a'
-    case 'V':
-      return '#8bc6ff'
-    case 'Λ':
-      return '#ffd86b'
-    case 'Ǝ':
-      return '#a3ffbf'
-    default:
-      return '#c7c9d1'
-  }
 }
 
 function luneaClosing(code: string) {
@@ -140,17 +122,21 @@ export default function MyPage() {
           backdropFilter: 'blur(10px) saturate(120%)',
         }}
       >
-        {result.structure_code
-  ? <HistoryIcon type={result.structure_code as TypeKey} />
-  : <div className="w-10 h-10 rounded-md bg-surface text-muted flex items-center justify-center">-</div>
-}
-
-            <div style={{ fontSize: 12, opacity: 0.8 }}>現在のテーマ</div>
-            <div style={{ fontSize: 18, fontWeight: 800, marginTop: 4 }}>{theme}</div>
-            {themeSetAt ? (
-              <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>{fmt(themeSetAt)}</div>
-            ) : null}
-            <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>ナビゲーター：{navName}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {latestCode ? (
+              <HistoryIcon type={latestCode as TypeKey} />
+            ) : (
+              <div className="w-10 h-10 rounded-md bg-surface text-muted flex items-center justify-center">-</div>
+            )}
+            <div>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>現在のテーマ</div>
+              <div style={{ fontSize: 18, fontWeight: 800, marginTop: 4 }}>{theme}</div>
+              {themeSetAt ? (
+                <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>{fmt(themeSetAt)}</div>
+              ) : null}
+              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>ナビゲーター：{navName}</div>
+            </div>
           </div>
           <a href="/theme" style={{ fontSize: 12, opacity: 0.8, textDecoration: 'underline' }}>
             変更する
@@ -171,21 +157,7 @@ export default function MyPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
-            aria-hidden
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 10,
-              background: `linear-gradient(135deg, ${codeBadgeColor(latestCode || '')}, #ffffff20)`,
-              display: 'grid',
-              placeItems: 'center',
-              fontWeight: 900,
-              fontSize: 16,
-            }}
-          >
-            {latestCode || '—'}
-          </div>
+          <HistoryIcon type={(latestCode || 'E') as TypeKey} />
           <div style={{ fontSize: 14, lineHeight: 1.6 }}>{closing}</div>
         </div>
       </section>
@@ -229,22 +201,11 @@ export default function MyPage() {
                     borderTop: '1px solid rgba(255,255,255,.08)',
                   }}
                 >
-                  <div
-                    aria-hidden
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 9,
-                      background: code ? codeBadgeColor(code) : '#c7c9d1',
-                      color: '#000',
-                      display: 'grid',
-                      placeItems: 'center',
-                      fontWeight: 900,
-                    }}
-                    title={code}
-                  >
-                    {code || '—'}
-                  </div>
+                  {code ? (
+                    <HistoryIcon type={code as TypeKey} />
+                  ) : (
+                    <div className="w-10 h-10 rounded-md bg-surface text-muted flex items-center justify-center">-</div>
+                  )}
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 700 }}>デイリー診断 {code || ''}</div>
                     <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>{r.choice || '—'}</div>

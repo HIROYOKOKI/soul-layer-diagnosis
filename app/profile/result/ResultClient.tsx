@@ -1,4 +1,6 @@
+// app/profile/result/ResultClient.tsx
 'use client'
+
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
@@ -45,7 +47,7 @@ export default function ResultClient() {
 
   return (
     <div className="mx-auto max-w-2xl p-4 grid gap-4">
-      <header className="flex items中心 justify-between">
+      <header className="flex items-center justify-between">
         <h1 className="text-lg font-bold">プロフィール診断結果</h1>
         <a href="/profile" className="text-xs underline opacity-90">編集</a>
       </header>

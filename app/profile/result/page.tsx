@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import ResultClient from './ResultClient'
 
-// SSGせず実行時描画にする
+// 実行時描画（SSGしない）
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
@@ -12,6 +12,7 @@ export default function Page() {
     </Suspense>
   )
 }
+
 
 
 type Result = {

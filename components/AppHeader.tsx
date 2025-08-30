@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import HeaderIcon from "./ui/HeaderIcon";
 import { ArrowLeft } from "lucide-react";
-import { Cog6ToothIcon } from "@heroicons/react/24/outline";   // 👈 差し替え
+ import { Cog6ToothIcon } from "@heroicons/react";
 
 type Me = { plan: "free" | "premium"; avatarUrl?: string } | null;
 
@@ -57,7 +57,7 @@ export default function AppHeader({ title, showBack = false, onBack }: Props) {
         </span>
       </div>
 
-      {/* 右：設定ボタン（常時表示, Cog6ToothIcon に統一） */}
+      {/* 右：設定ボタン（常時表示, シアン系 Cog6ToothIcon） */}
       <div className="h-10 w-10">
         {loading ? (
           <div className="h-10 w-10 rounded-full bg-white/6 animate-pulse" />
@@ -67,7 +67,7 @@ export default function AppHeader({ title, showBack = false, onBack }: Props) {
             className="h-10 w-10 rounded-full grid place-items-center
                        bg-white/6 hover:bg-white/10 transition"
           >
-            <Cog6ToothIcon className="h-6 w-6 text-white/80" aria-hidden="true" />
+            <Cog6ToothIcon className="h-6 w-6 text-sky-400" aria-hidden="true" />
           </button>
         )}
       </div>

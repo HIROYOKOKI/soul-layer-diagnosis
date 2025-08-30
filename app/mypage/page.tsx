@@ -518,7 +518,7 @@ function buildMockSeries(days: number = 30): SeriesPoint[] {
     const E = combine(profile.E, theme.E, quick.E, daily.E, weekly.E, monthly.E);
     const V = combine(profile.V, theme.V, quick.V, daily.V, weekly.V, monthly.V);
     const L = combine(profile.L, theme.L, quick.L, daily.L, weekly.L, monthly.L);
-    const Eexists = combine(profile.Eexists, theme.Eexists, quick.Eexists, daily.Eexists, monthly.Eexists);
+    const Eexists = combine(profile.Eexists, theme.Eexists, quick.Eexists, daily.Eexists, weekly.Eexists, monthly.Eexists);
 
     series.push({ date, E, V, L, Eexists });
   }

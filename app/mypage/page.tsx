@@ -68,12 +68,12 @@ export default function MyPage() {
           }
         )
       } catch (_err) {
-  setToday({ E: 0.65, V: 0.8, L: 0.45, Eexists: 0.7 })
-  setLatest({ code: "Ǝ", text: "静かに観察したい", date: new Date().toISOString().slice(0, 10) })
-  setTodayErr(_err instanceof Error ? _err.message : "today fetch error")
+  setSeries(buildMockSeries(range))
+  setSeriesErr(_err instanceof Error ? _err.message : "series fetch error")
 } finally {
-  setTodayLoading(false)
+  setSeriesLoading(false)
 }
+
     })()
 
     ;(async () => {

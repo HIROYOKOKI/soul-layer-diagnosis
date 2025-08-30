@@ -1,7 +1,8 @@
 // app/theme/confirm/page.tsx
-import ConfirmClient from "./ConfirmClient";
-
-export default function ConfirmPage() {
-  return null; 
+export default function ThemeConfirmPage() {
+  return (
+    <div className="p-4 text-white">
+      Theme Confirm Page
+    </div>
+  )
 }
-

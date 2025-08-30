@@ -56,17 +56,17 @@ export default function AppHeader({ title, showBack = false, onBack }: Props) {
         </span>
       </div>
 
-      {/* 右：設定ボタン（常時表示、loading中はSkeleton） */}
-      <div className="h-8 w-8">
+      {/* 右：設定ボタン（常時表示, 24pxアイコン, 明るいシアン青） */}
+      <div className="h-10 w-10">
         {loading ? (
-          <div className="h-8 w-8 rounded-full bg-white/6 animate-pulse" />
+          <div className="h-10 w-10 rounded-full bg-white/6 animate-pulse" />
         ) : (
           <button
             aria-label="Settings"
-            className="h-8 w-8 rounded-full grid place-items-center
+            className="h-10 w-10 rounded-full grid place-items-center
                        bg-white/6 hover:bg-white/10 transition"
           >
-            <Settings className="h-4 w-4 text-white/80" aria-hidden="true" />
+            <Settings className="h-6 w-6 text-sky-400" aria-hidden="true" />
           </button>
         )}
       </div>

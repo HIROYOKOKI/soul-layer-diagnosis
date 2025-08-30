@@ -3,8 +3,7 @@
 
 import { useEffect, useState } from "react";
 import HeaderIcon from "./ui/HeaderIcon";
-import { ArrowLeft } from "lucide-react";
-import { Cog6ToothIcon } from "@heroicons/react/outline";   // v1系で利用
+import { ArrowLeft, Cog } from "lucide-react";   // 👈 Cogを追加
 
 type Me = { plan: "free" | "premium"; avatarUrl?: string } | null;
 
@@ -57,7 +56,7 @@ export default function AppHeader({ title, showBack = false, onBack }: Props) {
           className="h-10 w-10 rounded-full grid place-items-center
                      bg-white/6 hover:bg-white/10 transition"
         >
-          <Cog6ToothIcon className="h-6 w-6 text-sky-400" aria-hidden="true" />
+          <Cog className="h-6 w-6 text-sky-400" aria-hidden="true" />
         </button>
       </div>
     </header>

@@ -238,4 +238,18 @@ main::before,
   border-left-color: transparent !important;
 }
 html, body { background:#000; color:#fff; }
+/* カード中の歯車（lucide-settings）を強制で隠す */
+.card :is(button, a):has(svg.lucide-settings),
+.card-header :is(button, a):has(svg.lucide-settings),
+[data-card] :is(button, a):has(svg.lucide-settings) {
+  display: none !important;
+}
+
+/* 予備：カード内に単体で置かれた settings アイコンも無効化 */
+.card :is(svg.lucide-settings),
+.card-header :is(svg.lucide-settings),
+[data-card] :is(svg.lucide-settings) {
+  display: none !important;
+}
+
 

@@ -67,9 +67,11 @@ export default function MyPage() {
             date: new Date().toISOString().slice(0, 10),
           }
         )
-      } catch (_err) {
+      } catch (_err: unknown) {
+  // フォールバック：ダミー生成
   setSeries(buildMockSeries(range))
-  setSeriesErr(_err instanceof Error ? _err.message : "series fetch error")
+  const msg = _err instanceof Error ? _err.message : "series fetch error"
+  setSeriesErr(msg)
 } finally {
   setSeriesLoading(false)
 }

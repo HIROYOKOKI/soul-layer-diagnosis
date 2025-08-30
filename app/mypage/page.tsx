@@ -67,14 +67,13 @@ export default function MyPage() {
             date: new Date().toISOString().slice(0, 10),
           }
         )
-      }catch (_err) {
-        // フォールバック（ダミー）
-        setToday({ E: 0.65, V: 0.8, L: 0.45, Eexists: 0.7 })
-        setLatest({ code: "Ǝ", text: "静かに観察したい", date: new Date().toISOString().slice(0, 10) })
-        setTodayErr(e?.message ?? "today fetch error")
-      } finally {
-        setTodayLoading(false)
-      }
+      } catch (_err) {
+  setToday({ E: 0.65, V: 0.8, L: 0.45, Eexists: 0.7 })
+  setLatest({ code: "Ǝ", text: "静かに観察したい", date: new Date().toISOString().slice(0, 10) })
+  setTodayErr(_err instanceof Error ? _err.message : "today fetch error")
+} finally {
+  setTodayLoading(false)
+}
     })()
 
     ;(async () => {

@@ -1,3 +1,4 @@
+// app/components/AppHeader.tsx
 "use client"
 
 import HeaderIcon from "@/components/ui/HeaderIcon";
@@ -11,7 +12,6 @@ export default function AppHeader() {
           <HeaderIcon src="/icon-512.png" />
           <span className="truncate text-xs text-white/70">SOUL LAYER DIAGNOSIS</span>
         </div>
-
         <div className="flex items-center gap-2">
           <span className="px-3 py-1 text-xs rounded-full bg-white/10 text-white/70">FREE</span>
           <button

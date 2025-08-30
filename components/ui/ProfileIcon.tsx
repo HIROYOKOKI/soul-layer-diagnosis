@@ -1,18 +1,10 @@
 "use client"
 import Image from "next/image";
 
-type Props = {
-  src?: string | null;
-  alt?: string;
-  size?: number; // px
-};
+type Props = { src?: string | null; alt?: string; size?: number };
 
-export default function ProfileIcon({
-  src,
-  alt = "Profile",
-  size = 48,      // ← Hiro横の想定サイズ
-}: Props) {
-  const safeSrc = src && src.trim() !== "" ? src : "/icon-512.png"; // 青光ロゴにフォールバック
+export default function ProfileIcon({ src, alt="Profile", size=48 }: Props) {
+  const safeSrc = src && src.trim() !== "" ? src : "/icon-512.png";
   return (
     <div
       className="relative shrink-0 rounded-full overflow-hidden
@@ -21,14 +13,7 @@ export default function ProfileIcon({
                  shadow-[0_0_0_2px_rgba(255,255,255,.03),0_0_18px_4px_rgba(56,189,248,.22)]"
       style={{ width: size, height: size }}
     >
-      <Image
-        src={safeSrc}
-        alt={alt}
-        fill
-        sizes={`${size}px`}
-        className="object-cover"
-        priority
-      />
+      <Image src={safeSrc} alt={alt} fill sizes={`${size}px`} className="object-cover" />
     </div>
   );
 }

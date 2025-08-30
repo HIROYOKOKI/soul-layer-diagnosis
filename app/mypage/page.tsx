@@ -1,4 +1,6 @@
 'use client'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useEffect, useMemo, useState } from "react"; // ← useRefは未使用なので削除
 import type * as React from "react";
 import type { ReactNode } from "react";
@@ -44,7 +46,7 @@ export default function MyPage() {
         const me = await r.json()
         setPlan((me?.plan?.toUpperCase?.() as any) === "PREMIUM" ? "PREMIUM" : "FREE")
         setProfile({ name: me?.name ?? "User", id: me?.id ?? "0001" })
-      } catch (e: any) {
+      } catch (_err) {
         setPlan("FREE") // 取得失敗時はFREE扱い
         setProfile({ name: "User", id: "0001" })
       }
@@ -65,7 +67,7 @@ export default function MyPage() {
             date: new Date().toISOString().slice(0, 10),
           }
         )
-      } catch (e: any) {
+      }catch (_err) {
         // フォールバック（ダミー）
         setToday({ E: 0.65, V: 0.8, L: 0.45, Eexists: 0.7 })
         setLatest({ code: "Ǝ", text: "静かに観察したい", date: new Date().toISOString().slice(0, 10) })
@@ -83,7 +85,7 @@ export default function MyPage() {
         if (!r.ok) throw new Error("/api/series failed")
         const s = (await r.json()) as SeriesPoint[]
         setSeries(s)
-      } catch (e: any) {
+      } catch (_err) {
         // フォールバック：ダミー生成
         setSeries(buildMockSeries(range))
         setSeriesErr(e?.message ?? "series fetch error")

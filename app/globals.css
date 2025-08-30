@@ -237,3 +237,5 @@ main::before,
 .border-l-[1px] {
   border-left-color: transparent !important;
 }
+html, body { background:#000; color:#fff; }
+

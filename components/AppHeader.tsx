@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import HeaderIcon from "./ui/HeaderIcon";
-import { Cog6ToothIcon } from "@heroicons/react/24/outline";
+import { Settings } from "lucide-react";   // ✅ lucide の Settings を使用
 
 type Me = { plan: "free" | "premium" } | null
 
@@ -44,7 +44,7 @@ export default function AppHeader() {
             className="h-8 w-8 rounded-full grid place-items-center
                        bg-white/6 hover:bg-white/10 transition"
           >
-            <Cog6ToothIcon className="h-4 w-4 text-white/80" />   {/* ✅ */}
+            <Settings className="h-4 w-4 text-white/80" aria-hidden="true" />
           </button>
         ) : (
           <div className="h-8 w-8" />

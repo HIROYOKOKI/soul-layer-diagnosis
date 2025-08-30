@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import HeaderIcon from "./ui/HeaderIcon";
 import { ArrowLeft } from "lucide-react";
- import { Cog6ToothIcon } from "@heroicons/react";
+import { Cog6ToothIcon } from "@heroicons/react/24/outline";
 
 type Me = { plan: "free" | "premium"; avatarUrl?: string } | null;
 

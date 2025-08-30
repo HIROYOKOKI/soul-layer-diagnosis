@@ -126,13 +126,17 @@ export default function MyPage() {
         </header>
 
         {/* プロフィール（最小表示） */}
-        <div className="flex items-center gap-4">
-          <Avatar />
-          <div>
-            <div className="text-lg font-semibold">{profile?.name ?? "User"}</div>
-            <div className="text-xs text-white/60">ID: {profile?.id ?? "0001"}</div>
-          </div>
-        </div>
+      import ProfileIcon from "@/components/ui/ProfileIcon";
+
+...
+
+<div className="flex items-center gap-3">
+  <ProfileIcon src={profile?.avatarUrl} size={48} />
+  <div>
+    <p className="font-medium">{profile?.name}</p>
+    <p className="text-xs text-white/60">ID: {profile?.id}</p>
+  </div>
+</div>
 
         {/* テーマ（文字のみ） */}
         <div>

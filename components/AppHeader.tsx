@@ -1,36 +1,27 @@
-// components/AppHeader.tsx
 "use client"
 
-import HeaderIcon from "./ui/HeaderIcon";
+import HeaderIcon from "@/components/ui/HeaderIcon";
+import { Settings } from "lucide-react";
 
-type Props = {
-  title?: string;
-  showBack?: boolean;       // 使っていればそのまま可
-  onBack?: () => void;
-};
-
-export default function AppHeader({ title, showBack=false, onBack }: Props) {
+export default function AppHeader() {
   return (
-    <header className="flex items-center justify-between px-4 py-3">
-      {/* 左：プロフィール（未設定なら青光ロゴ） */}
-      <div className="flex items-center gap-2 min-w-0">
-        <HeaderIcon src="/icon-512.png" />
-        {/* ロゴ画像（/public に置いてある想定。無ければテキストに自動フォールバック） */}
-        <div className="min-w-0">
-          <img
-            src="/soul-layer-diagnosis.png"
-            alt="SOUL LAYER DIAGNOSIS"
-            className="h-4 hidden sm:block"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-          />
-          <span className="sm:hidden block text-xs text-white/70">
-            {title ?? "SOUL LAYER DIAGNOSIS"}
-          </span>
+    <header className="sticky top-0 z-40 bg-black">
+      <div className="mx-auto flex items-center justify-between px-4 py-3 w-full max-w-[720px]">
+        <div className="flex items-center gap-2 min-w-0">
+          <HeaderIcon src="/icon-512.png" />
+          <span className="truncate text-xs text-white/70">SOUL LAYER DIAGNOSIS</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="px-3 py-1 text-xs rounded-full bg-white/10 text-white/70">FREE</span>
+          <button
+            aria-label="Settings"
+            className="header-settings h-8 w-8 rounded-full grid place-items-center bg-white/6 hover:bg-white/10 transition"
+          >
+            <Settings className="h-6 w-6 text-sky-400" aria-hidden="true" />
+          </button>
         </div>
       </div>
-
-      {/* 右：何も置かない（歯車なし） */}
-      <div className="h-8 w-8" />
     </header>
   );
 }

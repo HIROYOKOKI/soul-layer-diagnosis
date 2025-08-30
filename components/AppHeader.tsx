@@ -1,4 +1,3 @@
-// app/components/AppHeader.tsx
 "use client"
 
 import HeaderIcon from "@/components/ui/HeaderIcon";

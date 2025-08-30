@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react'
 
-type ThemeGetResponse = { theme: string | null }  // /api/theme/get の返り値を想定
+type ThemeGetResponse = { theme: string | null } 
 
 export default function AppSubHeaderTheme() {
   const [theme, setTheme] = useState<string | null>(null)
@@ -29,7 +29,6 @@ export default function AppSubHeaderTheme() {
     return () => { aborted = true }
   }, [])
 
-  // 読み込み中はちらつきを避けて非表示
   if (!loaded) return null
 
   return (

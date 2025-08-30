@@ -218,3 +218,22 @@ body  { background: var(--color-bg); color: var(--color-fg); }
   --radius-pill: 999px;
   --shadow-card: 0 10px 30px rgba(0,0,0,.35);
 }
+/* ===== kill center guide (any leftover 'before' or gradient) ===== */
+main::before,
+.center-guide::before,
+[data-center-guide]::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* 背景グラデの“中央1px”系も全て無効化 */
+.bg-center-line,
+.has-center-line {
+  background-image: none !important;
+}
+
+/* 念のため縦ボーダーを透明化（1px残り対策） */
+.border-l,
+.border-l-[1px] {
+  border-left-color: transparent !important;
+}

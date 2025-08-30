@@ -89,7 +89,8 @@ export default function MyPage() {
       } catch (_err) {
         // フォールバック：ダミー生成
         setSeries(buildMockSeries(range))
-        setSeriesErr(Error ? _err.message "series fetch error")
+       setSeriesErr(_err instanceof Error ? _err.message : "series fetch error")
+
       } finally {
         setSeriesLoading(false)
       }

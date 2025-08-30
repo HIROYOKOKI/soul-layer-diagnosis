@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import HeaderIcon from "./ui/HeaderIcon";
-import { Cog6ToothIcon } from "lucide-react";   // ✅ 修正！
+import { Cog6ToothIcon } from "@heroicons/react/24/outline";
 
 type Me = { plan: "free" | "premium" } | null
 

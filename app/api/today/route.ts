@@ -7,13 +7,14 @@ process.env.NEXT_PUBLIC_SUPABASE_URL!,
 process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-function normalizeScores(j: any) {
-// structure_score jsonb に "E","V","L" or "Λ","Eexists" or "Ǝ" が入っている想定
-const E = Number(j?.E ?? 0)
-const V = Number(j?.V ?? 0)
-const L = Number(j?.L ?? j?.["Λ"] ?? 0)
-const Eexists = Number(j?.Eexists ?? j?.["Ǝ"] ?? 0)
-return { E, V, L, Eexists }
+type ScoreJson = Partial<Record<"E"|"V"|"L"|"Λ"|"Eexists"|"Ǝ", number>>;
+
+function normalizeScores(j: ScoreJson | null | undefined) {
+  const E = Number(j?.E ?? 0)
+  const V = Number(j?.V ?? 0)
+  const L = Number(j?.L ?? j?.["Λ"] ?? 0)
+  const Eexists = Number(j?.Eexists ?? j?.["Ǝ"] ?? 0)
+  return { E, V, L, Eexists }
 }
 
 export async function GET() {

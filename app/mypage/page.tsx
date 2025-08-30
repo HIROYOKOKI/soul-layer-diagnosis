@@ -1,7 +1,7 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from "react"
-import type * as React from "react"
-import type { ReactNode } from "react"
+import { useEffect, useMemo, useState } from "react"; // ← useRefは未使用なので削除
+import type * as React from "react";
+import type { ReactNode } from "react";
 
 
 /**

@@ -1,4 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type React } from "react"
+'use client'
+import { useEffect, useMemo, useRef, useState } from "react"
+import type * as React from "react"
+import type { ReactNode } from "react"
+
 
 /**
  * MyPage（本番実装・API接続下地）

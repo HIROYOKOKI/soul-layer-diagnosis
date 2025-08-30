@@ -1,10 +1,9 @@
 'use client'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useEffect, useMemo, useState } from "react"; // ← useRefは未使用なので削除
-import type * as React from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-
+import ProfileIcon from "@/components/ui/ProfileIcon"; // 👈 先頭でimport（必須）
 
 /**
  * MyPage（本番実装・API接続下地）
@@ -14,93 +13,93 @@ import type { ReactNode } from "react";
  * - 依存ライブラリ無し（SVGで描画）
  */
 export default function MyPage() {
-  const [plan, setPlan] = useState<"FREE" | "PREMIUM" | "UNKNOWN">("UNKNOWN")
-  const [range, setRange] = useState<7 | 30 | 90>(30)
-  const [showArt, setShowArt] = useState(false)
-  const premium = plan === "PREMIUM"
+  const [plan, setPlan] = useState<"FREE" | "PREMIUM" | "UNKNOWN">("UNKNOWN");
+  const [range, setRange] = useState<7 | 30 | 90>(30);
+  const [showArt, setShowArt] = useState(false);
+  const premium = plan === "PREMIUM";
 
   // --- 状態: プロフィール（最小表示） ---
-  const [profile, setProfile] = useState<{ name: string; id: string } | null>(null)
+  const [profile, setProfile] = useState<{ name: string; id: string; avatarUrl?: string } | null>(null);
 
   // --- 状態: 当日の合成スコア（レーダー用） ---
-  const [today, setToday] = useState<EVAEVector | null>(null)
-  const [todayLoading, setTodayLoading] = useState(true)
-  const [todayErr, setTodayErr] = useState<string | null>(null)
+  const [today, setToday] = useState<EVAEVector | null>(null);
+  const [todayLoading, setTodayLoading] = useState(true);
+  const [todayErr, setTodayErr] = useState<string | null>(null);
 
   // --- 状態: 時系列（折れ線用） ---
-  const [series, setSeries] = useState<SeriesPoint[] | null>(null)
-  const [seriesLoading, setSeriesLoading] = useState(true)
-  const [seriesErr, setSeriesErr] = useState<string | null>(null)
+  const [series, setSeries] = useState<SeriesPoint[] | null>(null);
+  const [seriesLoading, setSeriesLoading] = useState(true);
+  const [seriesErr, setSeriesErr] = useState<string | null>(null);
 
   // --- 状態: 最新メッセージ ---
-  const [latest, setLatest] = useState<{ code: Code; text: string; date: string } | null>(null)
+  const [latest, setLatest] = useState<{ code: Code; text: string; date: string } | null>(null);
 
   // 初回＆range変化時にAPI取得
   useEffect(() => {
-    const ac = new AbortController()
+    const ac = new AbortController();
 
-    ;(async () => {
+    // /api/me
+    (async () => {
       try {
-        const r = await fetch("/api/me", { signal: ac.signal })
-        if (!r.ok) throw new Error("/api/me failed")
-        const me = await r.json()
-        setPlan((me?.plan?.toUpperCase?.() as any) === "PREMIUM" ? "PREMIUM" : "FREE")
-        setProfile({ name: me?.name ?? "User", id: me?.id ?? "0001" })
+        const r = await fetch("/api/me", { signal: ac.signal });
+        if (!r.ok) throw new Error("/api/me failed");
+        const me = await r.json();
+        setPlan((me?.plan?.toUpperCase?.() as any) === "PREMIUM" ? "PREMIUM" : "FREE");
+        setProfile({ name: me?.name ?? "User", id: me?.id ?? "0001", avatarUrl: me?.avatarUrl });
       } catch (_err) {
-        setPlan("FREE") // 取得失敗時はFREE扱い
-        setProfile({ name: "User", id: "0001" })
+        setPlan("FREE"); // 取得失敗時はFREE扱い
+        setProfile({ name: "User", id: "0001" });
       }
-    })()
+    })();
 
-    ;(async () => {
-      setTodayLoading(true)
-      setTodayErr(null)
+    // /api/today
+    (async () => {
+      setTodayLoading(true);
+      setTodayErr(null);
       try {
-        const r = await fetch("/api/today", { signal: ac.signal })
-        if (!r.ok) throw new Error("/api/today failed")
-        const t = (await r.json()) as { scores: EVAEVector; latest?: { code: Code; text: string; date: string } }
-        setToday(t.scores)
+        const r = await fetch("/api/today", { signal: ac.signal });
+        if (!r.ok) throw new Error("/api/today failed");
+        const t = (await r.json()) as { scores: EVAEVector; latest?: { code: Code; text: string; date: string } };
+        setToday(t.scores);
         setLatest(
           t.latest ?? {
             code: "Ǝ",
             text: "静かに観察したい",
             date: new Date().toISOString().slice(0, 10),
           }
-        )
-      } catch (_err: unknown) {
-  // フォールバック：ダミー生成
-  setSeries(buildMockSeries(range))
-  const msg = _err instanceof Error ? _err.message : "series fetch error"
-  setSeriesErr(msg)
-} finally {
-  setSeriesLoading(false)
-}
-
-    })()
-
-    ;(async () => {
-      setSeriesLoading(true)
-      setSeriesErr(null)
-      try {
-        const r = await fetch(`/api/series?days=${range}`, { signal: ac.signal })
-        if (!r.ok) throw new Error("/api/series failed")
-        const s = (await r.json()) as SeriesPoint[]
-        setSeries(s)
-      } catch (_err) {
-        // フォールバック：ダミー生成
-        setSeries(buildMockSeries(range))
-       setSeriesErr(_err instanceof Error ? _err.message : "series fetch error")
-
+        );
+      } catch (err: unknown) {
+        setToday(null);
+        const msg = err instanceof Error ? err.message : "today fetch error";
+        setTodayErr(msg);
       } finally {
-        setSeriesLoading(false)
+        setTodayLoading(false);
       }
-    })()
+    })();
 
-    return () => ac.abort()
-  }, [range])
+    // /api/series
+    (async () => {
+      setSeriesLoading(true);
+      setSeriesErr(null);
+      try {
+        const r = await fetch(`/api/series?days=${range}`, { signal: ac.signal });
+        if (!r.ok) throw new Error("/api/series failed");
+        const s = (await r.json()) as SeriesPoint[];
+        setSeries(s);
+      } catch (err) {
+        // フォールバック：ダミー生成
+        setSeries(buildMockSeries(range));
+        setSeriesErr(err instanceof Error ? err.message : "series fetch error");
+      } finally {
+        setSeriesLoading(false);
+      }
+    })();
+
+    return () => ac.abort();
+  }, [range]);
 
   // テーマ（文字のみ）→ /api/today から日付取得、なければ今日
-  const theme = useMemo(() => ({ name: "self", date: new Date().toISOString().slice(0, 10) }), [])
+  const theme = useMemo(() => ({ name: "self", date: new Date().toISOString().slice(0, 10) }), []);
 
   return (
     <div className="relative min-h-screen bg-black text-white overflow-hidden">
@@ -110,8 +109,9 @@ export default function MyPage() {
         <div className="absolute -top-1/4 left-1/2 -translate-x-1/2 w-[1200px] h-[1200px] rounded-full blur-3xl opacity-30 bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.25),transparent_60%)]" />
       </div>
 
-      <div className="relative mx-auto max-w-5xl px-5 py-8 grid gap-6">
-        {/* ヘッダー */}
+      {/* レイアウト幅の固定（はみ出し防止） */}
+      <div className="relative mx-auto w-full max-w-[720px] px-4 py-8 grid gap-6">
+        {/* ヘッダー（このページ内のローカル見出し） */}
         <header className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">MY PAGE</h1>
@@ -119,24 +119,20 @@ export default function MyPage() {
           </div>
           <div className="flex items-center gap-3">
             <PlanPill plan={plan} />
-            <button className="rounded-full p-2 border border-white/10 hover:bg-white/5" title="設定">
-              <span className="i">⚙️</span>
+            <button className="h-10 w-10 rounded-full grid place-items-center bg-white/6 hover:bg-white/10 transition" title="設定">
+              <span aria-hidden className="text-sky-400 text-xl">⚙️</span>
             </button>
           </div>
         </header>
 
         {/* プロフィール（最小表示） */}
-      import ProfileIcon from "@/components/ui/ProfileIcon";
-
-...
-
-<div className="flex items-center gap-3">
-  <ProfileIcon src={profile?.avatarUrl} size={48} />
-  <div>
-    <p className="font-medium">{profile?.name}</p>
-    <p className="text-xs text-white/60">ID: {profile?.id}</p>
-  </div>
-</div>
+        <div className="flex items-center gap-3">
+          <ProfileIcon src={profile?.avatarUrl} size={48} />
+          <div>
+            <p className="font-medium">{profile?.name}</p>
+            <p className="text-xs text-white/60">ID: {profile?.id}</p>
+          </div>
+        </div>
 
         {/* テーマ（文字のみ） */}
         <div>
@@ -247,28 +243,28 @@ export default function MyPage() {
         </footer>
       </div>
     </div>
-  )
+  );
 }
 
 /* ===================== */
-/* 型・ユーティリティ  */
+/* 型・ユーティリティ   */
 /* ===================== */
-type Code = "E" | "V" | "Λ" | "Ǝ"
-type EVAEVector = { E: number; V: number; L: number; Eexists: number }
-type SeriesPoint = { date: string } & EVAEVector
+type Code = "E" | "V" | "Λ" | "Ǝ";
+type EVAEVector = { E: number; V: number; L: number; Eexists: number };
+type SeriesPoint = { date: string } & EVAEVector;
 
-function clamp01(v: number) { return Math.max(0, Math.min(1, v)) }
+function clamp01(v: number) { return Math.max(0, Math.min(1, v)); }
 
 /* ============ */
 /* UIパーツ類  */
 /* ============ */
 function Card({ children }: { children: ReactNode }) {
   return (
-    <section className="relative rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5 shadow-[0_0_40px_rgba(59,130,246,0.08)]">
+    <section className="relative w-full max-w-full overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5 shadow-[0_0_40px_rgba(59,130,246,0.08)]">
       <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/5" />
       {children}
     </section>
-  )
+  );
 }
 
 function Badge({ children }: { children: ReactNode }) {
@@ -276,102 +272,100 @@ function Badge({ children }: { children: ReactNode }) {
     <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-gradient-to-br from-cyan-500/30 to-blue-700/30 border border-cyan-300/30 text-cyan-200 text-base font-semibold shadow-[0_0_30px_rgba(56,189,248,0.25)]">
       {children}
     </span>
-  )
-}
-
-function Avatar() {
-  return (
-    <div className="relative w-12 h-12 rounded-full overflow-hidden border border-white/15">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_60%_40%,rgba(56,189,248,0.6),rgba(0,0,0,0.2)_60%)]" />
-      <div className="absolute inset-0 bg-[conic-gradient(from_180deg_at_50%_50%,rgba(56,189,248,0.25),transparent_30%,rgba(99,102,241,0.25),transparent_60%,rgba(56,189,248,0.25))] mix-blend-screen" />
-    </div>
-  )
+  );
 }
 
 function PlanPill({ plan }: { plan: "FREE" | "PREMIUM" | "UNKNOWN" }) {
-  const label = plan === "UNKNOWN" ? "—" : plan
+  const label = plan === "UNKNOWN" ? "—" : plan;
   return (
     <span className="text-[11px] px-2 py-1 rounded-full border border-white/10 bg-white/5 text-white/70">{label}</span>
-  )
+  );
 }
 
 function Skeleton({ height }: { height: number }) {
-  return <div className="w-full rounded-xl bg-white/5 animate-pulse" style={{ height }} />
+  return <div className="w-full rounded-xl bg-white/5 animate-pulse" style={{ height }} />;
 }
 
 function ErrorNote({ note }: { note: string }) {
-  return <div className="text-sm text-red-300/80">{note}</div>
+  return <div className="text-sm text-red-300/80">{note}</div>;
 }
 
 /* ==================== */
-/* レーダーチャート   */
+/* レーダーチャート    */
 /* ==================== */
 function RadarChart({ values }: { values: EVAEVector }) {
-  const size = 260
-  const cx = size / 2
-  const cy = size / 2
-  const r = 100
+  const size = 260;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 100;
   const axes = [
     { label: "E", angle: -90 },
     { label: "V", angle: 0 },
     { label: "Λ", angle: 90 },
     { label: "Ǝ", angle: 180 },
-  ]
-  const vals = [values.E, values.V, values.L, values.Eexists]
+  ];
+  const vals = [values.E, values.V, values.L, values.Eexists];
+
   function polar(angleDeg: number, radiusScale: number) {
-    const rad = (Math.PI / 180) * angleDeg
-    const rr = r * clamp01(radiusScale)
-    return [cx + rr * Math.cos(rad), cy + rr * Math.sin(rad)]
+    const rad = (Math.PI / 180) * angleDeg;
+    const rr = r * clamp01(radiusScale);
+    return [cx + rr * Math.cos(rad), cy + rr * Math.sin(rad)];
   }
-  const points = axes.map((a, i) => polar(a.angle, vals[i])).map(([x, y]) => `${x},${y}`).join(" ")
+
+  const points = axes.map((a, i) => polar(a.angle, vals[i])).map(([x, y]) => `${x},${y}`).join(" ");
 
   return (
     <div className="w-full flex items-center justify-center">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="drop-shadow-[0_0_20px_rgba(56,189,248,0.15)]">
         {[0.25, 0.5, 0.75, 1].map((t) => (<circle key={t} cx={cx} cy={cy} r={r * t} className="fill-none stroke-white/10" />))}
-        {axes.map((a) => { const [x, y] = polar(a.angle, 1); return (
-          <g key={a.label}>
-            <line x1={cx} y1={cy} x2={x} y2={y} className="stroke-white/15" />
-            <text x={x} y={y} dy={a.angle === 90 ? 12 : a.angle === -90 ? -6 : 4} className="fill-white/70 text-[12px]">{a.label}</text>
-          </g>
-        )})}
+        {axes.map((a) => {
+          const [x, y] = polar(a.angle, 1);
+          return (
+            <g key={a.label}>
+              <line x1={cx} y1={cy} x2={x} y2={y} className="stroke-white/15" />
+              <text x={x} y={y} dy={a.angle === 90 ? 12 : a.angle === -90 ? -6 : 4} className="fill-white/70 text-[12px]">{a.label}</text>
+            </g>
+          );
+        })}
         <defs>
           <radialGradient id="glow" cx="50%" cy="50%">
             <stop offset="0%" stopColor="rgba(56,189,248,0.5)" />
             <stop offset="100%" stopColor="rgba(56,189,248,0.0)" />
           </radialGradient>
-          <filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur in="SourceGraphic" stdDeviation="6" /></filter>
+          <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
+          </filter>
         </defs>
         <polygon points={points} fill="url(#glow)" filter="url(#blur)" />
         <polygon points={points} className="fill-cyan-400/25 stroke-cyan-300/50" />
       </svg>
     </div>
-  )
+  );
 }
 
 /* ==================== */
-/* 折れ線グラフ         */
+/* 折れ線グラフ        */
 /* ==================== */
 function TimeSeriesChart({ data }: { data: SeriesPoint[] }) {
-  const width = data.length * 28 + 80 // 7/30/90対応
-  const height = 240
-  const pad = { l: 48, r: 40, t: 12, b: 36 }
+  const width = data.length * 28 + 80; // 7/30/90対応
+  const height = 240;
+  const pad = { l: 48, r: 40, t: 12, b: 36 };
 
-  const x = (i: number) => pad.l + i * 28
-  const y = (v: number) => pad.t + (height - pad.t - pad.b) * (1 - clamp01(v))
-  const line = (points: number[]) => points.map((v, i) => `${x(i)},${y(v)}`).join(" ")
-  const colors = { E: "#fb7185", V: "#38bdf8", L: "#86efac", Eexists: "#a78bfa" }
+  const x = (i: number) => pad.l + i * 28;
+  const y = (v: number) => pad.t + (height - pad.t - pad.b) * (1 - clamp01(v));
+  const line = (points: number[]) => points.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+  const colors = { E: "#fb7185", V: "#38bdf8", L: "#86efac", Eexists: "#a78bfa" } as const;
 
   function idxFromClient(evt: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>) {
-    const svg = evt.currentTarget
-    const rect = svg.getBoundingClientRect()
-    const clientX = 'touches' in evt ? (evt.touches[0]?.clientX ?? 0) : (evt as React.MouseEvent).clientX
-    const px = clientX - rect.left
-    const i = Math.round((px - pad.l) / 28)
-    return Math.max(0, Math.min(data.length - 1, i))
+    const svg = evt.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    const clientX = "touches" in evt ? (evt.touches[0]?.clientX ?? 0) : (evt as React.MouseEvent).clientX;
+    const px = clientX - rect.left;
+    const i = Math.round((px - pad.l) / 28);
+    return Math.max(0, Math.min(data.length - 1, i));
   }
 
-  const [hover, setHover] = useState<number | null>(null)
+  const [hover, setHover] = useState<number | null>(null);
 
   return (
     <div className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -409,16 +403,16 @@ function TimeSeriesChart({ data }: { data: SeriesPoint[] }) {
           <g>
             <line x1={x(hover)} y1={pad.t} x2={x(hover)} y2={height - pad.b} className="stroke-white/30" />
             {(["E", "V", "L", "Eexists"] as const).map((k) => {
-              const val = data[hover][k]
-              const cx = x(hover)
-              const cy = y(val)
-              const fill = (colors as Record<string, string>)[k]
-              return <circle key={k} cx={cx} cy={cy} r={3.5} fill={fill} />
+              const val = data[hover][k];
+              const cx = x(hover);
+              const cy = y(val);
+              const fill = (colors as Record<string, string>)[k];
+              return <circle key={k} cx={cx} cy={cy} r={3.5} fill={fill} />;
             })}
             {(() => {
-              const d = data[hover]
-              const boxX = Math.min(Math.max(x(hover) + 8, pad.l), width - pad.r - 120)
-              const boxY = pad.t + 8
+              const d = data[hover];
+              const boxX = Math.min(Math.max(x(hover) + 8, pad.l), width - pad.r - 120);
+              const boxY = pad.t + 8;
               return (
                 <g>
                   <rect x={boxX} y={boxY} width={120} height={68} rx={8} className="fill-black/80 stroke-white/15" />
@@ -428,7 +422,7 @@ function TimeSeriesChart({ data }: { data: SeriesPoint[] }) {
                   <text x={boxX + 8} y={boxY + 52} className="fill-white/80 text-[10px]">Λ: {d.L.toFixed(2)}</text>
                   <text x={boxX + 8} y={boxY + 64} className="fill-white/80 text-[10px]">Ǝ: {d.Eexists.toFixed(2)}</text>
                 </g>
-              )
+              );
             })()}
           </g>
         )}
@@ -446,7 +440,7 @@ function TimeSeriesChart({ data }: { data: SeriesPoint[] }) {
         </g>
       </svg>
     </div>
-  )
+  );
 }
 
 /* ==================== */
@@ -471,17 +465,19 @@ function Slider({ children }: { children: ReactNode }) {
         <span className="w-2 h-2 rounded-full bg-white/30"></span>
       </div>
     </div>
-  )
+  );
 }
 
 /* ==================== */
 /* アート（Premium）    */
 /* ==================== */
 function ArtCard({ code }: { code: Code }) {
-  const palette = code === "E" ? ["#fb923c", "#f97316", "#ea580c"]
+  const palette =
+    code === "E" ? ["#fb923c", "#f97316", "#ea580c"]
     : code === "V" ? ["#22d3ee", "#06b6d4", "#0891b2"]
     : code === "Λ" ? ["#a3e635", "#84cc16", "#65a30d"]
-    : ["#a78bfa", "#7c3aed", "#312e81"]
+    : ["#a78bfa", "#7c3aed", "#312e81"];
+
   return (
     <div className="relative h-48 overflow-hidden rounded-xl border border-white/10 bg-black/40">
       <svg className="absolute inset-0 w-full h-full" viewBox="0 0 600 240">
@@ -496,66 +492,57 @@ function ArtCard({ code }: { code: Code }) {
       <div className="absolute inset-0 blur-3xl bg-[radial-gradient(circle_at_60%_50%,rgba(56,189,248,0.25),transparent_50%)]" />
       <div className="absolute bottom-2 right-3 text-[10px] text-white/50">ミリデュームアート</div>
     </div>
-  )
+  );
 }
 
 /* ==================== */
 /* ダミー系列生成       */
 /* ==================== */
 function buildMockSeries(days: number = 30): SeriesPoint[] {
-  // 係数（Quick は 1.2）
-  const W_PROFILE = 1.0
-  const W_THEME = 0.5
-  const W_QUICK = 1.2
-  const W_DAILY = 0.1
-  const W_WEEKLY = 0.5
-  const W_MONTHLY = 1.5
+  const W_PROFILE = 1.0, W_THEME = 0.5, W_QUICK = 1.2, W_DAILY = 0.1, W_WEEKLY = 0.5, W_MONTHLY = 1.5;
 
-  let seed = 42
-  const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32 }
-  const today = new Date()
-  const daysCount = Math.max(1, Math.floor(days))
-  const series: SeriesPoint[] = []
+  let seed = 42;
+  const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
+  const today = new Date();
+  const daysCount = Math.max(1, Math.floor(days));
+  const series: SeriesPoint[] = [];
 
   for (let i = daysCount - 1; i >= 0; i--) {
-    const d = new Date(today); d.setDate(d.getDate() - i)
-    const date = d.toISOString().slice(0, 10)
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const date = d.toISOString().slice(0, 10);
 
-    const profile = { E: 0.6, V: 0.6, L: 0.6, Eexists: 0.6 }
-    const theme =   { E: rand(), V: rand(), L: rand(), Eexists: rand() }
-    const quick =   { E: rand(), V: rand(), L: rand(), Eexists: rand() }
-    const daily =   { E: rand(), V: rand(), L: rand(), Eexists: rand() }
-    const weeklyBoost = d.getDay() === 0 ? 1 : 0
-    const weekly =  { E: rand() * weeklyBoost, V: rand() * weeklyBoost, L: rand() * weeklyBoost, Eexists: rand() * weeklyBoost }
-    const monthlyBoost = d.getDate() === 1 ? 1 : 0
-    const monthly = { E: rand() * monthlyBoost, V: rand() * monthlyBoost, L: rand() * monthlyBoost, Eexists: rand() * monthlyBoost }
+    const profile = { E: 0.6, V: 0.6, L: 0.6, Eexists: 0.6 };
+    const theme   = { E: rand(), V: rand(), L: rand(), Eexists: rand() };
+    const quick   = { E: rand(), V: rand(), L: rand(), Eexists: rand() };
+    const daily   = { E: rand(), V: rand(), L: rand(), Eexists: rand() };
+    const weeklyBoost = d.getDay() === 0 ? 1 : 0;
+    const weekly  = { E: rand() * weeklyBoost, V: rand() * weeklyBoost, L: rand() * weeklyBoost, Eexists: rand() * weeklyBoost };
+    const monthlyBoost = d.getDate() === 1 ? 1 : 0;
+    const monthly = { E: rand() * monthlyBoost, V: rand() * monthlyBoost, L: rand() * monthlyBoost, Eexists: rand() * monthlyBoost };
 
-    const denom = W_PROFILE + W_THEME + W_QUICK + W_DAILY + W_WEEKLY + W_MONTHLY
+    const denom = W_PROFILE + W_THEME + W_QUICK + W_DAILY + W_WEEKLY + W_MONTHLY;
     const combine = (p: number, t: number, q: number, da: number, w: number, m: number) =>
-      clamp01((W_PROFILE * p + W_THEME * t + W_QUICK * q + W_DAILY * da + W_WEEKLY * w + W_MONTHLY * m) / denom)
+      clamp01((W_PROFILE * p + W_THEME * t + W_QUICK * q + W_DAILY * da + W_WEEKLY * w + W_MONTHLY * m) / denom);
 
-    const E = combine(profile.E, theme.E, quick.E, daily.E, weekly.E, monthly.E)
-    const V = combine(profile.V, theme.V, quick.V, daily.V, weekly.V, monthly.V)
-    const L = combine(profile.L, theme.L, quick.L, daily.L, weekly.L, monthly.L)
-    const Eexists = combine(profile.Eexists, theme.Eexists, quick.Eexists, daily.Eexists, weekly.Eexists, monthly.Eexists)
+    const E = combine(profile.E, theme.E, quick.E, daily.E, weekly.E, monthly.E);
+    const V = combine(profile.V, theme.V, quick.V, daily.V, weekly.V, monthly.V);
+    const L = combine(profile.L, theme.L, quick.L, daily.L, weekly.L, monthly.L);
+    const Eexists = combine(profile.Eexists, theme.Eexists, quick.Eexists, daily.Eexists, weekly.Eexists, monthly.Eexists);
 
-    series.push({ date, E, V, L, Eexists })
+    series.push({ date, E, V, L, Eexists });
   }
-  return series
+  return series;
 }
 
 /* ==================== */
-/* テスト（console）     */
+/* テスト（console）    */
 /* ==================== */
 if (typeof window !== "undefined") {
-  // Test: buildMockSeries 基本
-  const s = buildMockSeries()
-  console.assert(s.length === 30, "series length=30")
-  console.assert(s.every(d => d.E>=0 && d.E<=1 && d.V>=0 && d.V<=1 && d.L>=0 && d.L<=1 && d.Eexists>=0 && d.Eexists<=1), "values in [0,1]")
-  // 可変日数
-  const s7 = buildMockSeries(7), s90 = buildMockSeries(90)
-  console.assert(s7.length === 7 && s90.length === 90, "7/90 supported")
-  // 昇順
-  const asc = s.every((d,i,a)=> i===0 || d.date >= a[i-1].date)
-  console.assert(asc, "ascending dates")
+  const s = buildMockSeries();
+  console.assert(s.length === 30, "series length=30");
+  console.assert(s.every(d => d.E>=0 && d.E<=1 && d.V>=0 && d.V<=1 && d.L>=0 && d.L<=1 && d.Eexists>=0 && d.Eexists<=1), "values in [0,1]");
+  const s7 = buildMockSeries(7), s90 = buildMockSeries(90);
+  console.assert(s7.length === 7 && s90.length === 90, "7/90 supported");
+  const asc = s.every((d,i,a)=> i===0 || d.date >= a[i-1].date);
+  console.assert(asc, "ascending dates");
 }

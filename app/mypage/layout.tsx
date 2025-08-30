@@ -2,16 +2,14 @@
 import type { ReactNode } from "react";
 import AppHeader from "@/components/AppHeader";
 
-export default function MyPageLayout({ children }: { children: ReactNode }) {
+export default function MyPageLayout({ children }) {
   return (
-    <div className="min-h-dvh bg-[#0B0F1A] overflow-x-hidden">
-      {/* ヘッダーは常時表示 */}
-      <AppHeader title="MY PAGE" showBack={false} />
-
-      {/* ページ幅と余白を固定（はみ出し防止） */}
-     <main className="mx-auto w-full max-w-[720px] px-4 pb-20 before:content-none">
-  {children}
-</main>
+    <div className="min-h-dvh bg-black overflow-x-hidden">
+      <AppHeader />  {/* ← title を渡さない（下で固定ブランド表示に） */}
+      <main className="mx-auto w-full max-w-[720px] px-4 pb-20">
+        {children}
+      </main>
     </div>
   );
 }
+

@@ -1,18 +1,21 @@
 // components/ui/CardHeader.tsx
 "use client"
 
-import { Settings } from "lucide-react";
+import { Settings } from "lucide-react"
 
 type Props = {
-  title: string;
-  onSettings?: () => void;
-  rightNode?: React.ReactNode;   // FREEピルなど
-};
+  title: string
+  onSettings?: () => void
+  rightNode?: React.ReactNode  // FREEピルなど
+}
 
 export default function CardHeader({ title, onSettings, rightNode }: Props) {
   return (
-    <div className="flex items-center justify-between">
-      <h3 className="text-sm text-white/80">{title}</h3>
+    <div className="flex items-center justify-between mb-2">
+      {/* 左: タイトル */}
+      <h3 className="text-sm font-medium text-white/80">{title}</h3>
+
+      {/* 右: ピル or 歯車 */}
       <div className="flex items-center gap-2">
         {rightNode}
         <button
@@ -27,5 +30,5 @@ export default function CardHeader({ title, onSettings, rightNode }: Props) {
         </button>
       </div>
     </div>
-  );
+  )
 }

@@ -4,9 +4,26 @@ import OpenAI from "openai"
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
+type Body = {
+  name: string
+  birthday: string
+  blood: string
+  gender: string
+  preference?: string | null
+}
+
+type Gen = {
+  fortune: string
+  personality: string
+  partner: string
+  opening?: string
+  closing?: string
+}
+
 export async function POST(req: Request) {
   try {
-    const { name, birthday, blood, gender, preference } = await req.json()
+    const body = (await req.json()) as Partial<Body>
+    const { name, birthday, blood, gender, preference } = body
 
     if (!name || !birthday || !blood || !gender) {
       return NextResponse.json(
@@ -33,8 +50,7 @@ export async function POST(req: Request) {
  "partner":"理想のパートナー像（80字以内）",
  "opening":"観測開始の一言（40字程度）",
  "closing":"締めの一言（40字程度）"
-}
-    `.trim()
+}`.trim()
 
     const r = await client.chat.completions.create({
       model: "gpt-4o-mini",
@@ -42,20 +58,26 @@ export async function POST(req: Request) {
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: sys },
-        { role: "user", content: user }
+        { role: "user", content: user },
       ],
     })
 
-    const parsed = JSON.parse(r.choices[0].message?.content || "{}")
+    const content = r.choices?.[0]?.message?.content ?? "{}"
 
-    const fortune = String(parsed.fortune || "").slice(0, 80)
-    const personality = String(parsed.personality || "").slice(0, 80)
-    const partner = String(parsed.partner || "").slice(0, 80)
-    const opening = String(parsed.opening || "観測しました──お伝えします。").slice(0, 60)
-    const closing = String(parsed.closing || "以上がいま映ったあなたです。").slice(0, 60)
+    let parsed: Partial<Gen> = {}
+    try {
+      parsed = JSON.parse(content) as Partial<Gen>
+    } catch {
+      parsed = {}
+    }
 
-    // フロントの「② 次へで順に出す」用の吹き出し配列
-    const luneaLines = [
+    const fortune = String(parsed.fortune ?? "").slice(0, 80)
+    const personality = String(parsed.personality ?? "").slice(0, 80)
+    const partner = String(parsed.partner ?? "").slice(0, 80)
+    const opening = String(parsed.opening ?? "観測しました──お伝えします。").slice(0, 60)
+    const closing = String(parsed.closing ?? "以上がいま映ったあなたです。").slice(0, 60)
+
+    const luneaLines: Array<{ type: string; label: string; text: string }> = [
       { type: "opening", label: "観測", text: opening },
       { type: "fortune", label: "総合運勢", text: fortune },
       { type: "personality", label: "性格傾向", text: personality },
@@ -65,11 +87,12 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      result: { fortune, personality, partner, luneaLines }
+      result: { fortune, personality, partner, luneaLines },
     })
-  } catch (e: any) {
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
     return NextResponse.json(
-      { ok: false, error: "internal_error", detail: e?.message ?? String(e) },
+      { ok: false, error: "internal_error", detail },
       { status: 500 }
     )
   }

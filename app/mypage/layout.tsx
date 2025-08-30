@@ -9,9 +9,9 @@ export default function MyPageLayout({ children }: { children: ReactNode }) {
       <AppHeader title="MY PAGE" showBack={false} />
 
       {/* ページ幅と余白を固定（はみ出し防止） */}
-      <main className="mx-auto w-full max-w-[720px] px-4 pb-20">
-        {children}
-      </main>
+     <main className="mx-auto w-full max-w-[720px] px-4 pb-20 before:content-none">
+  {children}
+</main>
     </div>
   );
 }

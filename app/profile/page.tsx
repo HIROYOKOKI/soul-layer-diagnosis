@@ -57,7 +57,7 @@ export default function ProfilePage() {
       {/* ヘッダー（ロゴ） */}
       <header className="py-6">
         <div className="mx-auto max-w-5xl px-5 flex items-center">
-          <img src="/evae-logo.svg" alt="EVΛƎ" className="h-6 opacity-90" />
+          <img src="/soul-layer-diagnosis.png" alt="EVΛƎ" className="h-6 opacity-90" />
         </div>
       </header>
 

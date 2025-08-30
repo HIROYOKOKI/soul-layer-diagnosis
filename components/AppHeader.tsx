@@ -1,9 +1,8 @@
-// components/AppHeader.tsx
 "use client"
 
 import { useEffect, useState } from "react";
-import HeaderIcon from "./ui/HeaderIcon";   // 👈 追加
-import { Cog6Tooth } from "lucide-react";
+import HeaderIcon from "./ui/HeaderIcon";
+import { Cog6ToothIcon } from "lucide-react";   // ✅ 修正！
 
 type Me = { plan: "free" | "premium" } | null
 
@@ -19,7 +18,7 @@ export default function AppHeader() {
         const j = await r.json()
         if (alive) setMe(j)
       } catch {
-        if (alive) setMe({ plan: "free" }) // fallback
+        if (alive) setMe({ plan: "free" })
       } finally {
         if (alive) setLoading(false)
       }
@@ -35,7 +34,7 @@ export default function AppHeader() {
         <span className="text-xs text-white/60">SOUL LAYER DIAGNOSIS</span>
       </div>
 
-      {/* 右：設定ボタン（Skeleton付き） */}
+      {/* 右：設定ボタン */}
       <div className="h-8 w-8">
         {loading ? (
           <div className="h-8 w-8 rounded-full bg-white/6 animate-pulse" />
@@ -45,10 +44,10 @@ export default function AppHeader() {
             className="h-8 w-8 rounded-full grid place-items-center
                        bg-white/6 hover:bg-white/10 transition"
           >
-            <Cog6Tooth className="h-4 w-4 text-white/80" />
+            <Cog6ToothIcon className="h-4 w-4 text-white/80" />   {/* ✅ */}
           </button>
         ) : (
-          <div className="h-8 w-8" />  // Free時は空スペース
+          <div className="h-8 w-8" />
         )}
       </div>
     </header>

@@ -1,19 +1,35 @@
-// app/components/AppHeader.tsx
+// components/AppHeader.tsx
 "use client"
 
-import HeaderIcon from "@/components/ui/HeaderIcon"; // ← 相対ではなくエイリアス
+import HeaderIcon from "@/components/ui/HeaderIcon";
 import { Settings } from "lucide-react";
 
 export default function AppHeader() {
   return (
     <header className="sticky top-0 z-40 bg-black">
       <div className="mx-auto flex items-center justify-between px-4 py-3 w-full max-w-[720px]">
+        
+        {/* 左：ロゴ＋タイトル */}
         <div className="flex items-center gap-2 min-w-0">
           <HeaderIcon src="/icon-512.png" />
-          <span className="truncate text-xs text-white/70">SOUL LAYER DIAGNOSIS</span>
+          <span className="truncate text-xs text-white/70">
+            SOUL LAYER DIAGNOSIS
+          </span>
         </div>
-        {/* ヘッダーは歯車なし。外（カード側）の設定ボタンを使う方針 */}
-        <div className="h-8 w-8" />
+
+        {/* 右：FREEピル＋お気に入りの歯車 */}
+        <div className="flex items-center gap-2">
+          <span className="px-3 py-1 text-xs rounded-full bg-white/10 text-white/70">
+            FREE
+          </span>
+          <button
+            aria-label="Settings"
+            className="h-8 w-8 rounded-full grid place-items-center
+                       bg-white/6 hover:bg-white/10 transition"
+          >
+            <Settings className="h-6 w-6 text-sky-400" aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </header>
   );

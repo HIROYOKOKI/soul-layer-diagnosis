@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import HeaderIcon from "./ui/HeaderIcon";
 import { ArrowLeft } from "lucide-react";
-import { Cog6ToothIcon } from "@heroicons/react/24/outline";
+import { Cog6ToothIcon } from "@heroicons/react/outline";   // v1系で利用
 
 type Me = { plan: "free" | "premium"; avatarUrl?: string } | null;
 
@@ -16,29 +16,22 @@ type Props = {
 
 export default function AppHeader({ title, showBack = false, onBack }: Props) {
   const [me, setMe] = useState<Me>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let alive = true;
     (async () => {
       try {
         const r = await fetch("/api/me", { cache: "no-store" });
         const j = await r.json();
-        if (alive) setMe(j);
+        setMe(j);
       } catch {
-        if (alive) setMe({ plan: "free" });
-      } finally {
-        if (alive) setLoading(false);
+        setMe({ plan: "free" });
       }
     })();
-    return () => {
-      alive = false;
-    };
   }, []);
 
   return (
     <header className="flex items-center justify-between px-4 py-3">
-      {/* 左：戻る or プロフィールアイコン（無ければ青光ロゴ）＋タイトル */}
+      {/* 左：戻る or プロフィールアイコン＋タイトル */}
       <div className="flex items-center gap-2 min-w-0">
         {showBack ? (
           <button
@@ -57,19 +50,15 @@ export default function AppHeader({ title, showBack = false, onBack }: Props) {
         </span>
       </div>
 
-      {/* 右：設定ボタン（常時表示, シアン系 Cog6ToothIcon） */}
+      {/* 右：設定ボタン（常時表示 / シアン） */}
       <div className="h-10 w-10">
-        {loading ? (
-          <div className="h-10 w-10 rounded-full bg-white/6 animate-pulse" />
-        ) : (
-          <button
-            aria-label="Settings"
-            className="h-10 w-10 rounded-full grid place-items-center
-                       bg-white/6 hover:bg-white/10 transition"
-          >
-            <Cog6ToothIcon className="h-6 w-6 text-sky-400" aria-hidden="true" />
-          </button>
-        )}
+        <button
+          aria-label="Settings"
+          className="h-10 w-10 rounded-full grid place-items-center
+                     bg-white/6 hover:bg-white/10 transition"
+        >
+          <Cog6ToothIcon className="h-6 w-6 text-sky-400" aria-hidden="true" />
+        </button>
       </div>
     </header>
   );

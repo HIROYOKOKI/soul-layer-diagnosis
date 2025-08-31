@@ -1,3 +1,4 @@
+// app/api/profile/save/route.ts
 import { NextResponse } from "next/server"
 import { getSupabaseAdmin } from "../../../../lib/supabase-admin"
 
@@ -7,8 +8,10 @@ type MaybeLine = string | { type?: string; label?: string; text?: string }
 function toText(v: MaybeTextObj): string {
   if (v == null) return ""
   if (typeof v === "string") {
-    try { const j = JSON.parse(v); return (j && typeof j === "object" && "text" in j) ? String((j as any).text ?? "") : v }
-    catch { return v }
+    try {
+      const j = JSON.parse(v)
+      return (j && typeof j === "object" && "text" in j) ? String((j as any).text ?? "") : v
+    } catch { return v }
   }
   return String(v.text ?? "")
 }
@@ -30,13 +33,18 @@ export async function POST(req: Request) {
 
   const payload = Array.isArray(body?.luneaLines)
     ? extractFromLines(body.luneaLines)
-    : { fortune: toText(body?.fortune), personality: toText(body?.personality), partner: toText(body?.partner) }
+    : {
+        fortune:     toText(body?.fortune),
+        personality: toText(body?.personality),
+        partner:     toText(body?.partner),
+      }
 
   if (!payload.fortune && !payload.personality && !payload.partner) {
     return NextResponse.json({ ok:false, error:"empty_payload" }, { status:400 })
   }
 
-  const { data, error } = await sb.from("profile_results")
+  const { data, error } = await sb
+    .from("profile_results")
     .insert([payload])
     .select("created_at")
     .maybeSingle()

@@ -3,19 +3,44 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useProfileDiagnose, type ProfilePayload } from "../_hooks/useProfileDiagnose"
+
+// NOTE: The previous build failed because the module "../_hooks/useProfileDiagnose"
+// could not be resolved. To make this component self-contained (and robust to
+// path/structure changes), the diagnose logic is inlined here.
+
+export type ProfilePayload = {
+  name: string
+  birthday: string // YYYY-MM-DD
+  blood: string
+  gender: string
+  preference?: string | null
+  theme?: string | null
+}
+
+// Inlined diagnose function (used to be provided by useProfileDiagnose hook)
+async function diagnoseProfile(payload: ProfilePayload): Promise<{ luneaLines: string[] }> {
+  const res = await fetch("/api/profile/diagnose", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ theme: payload.theme ?? "dev", ...payload }),
+    cache: "no-store",
+  })
+  if (!res.ok) throw new Error(`HTTP_${res.status}`)
+  const json = await res.json()
+  const lines = json?.result?.luneaLines
+  if (!json?.ok || !Array.isArray(lines)) throw new Error(json?.error || "profile_diagnose_failed")
+  return { luneaLines: lines as string[] }
+}
 
 type Pending = ProfilePayload
 
 export default function ConfirmClient() {
   const router = useRouter()
-  const diagnose = useProfileDiagnose()
 
   const [p, setP] = useState<Pending | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 一時保存の入力を復元。無ければ入力ページへ戻す
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("profile_pending")
@@ -29,14 +54,10 @@ export default function ConfirmClient() {
     try {
       setLoading(true); setError(null)
 
-      // 1) 診断（フック経由）
-      const res = await diagnose(p) // { luneaLines: string[] }
-
-      // 2) 結果をセッションへ（結果ページで使用）
+      const res = await diagnoseProfile(p) // { luneaLines: string[] }
       sessionStorage.removeItem("profile_pending")
       sessionStorage.setItem("profile_result_luneaLines", JSON.stringify(res.luneaLines))
 
-      // 3) 保存API（任意：失敗しても遷移は続行）
       try {
         const save = await fetch("/api/profile/save", {
           method: "POST",
@@ -47,9 +68,8 @@ export default function ConfirmClient() {
         if (!save.ok) setError(`save_failed_${save.status}`)
       } catch { setError("save_failed_network") }
 
-      // 4) 結果へ
       router.push("/profile/result")
-    } catch (e: any) {
+    } catch (e:any) {
       setError(e?.message || "diagnose_failed")
     } finally {
       setLoading(false)
@@ -60,79 +80,83 @@ export default function ConfirmClient() {
 
   return (
     <main className="min-h-[100dvh] relative text-white">
-      {/* 背景（黒ベース＋淡いオーラ） */}
+      {/* 背景 */}
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-black" />
-        <div className="absolute inset-0 bg-[radial-gradient(600px_420px_at_50%_15%,rgba(79,195,255,0.18),transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(640px_440px_at_50%_14%,rgba(56,189,248,0.18),transparent)]" />
         <div className="absolute inset-x-0 top-[44%] h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
       </div>
 
-      {/* ヘッダー：ロゴ + EVΛƎ PROJECT */}
-      <header className="flex items-center justify-between px-5 py-6 max-w-5xl mx-auto">
+      {/* ヘッダー */}
+      <header className="flex items-center justify-between px-5 py-6 max-w-6xl mx-auto">
         <div className="flex items-center gap-3">
-          <img src="/soul-layer-diagnosis.png" alt="Soul Layer" className="h-8 w-auto" />
-          <span className="text-lg font-bold tracking-wide">EVΛƎ PROJECT</span>
+          <span
+            className="h-8 w-8 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 ring-1 ring-sky-300/40 shadow-[0_0_22px_rgba(56,189,248,.65)]"
+            aria-hidden
+          />
+          <span className="text-[15px] md:text-base tracking-[0.18em] font-semibold">
+            SOUL LAYER DIAGNOSIS
+          </span>
         </div>
       </header>
 
       {/* 本文 */}
-      <div className="mx-auto max-w-5xl px-5 pb-16">
+      <div className="mx-auto max-w-5xl px-5">
         <h1 className="text-2xl font-bold tracking-wide">入力内容の確認</h1>
         <p className="text-sm opacity-70 mt-1">送信前にもう一度ご確認ください。</p>
 
-        {/* ガラスカード */}
+        {/* 情報カード */}
         <section className="mt-6 max-w-2xl rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6 shadow-[0_10px_40px_rgba(0,0,0,.35)]">
           <dl className="grid gap-3 text-[15px] leading-relaxed">
-            <Item label="名前" value={p.name} />
-            <Item label="誕生日" value={p.birthday} />
-            <Item label="血液型" value={p.blood} />
-            <Item label="性別" value={p.gender} />
+            <Item label="名前"     value={p.name} />
+            <Item label="誕生日"   value={p.birthday} />
+            <Item label="血液型"   value={p.blood} />
+            <Item label="性別"     value={p.gender} />
             {p.preference ? <Item label="恋愛対象" value={p.preference} /> : null}
           </dl>
 
-          {/* ボタン：横並び */}
-          <div className="mt-7 flex flex-wrap gap-8">
-            {/* 修正する：常時黒、hoverで反転（A案） */}
-            <button
-              onClick={() => router.push("/profile")}
-              className="h-11 px-6 rounded-full bg-black text-white
-                         border border-white/20
-                         hover:bg-white hover:text-black
-                         transition font-medium"
-            >
-              修正する
-            </button>
-
-            {/* 診断ボタン：app/buttons の色を使用（クラス名はプロジェクトの実装に合わせて） */}
-            <button
-              onClick={handleConfirm}
-              disabled={loading}
-              className={[
-                // ここにプロジェクト共通のボタンクラス名を入れてください（例）
-                "btn-primary-glow",
-                // フォールバック（共通クラスが無い環境でも光る）
-                "relative h-11 px-8 rounded-full font-semibold uppercase tracking-wide",
-                "bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500",
-                "text-white shadow-[0_0_20px_rgba(168,85,247,0.6)] hover:shadow-[0_0_30px_rgba(168,85,247,0.9)]",
-                "transition disabled:opacity-60",
-              ].join(" ")}
-            >
-              {loading ? "診断中…" : "この内容で診断"}
-            </button>
-          </div>
-
           {error && (
-            <p className="mt-4 text-sm text-rose-300">
-              エラー：{error}（時間をおいて再試行してください）
-            </p>
+            <p className="mt-4 text-sm text-rose-300">エラー：{error}（時間をおいて再試行してください）</p>
           )}
         </section>
+
+        {/* カード外：横並びボタン */}
+        <div className="mt-8 flex flex-wrap items-center gap-6">
+          {/* 修正する：常時黒、hoverで背景と文字色反転 */}
+          <button
+            onClick={() => router.push("/profile")}
+            className="h-12 px-8 rounded-full bg-black text-white border border-white/20 hover:bg-white hover:text-black transition font-medium"
+          >
+            修正する
+          </button>
+
+          {/* この内容で診断：Glow Primary */}
+          <button
+            onClick={handleConfirm}
+            disabled={loading}
+            className={[
+              "btn-primary",
+              "h-12 px-10 rounded-full font-extrabold tracking-wide uppercase",
+              "bg-gradient-to-r from-sky-500 to-indigo-500",
+              "text-white shadow-[0_0_22px_rgba(79,70,229,.55)]",
+              "hover:shadow-[0_0_30px_rgba(79,70,229,.85)]",
+              "transition disabled:opacity-60"
+            ].join(" ")}
+          >
+            {loading ? "診断中…" : "この内容で診断"}
+          </button>
+        </div>
+
+        {/* フッター（小さく） */}
+        <footer className="mt-12 pb-10 text-[11px] opacity-70">
+          © EVΛƎ PROJECT
+        </footer>
       </div>
     </main>
   )
 }
 
-/* 行表示コンポーネント（ラベル薄／値標準） */
+/* ラベル薄／値標準 */
 function Item({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="grid grid-cols-[120px_1fr] gap-4">
@@ -141,3 +165,11 @@ function Item({ label, value }: { label: string; value?: string | null }) {
     </div>
   )
 }
+
+/*
+Manual test cases:
+1) /profile で入力→確認→「この内容で診断」→ /profile/result へ遷移し、保存が反映される。
+2) /profile/confirm を直叩き→ /profile にリダイレクトされる。
+3) /api/profile/diagnose を強制500にするとエラー文言が表示される。
+4) /api/profile/save が404でも遷移は続行、画面下にエラー文言が出る。
+*/

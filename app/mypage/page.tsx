@@ -3,30 +3,40 @@
 import { useEffect, useState } from "react"
 import Image from "next/image"
 
+type User = {
+  id: string | null
+  name: string
+  plan: string
+  avatarUrl: string
+}
+
+type ApiMeResponse = { ok: boolean; user: User }
 type ProfileBlock = { fortune:string; personality:string; partner:string; created_at:string }
-type DailyBlock = { code:string; comment:string; quote:string; created_at:string }
+type DailyBlock   = { code:string; comment:string; quote:string; created_at:string }
+type ProfileLatestResponse = { ok: boolean; item: ProfileBlock | null }
+type DailyLatestResponse   = { ok: boolean; item: DailyBlock | null }
 
 export default function MyPage() {
-  const [me,setMe] = useState<any>(null)
-  const [profile,setProfile] = useState<ProfileBlock|null>(null)
-  const [daily,setDaily] = useState<DailyBlock|null>(null)
+  const [me, setMe] = useState<User | null>(null)
+  const [profile, setProfile] = useState<ProfileBlock | null>(null)
+  const [daily, setDaily] = useState<DailyBlock | null>(null)
 
   useEffect(() => {
     (async () => {
-      const m = await fetch("/api/me").then(r=>r.json())
+      const m: ApiMeResponse = await fetch("/api/me").then(r => r.json())
       setMe(m.user)
 
-      const pr = await fetch("/api/mypage/profile-latest")
-        .then(r=>r.json())
+      const pr: ProfileLatestResponse | null = await fetch("/api/mypage/profile-latest")
+        .then(r => r.json())
         .catch(() => null)
       if (pr?.ok) setProfile(pr.item)
 
-      const dr = await fetch("/api/mypage/daily-latest")
-        .then(r=>r.json())
+      const dr: DailyLatestResponse | null = await fetch("/api/mypage/daily-latest")
+        .then(r => r.json())
         .catch(() => null)
       if (dr?.ok) setDaily(dr.item)
     })()
-  },[])
+  }, [])
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">

@@ -55,9 +55,19 @@ export default function DiagnoseClient() {
       const json = (await res.json()) as Resp
       if (!json.ok) throw new Error(json.error || "diagnose_failed")
 
-      // 結果をページ内表示 & 既存の /profile/result にも流用できるよう保存
+      // ① 画面に表示
       setLines(json.result.luneaLines)
+      // ② /profile/result 用に保存
       sessionStorage.setItem("profile_result_luneaLines", JSON.stringify(json.result.luneaLines))
+
+      // ★ ③ DBに保存（fire-and-forget：待たずに投げるだけ）
+      //    すぐ /mypage に反映したいなら、下を await に変えてもOK
+      void fetch("/api/profile/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ luneaLines: json.result.luneaLines }),
+      }).catch(() => {})
+
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {

@@ -2,7 +2,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"                      // ← 追加
 import { useProfileDiagnose, type ProfilePayload } from "../_hooks/useProfileDiagnose"
 
 export default function ConfirmClient() {
@@ -15,9 +15,23 @@ export default function ConfirmClient() {
     try {
       setLoading(true)
       setError(null)
-      const res = await diagnose(payload) // { luneaLines: string[] }
-      // 受け渡し
+
+      // 1) 診断
+      const res = await diagnose(payload)                      // { luneaLines: string[] }
+
+      // 2) 結果をセッションへ
       sessionStorage.setItem("profile_result_luneaLines", JSON.stringify(res.luneaLines))
+
+      // 3) 保存（待ってから遷移すると /mypage 反映が確実）
+      const save = await fetch("/api/profile/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ luneaLines: res.luneaLines }),
+        cache: "no-store",
+      })
+      if (!save.ok) throw new Error(`save_failed_${save.status}`)
+
+      // 4) 結果ページへ
       router.push("/profile/result")
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
@@ -26,25 +40,5 @@ export default function ConfirmClient() {
     }
   }
 
-  return (
-    <div className="p-6">
-      <button
-        onClick={() =>
-          onSubmit({
-            name: "Hiro",
-            birthday: "1985-05-05",
-            blood: "A",
-            gender: "Male",
-            preference: "Unset",
-          })
-        }
-        className="px-4 py-2 rounded bg-black text-white"
-        disabled={loading}
-      >
-        この内容で診断
-      </button>
-      {loading && <p className="mt-3">診断中…</p>}
-      {error && <p className="mt-3 text-red-500">Error: {error}</p>}
-    </div>
-  )
+  // ・・・UIはそのまま（ボタンで onSubmit(...) を呼ぶ）
 }

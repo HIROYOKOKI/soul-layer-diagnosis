@@ -1,14 +1,10 @@
+// app/api/profile/save/route.ts
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE!
-)
+import { getSupabaseAdmin } from "@/lib/supabase-admin"
 
 type Body = {
   name: string
-  birthday: string   // YYYY-MM-DD
+  birthday: string
   blood: string
   gender: string
   preference?: string | null
@@ -23,6 +19,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok:false, error:"missing_params" }, { status:400 })
     }
 
+    const supabase = getSupabaseAdmin()
+    if (!supabase) {
+      return NextResponse.json(
+        { ok:false, error:"supabase_env_missing" },
+        { status:500 }
+      )
+    }
+
     const { data, error } = await supabase
       .from("profiles")
       .insert({ name, birthday, blood, gender, preference: preference ?? null })
@@ -30,7 +34,10 @@ export async function POST(req: Request) {
       .single()
 
     if (error) {
-      return NextResponse.json({ ok:false, error:"insert_failed", detail:error.message }, { status:500 })
+      return NextResponse.json(
+        { ok:false, error:"insert_failed", detail:error.message },
+        { status:500 }
+      )
     }
 
     return NextResponse.json({ ok:true, profileId: data.id })

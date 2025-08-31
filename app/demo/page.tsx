@@ -38,7 +38,7 @@ function LuneaBubble({
 }) {
   return (
     <div className="flex items-start gap-3">
-      {/* ルネア静止アイコン */}
+      {/* ルネア静止アイコン（サイズはそのまま） */}
       <div className="relative h-12 w-12 overflow-hidden rounded-full ring-1 ring-white/15 shrink-0">
         <Image src="/lunea.png" alt="ルネア" fill sizes="64px" className="object-cover object-top" />
       </div>
@@ -100,14 +100,15 @@ export default function DemoPage() {
   // 初回はイントロ2つを順送り
   useEffect(() => {
     if (phase !== "intro1") return
-    const t = setTimeout(() => setPhase("intro2"), 1200) // タイプ終盤で切替
+    const t = setTimeout(() => setPhase("intro2"), 1200) // タイプ終盤で切替（速度そのまま）
     return () => clearTimeout(t)
   }, [phase])
 
+  // 質問→思考→結果（thinking をしっかり見せるため delay を延長）
   const pick = (code: Code) => {
     setPicked(code)
     setPhase("thinking")
-    setTimeout(() => setPhase("result"), 650)
+    setTimeout(() => setPhase("result"), 1800) // ← 650ms → 1800ms に延長（速度は変更なし）
   }
 
   const resultText: Record<Code, string> = {
@@ -128,6 +129,7 @@ export default function DemoPage() {
         <div className="mx-auto flex items-center justify-between px-4 py-3 w-full max-w-[720px]">
           <span className="font-semibold text-sm tracking-wide">SOUL LAYER DIAGNOSIS</span>
           <span className="text-xs text-white/60">ルネア診断</span>
+          {/* アイコンの大きさはそのまま */}
           <div className="relative h-12 w-12 overflow-hidden rounded-full ring-1 ring-white/15">
             <Image src="/icon-512.png" alt="LUNEA Symbol" fill sizes="64px" className="object-cover" />
           </div>
@@ -139,11 +141,20 @@ export default function DemoPage() {
         <section className="mt-4 space-y-3">
           {/* イントロ2段：順送りでタイプライター */}
           {phase === "intro1" && (
-            <LuneaBubble key="intro1" text="はじめまして。わたしはルネア。魂の層を観測するナビゲータだよ。" animate speed={150} />
+            <LuneaBubble
+              key="intro1"
+              text="はじめまして。わたしはルネア。魂の層を観測するナビゲータだよ。"
+              animate
+              speed={150}
+            />
           )}
           {phase !== "intro1" && (
             <>
-              <LuneaBubble key="intro1_static" text="観測が終わったよ。これが、きみの“現在の層”の響きだ。" />
+              {/* ここは挨拶の固定表示（結果セリフは入れない） */}
+              <LuneaBubble
+                key="intro1_static"
+                text="はじめまして。わたしはルネア。魂の層を観測するナビゲータだよ。"
+              />
               {phase === "intro2" && (
                 <LuneaBubble key="intro2" text="きみの“いま”を静かに映してみようか。" animate speed={150} />
               )}
@@ -152,21 +163,49 @@ export default function DemoPage() {
 
           {/* 質問／思考／結果 */}
           {phase === "ask" && (
-            <LuneaBubble key="ask" text="Q1. きょう、きみはどんな光で在りたい？直感で選んでみて。" animate speed={200} />
+            <LuneaBubble
+              key="ask"
+              text="Q1. きょう、きみはどんな光で在りたい？直感で選んでみて。"
+              animate
+              speed={200}
+            />
           )}
+
           {phase === "thinking" && (
-            <LuneaBubble key="thinking" text="…観測中。きみの選んだ光の軌跡を読み解いているよ。" animate speed={200} />
+            <LuneaBubble
+              key="thinking"
+              text="…観測中。きみの選んだ光の軌跡を読み解いているよ。"
+              animate
+              speed={200}
+            />
           )}
+
           {phase === "result" && picked && (
             <>
-              <LuneaBubble key="result-lead" text="その選択が、きみの“今”を教えてくれたよ。" animate speed={200} />
+              {/* セリフ① → セリフ② の順。速度・アイコンサイズはそのまま */}
+              <LuneaBubble
+                key="result-1"
+                text="観測が終わったよ。これが、きみの“現在の層”の響きだ。"
+                animate
+                speed={200}
+              />
+              <LuneaBubble
+                key="result-2"
+                text="その選択が、きみの“いま”を教えてくれたよ。"
+                animate
+                speed={200}
+              />
+
               <div className="w-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="text-sm text-sky-300">結果：{picked} が高め</div>
                 <div className="mt-1 text-white/90">{resultText[picked]}</div>
                 <div className="mt-2 text-xs text-white/60 italic">「どこかに必ず詩がある。」</div>
                 <div className="mt-4 flex gap-2">
                   <button
-                    onClick={() => { setPicked(null); setPhase("ask") }}
+                    onClick={() => {
+                      setPicked(null)
+                      setPhase("ask")
+                    }}
                     className="rounded-lg border border-white/10 px-3 py-2 text-xs hover:bg-white/5"
                   >
                     もう一度
@@ -193,9 +232,7 @@ export default function DemoPage() {
       </main>
 
       {/* フェーズ遷移：intro2 完了で ask へ */}
-      {phase === "intro2" && (
-        <PhaseAdvance onDone={() => setPhase("ask")} delay={900} />
-      )}
+      {phase === "intro2" && <PhaseAdvance onDone={() => setPhase("ask")} delay={900} />}
     </div>
   )
 }

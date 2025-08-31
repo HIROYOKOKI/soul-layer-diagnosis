@@ -176,3 +176,45 @@ export default function MyPageClient() {
     </div>
   )
 }
+function EVAEPreviewRadar() {
+  // 0〜1 の仮スコア（後でDBに接続）
+  const scores = { E: 0.7, V: 0.4, "Λ": 0.6, "Ǝ": 0.5 } as const
+  const keys = ["E", "V", "Λ", "Ǝ"] as const
+  const size = 220, cx = size/2, cy = size/2, r = 90
+
+  const angle = (i: number) => (Math.PI * 2 * i) / keys.length - Math.PI / 2
+  const pt = (k: (typeof keys)[number], i: number) => {
+    const rr = r * scores[k]
+    return [cx + rr * Math.cos(angle(i)), cy + rr * Math.sin(angle(i))]
+  }
+  const poly = keys.map((k, i) => pt(k, i).join(",")).join(" ")
+
+  return (
+    <div className="p-4 rounded-2xl shadow bg-white">
+      <h2 className="font-semibold text-lg mb-2">構造バランス（プレビュー）</h2>
+      <svg width={size} height={size} className="block">
+        {/* グリッド（白30%・1px相当） */}
+        {[0.3, 0.6, 1].map((t, idx) => (
+          <circle key={idx} cx={cx} cy={cy} r={r * t} fill="none" stroke="rgba(0,0,0,.12)" strokeWidth="1" />
+        ))}
+        {/* 軸 */}
+        {keys.map((_, i) => (
+          <line key={i}
+                x1={cx} y1={cy}
+                x2={cx + r * Math.cos(angle(i))}
+                y2={cy + r * Math.sin(angle(i))}
+                stroke="rgba(0,0,0,.12)" strokeWidth="1" />
+        ))}
+        {/* ポリゴン（4色グラデの代替：薄色塗り） */}
+        <polygon points={poly} fill="rgba(0,0,0,.06)" stroke="rgba(0,0,0,.35)" strokeWidth="2" />
+        {/* ラベル */}
+        {keys.map((k, i) => {
+          const [x, y] = [cx + (r + 14) * Math.cos(angle(i)), cy + (r + 14) * Math.sin(angle(i))]
+          return <text key={k} x={x} y={y} textAnchor="middle" dominantBaseline="middle" fontSize="12">{k}</text>
+        })}
+      </svg>
+      <p className="text-xs text-gray-500 mt-2">※ スコア未接続（後でDB値に置換）</p>
+    </div>
+  )
+}
+

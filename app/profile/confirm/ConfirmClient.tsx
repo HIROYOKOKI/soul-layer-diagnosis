@@ -4,10 +4,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
-// NOTE: The previous build failed because the module "../_hooks/useProfileDiagnose"
-// could not be resolved. To make this component self-contained (and robust to
-// path/structure changes), the diagnose logic is inlined here.
-
 export type ProfilePayload = {
   name: string
   birthday: string // YYYY-MM-DD
@@ -17,7 +13,6 @@ export type ProfilePayload = {
   theme?: string | null
 }
 
-// Inlined diagnose function (used to be provided by useProfileDiagnose hook)
 async function diagnoseProfile(payload: ProfilePayload): Promise<{ luneaLines: string[] }> {
   const res = await fetch("/api/profile/diagnose", {
     method: "POST",
@@ -54,7 +49,7 @@ export default function ConfirmClient() {
     try {
       setLoading(true); setError(null)
 
-      const res = await diagnoseProfile(p) // { luneaLines: string[] }
+      const res = await diagnoseProfile(p)
       sessionStorage.removeItem("profile_pending")
       sessionStorage.setItem("profile_result_luneaLines", JSON.stringify(res.luneaLines))
 
@@ -87,17 +82,19 @@ export default function ConfirmClient() {
         <div className="absolute inset-x-0 top-[44%] h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
       </div>
 
-      {/* ヘッダー */}
-      <header className="flex items-center justify-between px-5 py-6 max-w-6xl mx-auto">
-        <div className="flex items-center gap-3">
-          <span
-            className="h-8 w-8 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 ring-1 ring-sky-300/40 shadow-[0_0_22px_rgba(56,189,248,.65)]"
-            aria-hidden
-          />
-          <span className="text-[15px] md:text-base tracking-[0.18em] font-semibold">
-            SOUL LAYER DIAGNOSIS
-          </span>
-        </div>
+      {/* ヘッダー：青光アイコン + ロゴ画像 */}
+      <header className="flex items-center gap-4 px-5 py-6 max-w-6xl mx-auto">
+        {/* 青光アイコン */}
+        <span
+          className="h-8 w-8 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 ring-1 ring-sky-300/40 shadow-[0_0_22px_rgba(56,189,248,.65)]"
+          aria-hidden
+        />
+        {/* ロゴ画像 */}
+        <img
+          src="/soul-layer-diagnosis.png"
+          alt="Soul Layer Diagnosis"
+          className="h-6 w-auto"
+        />
       </header>
 
       {/* 本文 */}
@@ -147,8 +144,8 @@ export default function ConfirmClient() {
           </button>
         </div>
 
-        {/* フッター（小さく） */}
-        <footer className="mt-12 pb-10 text-[11px] opacity-70">
+        {/* フッター：中央配置 */}
+        <footer className="mt-12 pb-10 text-[11px] opacity-70 text-center">
           © EVΛƎ PROJECT
         </footer>
       </div>
@@ -156,7 +153,6 @@ export default function ConfirmClient() {
   )
 }
 
-/* ラベル薄／値標準 */
 function Item({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="grid grid-cols-[120px_1fr] gap-4">

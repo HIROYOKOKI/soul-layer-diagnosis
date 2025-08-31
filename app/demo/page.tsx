@@ -39,16 +39,16 @@ export default function DemoPage() {
       if (!j.ok) throw new Error("api_failed")
       setLines(j.result.luneaLines)
     } catch {
-      // フォールバック
-      setLines([
-        { label:"観測", text:"今日は観測が強い日。静かに全体像を見るほど、答えは輪郭を表す。" },
-        { label:"運勢", text:"焦らず一歩ずつ。昨日の選択が今日の追い風になっている。" },
-        { label:"性格", text:"あなたの核はやさしさと粘り強さ。小さな配慮が場を変える。" },
-        { label:"理想", text:"『丁寧さ』と『スピード』の両立。今日は“手放す”勇気も選択肢。" },
-        { label:"締め", text:"観測→選択→行動。波を起こすのは、あなたの一呼吸。" },
-      ])
-    } finally { setLoading(false) }
-  }
+    async function runDemo() {
+  setLines([
+    { label:"観測", text:"今日は観測が強い日。静かに全体像を見るほど、答えは輪郭を表す。" },
+    { label:"運勢", text:"焦らず一歩ずつ。昨日の選択が今日の追い風になっている。" },
+    { label:"性格", text:"あなたの核はやさしさと粘り強さ。小さな配慮が場を変える。" },
+    { label:"理想", text:"『丁寧さ』と『スピード』の両立。今日は“手放す”勇気も選択肢。" },
+    { label:"締め", text:"観測→選択→行動。波を起こすのは、あなたの一呼吸。" },
+  ])
+  setStep(0)
+}
 
   const visible = lines ? lines.slice(0, step + 1) : []
 

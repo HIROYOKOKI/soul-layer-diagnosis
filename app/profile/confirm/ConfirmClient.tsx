@@ -82,19 +82,11 @@ export default function ConfirmClient() {
         <div className="absolute inset-x-0 top-[44%] h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
       </div>
 
-      {/* ヘッダー：青光アイコン + ロゴ画像 */}
-      <header className="flex items-center gap-4 px-5 py-6 max-w-6xl mx-auto">
-        {/* 青光アイコン */}
-        <span
-          className="h-8 w-8 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 ring-1 ring-sky-300/40 shadow-[0_0_22px_rgba(56,189,248,.65)]"
-          aria-hidden
-        />
-        {/* ロゴ画像 */}
-        <img
-          src="/soul-layer-diagnosis.png"
-          alt="Soul Layer Diagnosis"
-          className="h-6 w-auto"
-        />
+      {/* ヘッダー：テキストのみ */}
+      <header className="flex items-center justify-center px-5 py-6 max-w-6xl mx-auto">
+        <span className="text-[15px] md:text-base tracking-[0.18em] font-semibold">
+          SOUL LAYER DIAGNOSIS
+        </span>
       </header>
 
       {/* 本文 */}
@@ -146,7 +138,7 @@ export default function ConfirmClient() {
 
         {/* フッター：中央配置 */}
         <footer className="mt-12 pb-10 text-[11px] opacity-70 text-center">
-          © EVΛƎ PROJECT
+          © 2025 EVΛƎ PROJECT
         </footer>
       </div>
     </main>

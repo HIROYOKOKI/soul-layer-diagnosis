@@ -82,27 +82,33 @@ export default function ConfirmClient() {
         <div className="absolute inset-x-0 top-[44%] h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
       </div>
 
-      {/* ヘッダー：青光アイコン + テキスト */}
-      <header className="flex items-center gap-3 px-5 py-6 max-w-6xl mx-auto">
-        {/* 青光アイコン */}
-        <span
-          className="h-8 w-8 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 ring-1 ring-sky-300/40 shadow-[0_0_22px_rgba(56,189,248,.65)]"
-          aria-hidden
-        />
-        {/* テキスト */}
-        <span className="text-[15px] md:text-base tracking-[0.18em] font-semibold">
-          SOUL LAYER DIAGNOSIS
-        </span>
+      {/* ヘッダー：SOUL LAYER DIAGNOSIS（左）＋ ルネア診断・青光アイコン（右） */}
+      <header className="px-5 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 max-w-6xl mx-auto flex items-center justify-between">
+        {/* 左：ブランドテキスト */}
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-[15px] md:text-base tracking-[0.18em] font-semibold whitespace-nowrap">
+            SOUL LAYER DIAGNOSIS
+          </span>
+        </div>
+        {/* 右：サブラベル＋青光アイコン */}
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="text-xs opacity-75 hidden xs:inline">ルネア診断</span>
+          <span
+            className="h-8 w-8 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 ring-1 ring-sky-300/40 shadow-[0_0_22px_rgba(56,189,248,.65)] shrink-0"
+            aria-hidden
+          />
+        </div>
       </header>
 
       {/* 本文 */}
-      <div className="mx-auto max-w-5xl px-5">
-        <h1 className="text-2xl font-bold tracking-wide">入力内容の確認</h1>
-        <p className="text-sm opacity-70 mt-1">送信前にもう一度ご確認ください。</p>
+      <div className="mx-auto w-full max-w-[720px] px-5 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+24px)]">
+        {/* タイトル */}
+        <h1 className="mt-1 text-[22px] sm:text-2xl font-bold tracking-wide">入力内容の確認</h1>
+        <p className="text-sm opacity-75 mt-1">送信前にもう一度ご確認ください。</p>
 
-        {/* 情報カード */}
-        <section className="mt-6 max-w-2xl rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6 shadow-[0_10px_40px_rgba(0,0,0,.35)]">
-          <dl className="grid gap-3 text-[15px] leading-relaxed">
+        {/* 情報カード（読みやすい幅・余白拡張・角を少し大きく） */}
+        <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-6 sm:p-7 shadow-[0_20px_60px_rgba(0,0,0,.45)]">
+          <dl className="grid gap-3 sm:gap-3.5 text-[15px] leading-[1.9]">
             <Item label="名前"     value={p.name} />
             <Item label="誕生日"   value={p.birthday} />
             <Item label="血液型"   value={p.blood} />
@@ -115,26 +121,25 @@ export default function ConfirmClient() {
           )}
         </section>
 
-        {/* カード外：横並びボタン */}
-        <div className="mt-8 flex flex-wrap items-center gap-6">
-          {/* 修正する：常時黒、hoverで背景と文字色反転 */}
+        {/* カード外：ボタンは中央寄せ／モバイルは縦、タブレット以上で横並び */}
+        <div className="mt-8 flex flex-col sm:flex-row justify-center items-stretch sm:items-center gap-4 sm:gap-6">
+          {/* 修正する：常時黒、hoverで反転。モバイルは幅いっぱい */}
           <button
             onClick={() => router.push("/profile")}
-            className="h-12 px-8 rounded-full bg-black text-white border border-white/20 hover:bg-white hover:text-black transition font-medium"
+            className="h-12 w-full sm:w-auto px-6 rounded-full bg-black text-white border border-white/20 hover:bg-white hover:text-black transition font-medium"
           >
             修正する
           </button>
 
-          {/* この内容で診断：Glow Primary */}
+          {/* この内容で診断：Glow Primary。モバイルは幅いっぱい */}
           <button
             onClick={handleConfirm}
             disabled={loading}
             className={[
               "btn-primary",
-              "h-12 px-10 rounded-full font-extrabold tracking-wide uppercase",
+              "h-12 w-full sm:w-auto px-8 rounded-full font-extrabold tracking-wide uppercase",
               "bg-gradient-to-r from-sky-500 to-indigo-500",
-              "text-white shadow-[0_0_22px_rgba(79,70,229,.55)]",
-              "hover:shadow-[0_0_30px_rgba(79,70,229,.85)]",
+              "text-white shadow-[0_0_22px_rgba(79,70,229,.55)] hover:shadow-[0_0_30px_rgba(79,70,229,.85)]",
               "transition disabled:opacity-60"
             ].join(" ")}
           >
@@ -142,8 +147,8 @@ export default function ConfirmClient() {
           </button>
         </div>
 
-        {/* フッター：中央配置 */}
-        <footer className="mt-12 pb-10 text-[11px] opacity-70 text-center">
+        {/* フッター：中央配置（下部余白を多めに） */}
+        <footer className="mt-10 sm:mt-12 pb-4 text-[11px] opacity-70 text-center">
           © 2025 EVΛƎ PROJECT
         </footer>
       </div>

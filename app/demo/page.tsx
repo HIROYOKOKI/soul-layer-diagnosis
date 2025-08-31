@@ -143,7 +143,7 @@ export default function DemoPage() {
           )}
           {phase !== "intro1" && (
             <>
-              <LuneaBubble key="intro1_static" text="はじめまして。わたしはルネア。魂の層を観測するナビゲータだよ。" />
+              <LuneaBubble key="intro1_static" text="観測が終わったよ。これが、きみの“現在の層”の響きだ。" />
               {phase === "intro2" && (
                 <LuneaBubble key="intro2" text="きみの“いま”を静かに映してみようか。" animate speed={150} />
               )}
@@ -159,7 +159,7 @@ export default function DemoPage() {
           )}
           {phase === "result" && picked && (
             <>
-              <LuneaBubble key="result-lead" text="観測が終わった。これが、きみの“現在の層”の響きだよ。" animate speed={200} />
+              <LuneaBubble key="result-lead" text="その選択が、きみの“今”を教えてくれたよ。" animate speed={200} />
               <div className="w-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="text-sm text-sky-300">結果：{picked} が高め</div>
                 <div className="mt-1 text-white/90">{resultText[picked]}</div>

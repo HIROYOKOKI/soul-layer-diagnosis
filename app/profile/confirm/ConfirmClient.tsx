@@ -1,114 +1,82 @@
-// app/profile/confirm/ConfirmClient.tsx
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useState } from 'react'
+import { useProfileDiagnose, type ProfilePayload } from './_hooks/useProfileDiagnose'
 
-export default function ConfirmClient() {
-  const sp = useSearchParams()
-  const router = useRouter()
+export default function ProfileFormClient() {
+  const diagnose = useProfileDiagnose()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // URL パラメータ
-  const name = sp.get('name') || '—'
-  const birthday = sp.get('birthday') || '—'
-  const blood = sp.get('blood') || '—'
-  const gender = sp.get('gender') || '—'
-  const preference = sp.get('preference') || '—'
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
 
-  // 直リンク対策（全部—なら入力へ）
-  const allEmpty = useMemo(
-    () => [name, birthday, blood, gender, preference].every(v => v === '—'),
-    [name, birthday, blood, gender, preference]
-  )
-  useEffect(() => {
-    if (allEmpty) router.replace('/profile')
-  }, [allEmpty, router])
+    const f = new FormData(e.currentTarget)
+    const payload: ProfilePayload = {
+      name: String(f.get('name') || ''),
+      birthday: String(f.get('birthday') || ''),
+      blood: String(f.get('blood') || ''),
+      gender: String(f.get('gender') || ''),
+      preference: (String(f.get('preference') || '') || null),
+    }
 
-  // 送信制御
-  const [submitting, setSubmitting] = useState(false)
-  const isValid = useMemo(() => {
-    return name !== '—' && birthday !== '—' && blood !== '—' && gender !== '—'
-  }, [name, birthday, blood, gender])
-
-  async function handleSubmit() {
-  if (!isValid || submitting) return
-
-  setSubmitting(true)
-  try {
-    const payload = { name, birthday, blood, gender, preference }
-    const res = await fetch('/api/profile/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) throw new Error('save failed')
-
-    const json: { id: string } = await res.json()
-
-    // （任意）速表示用の控え：直リンクでもOKだが、将来は不要にできる
-    sessionStorage.setItem('profile:last', JSON.stringify(payload))
-
-    // ← id で結果ページへ
-    router.push(`/profile/result?id=${encodeURIComponent(json.id)}`)
-  } catch (_err) {
-    alert('保存に失敗しました。通信環境をご確認ください。')
-  } finally {
-    setSubmitting(false)
+    try {
+      await diagnose(payload)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
   return (
-    <div className="min-h-screen flex flex-col bg-black text-white">
-      {/* Header */}
-      <header className="w-full p-4 flex justify-center">
-        <img src="/evae-logo.svg" alt="EVΛƎ" className="h-8" />
-      </header>
+    <form onSubmit={handleSubmit} className="max-w-xl mx-auto grid gap-4 p-6">
+      <h1 className="text-xl font-bold">プロフィール入力</h1>
 
-      {/* Main */}
-      <main className="flex flex-1 items-center justify-center px-4">
-        <div className="bg-neutral-900/70 rounded-xl p-6 shadow-lg border border-white/10 w-full max-w-md">
-          <h2 className="text-center text-lg font-bold mb-4">入力確認</h2>
-          <ul className="space-y-2 text-sm">
-            <li className="flex justify-between"><span>NAME</span><span>{name}</span></li>
-            <li className="flex justify-between"><span>DATE OF BIRTH</span><span>{birthday}</span></li>
-            <li className="flex justify-between"><span>BLOOD TYPE</span><span>{blood}</span></li>
-            <li className="flex justify-between"><span>GENDER</span><span>{gender}</span></li>
-            <li className="flex justify-between"><span>PREFERENCE</span><span>{preference}</span></li>
-          </ul>
+      <label className="grid gap-1 text-sm">
+        <span>名前</span>
+        <input name="name" type="text" required className="px-3 py-2 rounded-lg bg-white/5 border border-white/10" />
+      </label>
 
-          <div className="mt-6 flex justify-between gap-3">
-            <button
-              onClick={() => router.back()}
-              className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition"
-            >
-              戻る
-            </button>
+      <label className="grid gap-1 text-sm">
+        <span>誕生日</span>
+        <input name="birthday" type="date" required className="px-3 py-2 rounded-lg bg-white/5 border border-white/10" />
+      </label>
 
-            <button
-              onClick={handleSubmit}
-              disabled={!isValid || submitting}
-              aria-disabled={!isValid || submitting}
-              className={`px-4 py-2 rounded-lg transition
-                ${(!isValid || submitting)
-                  ? 'bg-white/20 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-blue-500 to-pink-500 hover:opacity-90'}`}
-            >
-              {submitting ? '送信中…' : '送信'}
-            </button>
-          </div>
+      <label className="grid gap-1 text-sm">
+        <span>血液型</span>
+        <select name="blood" className="px-3 py-2 rounded-lg bg-white/5 border border-white/10">
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="O">O</option>
+          <option value="AB">AB</option>
+        </select>
+      </label>
 
-          {!isValid && (
-            <p className="mt-3 text-xs text-red-400">
-              必須項目（NAME / DATE OF BIRTH / BLOOD TYPE / GENDER）が未入力です。
-            </p>
-          )}
-        </div>
-      </main>
+      <label className="grid gap-1 text-sm">
+        <span>性別</span>
+        <select name="gender" className="px-3 py-2 rounded-lg bg-white/5 border border-white/10">
+          <option value="Male">男性</option>
+          <option value="Female">女性</option>
+          <option value="Other">その他</option>
+        </select>
+      </label>
 
-      {/* Footer */}
-      <footer className="w-full py-4 text-center text-xs text-white/40">
-        © 2025 Soul Layer Log
-      </footer>
-    </div>
+      <label className="grid gap-1 text-sm">
+        <span>恋愛対象（任意）</span>
+        <input name="preference" type="text" placeholder="例: 女性 / 男性 / 指定なし"
+               className="px-3 py-2 rounded-lg bg-white/5 border border-white/10" />
+      </label>
+
+      <div className="flex items-center gap-3 pt-2">
+        <button disabled={loading} type="submit"
+                className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10">
+          {loading ? '診断中…' : '診断する'}
+        </button>
+        {error && <p className="text-sm text-red-400">エラー：{error}</p>}
+      </div>
+    </form>
   )
 }

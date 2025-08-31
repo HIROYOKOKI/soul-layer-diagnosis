@@ -1,14 +1,7 @@
-// app/api/profile/diagnose/route.ts
 import { NextResponse } from "next/server"
 import { getOpenAI } from "../../../../lib/openai"
 
-type Body = {
-  name: string
-  birthday: string
-  blood: "A" | "B" | "O" | "AB"
-  gender: "Male" | "Female" | "Other"
-  preference?: string | null
-}
+type Body = { name:string; birthday:string; blood:"A"|"B"|"O"|"AB"; gender:"Male"|"Female"|"Other"; preference?:string|null }
 
 function buildPrompt(b: Body) {
   return `以下の人物に向けて、LUNEAの口調で5行の短いガイダンスを出してください。
@@ -29,19 +22,10 @@ export async function POST(req: Request) {
       ],
     })
     const content = resp.choices[0]?.message?.content ?? ""
-    const luneaLines = content
-      .split(/\n+/)
-      .map(s => s.replace(/^\s*[-・●\d\.]+\s*/, ""))
-      .filter(Boolean)
-      .slice(0, 5)
-
-    return NextResponse.json({ ok: true, result: { luneaLines } })
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
+    const luneaLines = content.split(/\n+/).map(s=>s.replace(/^\s*[-・●\d\.]+\s*/,"")).filter(Boolean).slice(0,5)
+    return NextResponse.json({ ok:true, result:{ luneaLines } })
+  } catch(e:any) {
+    return NextResponse.json({ ok:false, error: String(e?.message ?? e) }, { status:500 })
   }
 }
-
-export async function GET() {
-  return NextResponse.json({ ok: true })
-}
+export async function GET(){ return NextResponse.json({ ok:true }) }

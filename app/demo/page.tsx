@@ -7,7 +7,7 @@ import { useEffect, useState } from "react"
 /* =========================
    Typewriter (hooks-safe)
    ========================= */
-function TypeLine({ text, speed = 100 }: { text: string; speed?: number }) {
+function TypeLine({ text, speed = 150 }: { text: string; speed?: number }) {
   const [display, setDisplay] = useState("")
   useEffect(() => {
     setDisplay("")
@@ -30,7 +30,7 @@ type Choice = { code: Code; label: string }
 function LuneaBubble({
   text,
   animate = false,
-  speed = 100,
+  speed = 150,
 }: {
   text: string
   animate?: boolean
@@ -139,27 +139,27 @@ export default function DemoPage() {
         <section className="mt-4 space-y-3">
           {/* イントロ2段：順送りでタイプライター */}
           {phase === "intro1" && (
-            <LuneaBubble key="intro1" text="はじめまして。わたしはルネア。魂の層を観測するナビゲータだよ。" animate speed={38} />
+            <LuneaBubble key="intro1" text="はじめまして。わたしはルネア。魂の層を観測するナビゲータだよ。" animate speed={150} />
           )}
           {phase !== "intro1" && (
             <>
               <LuneaBubble key="intro1_static" text="はじめまして。わたしはルネア。魂の層を観測するナビゲータだよ。" />
               {phase === "intro2" && (
-                <LuneaBubble key="intro2" text="きみの“いま”を静かに映してみようか。" animate speed={100} />
+                <LuneaBubble key="intro2" text="きみの“いま”を静かに映してみようか。" animate speed={150} />
               )}
             </>
           )}
 
           {/* 質問／思考／結果 */}
           {phase === "ask" && (
-            <LuneaBubble key="ask" text="Q1. きょう、きみはどんな光で在りたい？直感で選んでみて。" animate speed={100} />
+            <LuneaBubble key="ask" text="Q1. きょう、きみはどんな光で在りたい？直感で選んでみて。" animate speed={150} />
           )}
           {phase === "thinking" && (
-            <LuneaBubble key="thinking" text="…観測中。きみの選んだ光の軌跡を読み解いているよ。" animate speed={100} />
+            <LuneaBubble key="thinking" text="…観測中。きみの選んだ光の軌跡を読み解いているよ。" animate speed={150} />
           )}
           {phase === "result" && picked && (
             <>
-              <LuneaBubble key="result-lead" text="観測が終わった。これが、きみの“現在の層”の響きだよ。" animate speed={100} />
+              <LuneaBubble key="result-lead" text="観測が終わった。これが、きみの“現在の層”の響きだよ。" animate speed={150} />
               <div className="w-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="text-sm text-sky-300">結果：{picked} が高め</div>
                 <div className="mt-1 text-white/90">{resultText[picked]}</div>

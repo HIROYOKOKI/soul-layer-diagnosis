@@ -1,30 +1,28 @@
-'use client'
-
-import { useRouter } from 'next/navigation'
+// app/profile/_hooks/useProfileDiagnose.ts
+"use client"
 
 export type ProfilePayload = {
   name: string
-  birthday: string      // YYYY-MM-DD
+  birthday: string
   blood: string
   gender: string
   preference?: string | null
 }
 
-type LuneaLine = { type: string; label: string; text: string }
-type DiagnoseResp = { ok: boolean; result?: { luneaLines: LuneaLine[] }; error?: string }
+type DiagnoseOk = { ok: true; result: { luneaLines: string[] } }
+type DiagnoseErr = { ok: false; error: string }
+type DiagnoseResp = DiagnoseOk | DiagnoseErr
 
 export function useProfileDiagnose() {
-  const router = useRouter()
-  return async function onSubmit(payload: ProfilePayload) {
-    const res = await fetch('/api/profile/diagnose', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+  return async function diagnose(payload: ProfilePayload): Promise<{ luneaLines: string[] }> {
+    const res = await fetch("/api/profile/diagnose", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     })
-    const json: DiagnoseResp = await res.json()
-    if (!json?.ok || !json.result) throw new Error(json?.error || '診断に失敗しました')
-
-    sessionStorage.setItem('lunea_profile_result', JSON.stringify(json.result.luneaLines))
-    router.push('/profile/result')
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const json = (await res.json()) as DiagnoseResp
+    if ("ok" in json && json.ok) return json.result
+    throw new Error("profile_diagnose_failed")
   }
 }

@@ -4,36 +4,53 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
-// ---- Local GlowButton（エイリアス不要・依存なし）----
+// GlowButton component updated to support variants and states (参考: ButtonsGallery)
 function GlowButton({
   children,
   variant = "primary",
-  className = "",
+  size = "lg",
   fullWidth = false,
+  loading = false,
   disabled,
+  className = "",
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "ghost"
+  variant?: "primary" | "secondary" | "danger" | "ghost"
+  size?: "lg" | "md"
   fullWidth?: boolean
+  loading?: boolean
 }) {
-  const base =
-    "rounded-full transition font-extrabold tracking-wide uppercase h-12 " +
-    (fullWidth ? "w-full " : "w-auto ")
-  const style =
-    variant === "primary"
-      ? "px-8 bg-gradient-to-r from-sky-500 to-indigo-500 text-white " +
-        "shadow-[0_0_18px_rgba(56,189,248,.45)] hover:shadow-[0_0_28px_rgba(56,189,248,.75)] " +
-        "active:translate-y-[1px] disabled:opacity-60"
-      : "px-6 bg-black text-white border border-white/20 hover:bg-white hover:text-black " +
-        "active:translate-y-[1px]"
+  const base = "rounded-full transition font-extrabold tracking-wide uppercase flex items-center justify-center"
+  const width = fullWidth ? "w-full" : "w-auto"
+  const h = size === "md" ? "h-10 px-6 text-sm" : "h-12 px-8"
+
+  let style = ""
+  switch (variant) {
+    case "primary":
+      style = "bg-gradient-to-r from-sky-500 to-indigo-500 text-white shadow-[0_0_18px_rgba(56,189,248,.45)] hover:shadow-[0_0_28px_rgba(56,189,248,.75)]"
+      break
+    case "secondary":
+      style = "bg-gradient-to-r from-gray-500 to-gray-700 text-white hover:shadow-[0_0_18px_rgba(156,163,175,.45)]"
+      break
+    case "danger":
+      style = "bg-gradient-to-r from-red-500 to-pink-600 text-white hover:shadow-[0_0_18px_rgba(239,68,68,.55)]"
+      break
+    case "ghost":
+    default:
+      style = "bg-black text-white border border-white/20 hover:bg-white hover:text-black"
+  }
+
   return (
-    <button disabled={disabled} className={`${base}${style} ${className}`} {...props}>
-      {children}
+    <button
+      disabled={disabled || loading}
+      className={`${base} ${width} ${h} ${style} ${disabled ? "opacity-60" : ""} ${className}`}
+      {...props}
+    >
+      {loading ? "…" : children}
     </button>
   )
 }
 
-// ---- Types / API ----
 export type ProfilePayload = {
   name: string
   birthday: string // YYYY-MM-DD
@@ -106,23 +123,22 @@ export default function ConfirmClient() {
         <div className="absolute inset-x-0 top-[44%] h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
       </div>
 
-      {/* ヘッダー：左テキスト / 右アイコン（safe-area上マージン） */}
+      {/* ヘッダー */}
       <header className="px-5 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 max-w-6xl mx-auto flex items-center justify-between">
         <span className="text-[15px] md:text-base tracking-[0.18em] font-semibold">
           SOUL LAYER DIAGNOSIS
         </span>
         <span
-          className="h-10 w-10 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 ring-1 ring-sky-300/50 shadow-[0_0_28px_rgba(56,189,248,.75)] shrink-0"
+          className="h-8 w-8 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 ring-1 ring-sky-300/40 shadow-[0_0_22px_rgba(56,189,248,.65)] shrink-0"
           aria-hidden
         />
       </header>
 
-      {/* 本文コンテナ（幅を締め、呼吸する余白） */}
+      {/* 本文 */}
       <div className="mx-auto w-full max-w-[680px] px-5 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+24px)]">
         <h1 className="mt-1 text-[22px] sm:text-2xl font-bold tracking-wide">入力内容の確認</h1>
         <p className="text-sm opacity-75 mt-1">送信前にもう一度ご確認ください。</p>
 
-        {/* カード */}
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-6 sm:p-7 shadow-[0_20px_60px_rgba(0,0,0,.45)]">
           <dl className="grid gap-3 sm:gap-3.5 text-[15px] leading-[1.9]">
             <Item label="名前"     value={p.name} />
@@ -137,22 +153,10 @@ export default function ConfirmClient() {
           )}
         </section>
 
-        {/* CTA：常時横並び（狭幅は折り返し） */}
+        {/* CTA：横並び */}
         <div className="mt-8 flex flex-row justify-center items-center gap-4 flex-wrap">
-          <GlowButton
-            variant="ghost"
-            className="min-w-[160px]"
-            onClick={() => router.push("/profile")}
-          >
-            修正する
-          </GlowButton>
-
-          <GlowButton
-            variant="primary"
-            className="min-w-[200px]"
-            disabled={loading}
-            onClick={handleConfirm}
-          >
+          <GlowButton variant="ghost" onClick={() => router.push("/profile")}>修正する</GlowButton>
+          <GlowButton variant="primary" loading={loading} onClick={handleConfirm}>
             {loading ? "診断中…" : "この内容で診断"}
           </GlowButton>
         </div>

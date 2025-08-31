@@ -39,8 +39,8 @@ function LuneaBubble({
   return (
     <div className="flex items-start gap-3">
       {/* ルネア静止アイコン */}
-      <div className="relative h-10 w-10 overflow-hidden rounded-full ring-1 ring-white/15 shrink-0">
-        <Image src="/lunea.png" alt="ルネア" fill sizes="40px" className="object-cover object-top" />
+      <div className="relative h-12 w-12 overflow-hidden rounded-full ring-1 ring-white/15 shrink-0">
+        <Image src="/lunea.png" alt="ルネア" fill sizes="64px" className="object-cover object-top" />
       </div>
 
       {/* 吹き出し */}
@@ -128,8 +128,8 @@ export default function DemoPage() {
         <div className="mx-auto flex items-center justify-between px-4 py-3 w-full max-w-[720px]">
           <span className="font-semibold text-sm tracking-wide">SOUL LAYER DIAGNOSIS</span>
           <span className="text-xs text-white/60">ルネア診断</span>
-          <div className="relative h-8 w-8 overflow-hidden rounded-full ring-1 ring-white/15">
-            <Image src="/icon-512.png" alt="LUNEA Symbol" fill sizes="32px" className="object-cover" />
+          <div className="relative h-12 w-12 overflow-hidden rounded-full ring-1 ring-white/15">
+            <Image src="/icon-512.png" alt="LUNEA Symbol" fill sizes="64px" className="object-cover" />
           </div>
         </div>
       </header>
@@ -152,14 +152,14 @@ export default function DemoPage() {
 
           {/* 質問／思考／結果 */}
           {phase === "ask" && (
-            <LuneaBubble key="ask" text="Q1. きょう、きみはどんな光で在りたい？直感で選んでみて。" animate speed={150} />
+            <LuneaBubble key="ask" text="Q1. きょう、きみはどんな光で在りたい？直感で選んでみて。" animate speed={200} />
           )}
           {phase === "thinking" && (
-            <LuneaBubble key="thinking" text="…観測中。きみの選んだ光の軌跡を読み解いているよ。" animate speed={150} />
+            <LuneaBubble key="thinking" text="…観測中。きみの選んだ光の軌跡を読み解いているよ。" animate speed={200} />
           )}
           {phase === "result" && picked && (
             <>
-              <LuneaBubble key="result-lead" text="観測が終わった。これが、きみの“現在の層”の響きだよ。" animate speed={150} />
+              <LuneaBubble key="result-lead" text="観測が終わった。これが、きみの“現在の層”の響きだよ。" animate speed={200} />
               <div className="w-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="text-sm text-sky-300">結果：{picked} が高め</div>
                 <div className="mt-1 text-white/90">{resultText[picked]}</div>

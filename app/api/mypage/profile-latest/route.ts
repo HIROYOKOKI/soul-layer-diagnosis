@@ -16,9 +16,9 @@ export async function GET() {
     .maybeSingle()
 
   if (error) {
-    return NextResponse.json({ ok:false, error:error.message }, { status:500 })
-  }
-
+   return NextResponse.json({ ok:true, item: data ?? null }, {
+  headers: { "Cache-Control": "no-store" }
+})
   return NextResponse.json(
     { ok:true, item: data ?? null },
     { headers: { "Cache-Control": "no-store" } }

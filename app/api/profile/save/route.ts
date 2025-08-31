@@ -17,11 +17,11 @@ function toText(v: MaybeTextObj): string {
   return String(v.text ?? "")
 }
 
-function extractFromLines(lines: unknown): { fortune: string; personality: string; partner: string } {
+function extractFromLines(lines: unknown) {
   const arr = Array.isArray(lines) ? (lines as MaybeLine[]).map(x => toText(x as any)) : []
-  const fortune = arr[1] ?? arr[0] ?? ""
+  const fortune     = arr[1] ?? arr[0] ?? ""
   const personality = arr[2] ?? ""
-  const partner = arr[3] ?? ""
+  const partner     = arr[3] ?? ""
   return { fortune, personality, partner }
 }
 
@@ -32,14 +32,13 @@ export async function POST(req: Request) {
   let body: any
   try { body = await req.json() } catch { return NextResponse.json({ ok:false, error:"invalid_json" }, { status:400 }) }
 
-  const payload =
-    Array.isArray(body?.luneaLines)
-      ? extractFromLines(body.luneaLines)
-      : {
-          fortune:     toText(body?.fortune),
-          personality: toText(body?.personality),
-          partner:     toText(body?.partner),
-        }
+  const payload = Array.isArray(body?.luneaLines)
+    ? extractFromLines(body.luneaLines)
+    : {
+        fortune:     toText(body?.fortune),
+        personality: toText(body?.personality),
+        partner:     toText(body?.partner),
+      }
 
   if (!payload.fortune && !payload.personality && !payload.partner) {
     return NextResponse.json({ ok:false, error:"empty_payload" }, { status:400 })
@@ -49,10 +48,9 @@ export async function POST(req: Request) {
     .from("profile_results")
     .insert([payload])
     .select("created_at")
-    .maybeSingle()
-
   if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 })
-  return NextResponse.json({ ok:true, saved:true, created_at: data?.created_at ?? null }, {
-    headers: { "Cache-Control": "no-store" },
+
+  return NextResponse.json({ ok:true, saved:true, created_at: data?.[0]?.created_at ?? null }, {
+    headers: { "Cache-Control": "no-store" }
   })
 }

@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@heroicons/react": "^1.0.6",
     "@supabase/supabase-js": "^2.55.0",
     "dayjs": "^1.11.13",
     "framer-motion": "^12.23.12",

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 'use client';
 import Image from "next/image"
 import { useState, type FormEvent, type ChangeEvent } from 'react';
@@ -164,3 +165,7 @@ export default function ProfilePage() {
     </main>
   );
 }
+=======
+import ProfileFormClient from './ProfileFormClient'
+export default function Page() { return <ProfileFormClient /> }
+>>>>>>> e65b975 (Result UI仕上げ: Luneaタイプライター／保存→MyPage反映／mypage API)

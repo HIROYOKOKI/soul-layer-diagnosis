@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // app/register/page.tsx
 'use client'
 
@@ -267,4 +268,9 @@ const styles: Record<string, CSSProperties> = {
   link: { color: '#9dc9ff', textDecoration: 'underline' },
   small: { margin: 0, fontSize: 12, opacity: 0.8 },
   errorText: { color: '#ff7a7a', margin: 0 },
+=======
+'use client'
+export default function Page() {
+  return <div style={{padding:24}}>REGISTER OK</div>
+>>>>>>> e65b975 (Result UI仕上げ: Luneaタイプライター／保存→MyPage反映／mypage API)
 }

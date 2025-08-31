@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // app/profile/result/page.tsx
 import { Suspense } from "react"
 import ResultClient from "./ResultClient"
@@ -11,3 +12,7 @@ export default function Page({
     </Suspense>
   )
 }
+=======
+import ResultClient from './ResultClient'
+export default function Page() { return <ResultClient /> }
+>>>>>>> e65b975 (Result UI仕上げ: Luneaタイプライター／保存→MyPage反映／mypage API)

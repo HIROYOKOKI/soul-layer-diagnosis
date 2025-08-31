@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -57,3 +58,7 @@ export default function ProfileConfirmPage() {
     </div>
   )
 }
+=======
+import ConfirmClient from './ConfirmClient'
+export default function Page() { return <ConfirmClient /> }
+>>>>>>> e65b975 (Result UI仕上げ: Luneaタイプライター／保存→MyPage反映／mypage API)

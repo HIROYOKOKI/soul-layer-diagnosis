@@ -8,7 +8,12 @@ export default function ProfileFormClient() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+<<<<<<< HEAD
     setError(null); setLoading(true)
+=======
+    setError(null)
+    setLoading(true)
+>>>>>>> e65b975 (Result UI仕上げ: Luneaタイプライター／保存→MyPage反映／mypage API)
 
     const f = new FormData(e.currentTarget)
     const pending = {
@@ -20,7 +25,11 @@ export default function ProfileFormClient() {
     }
 
     try {
+<<<<<<< HEAD
       // 確認画面で表示するため一時保存
+=======
+      // 確認画面で表示するため一時保存して遷移
+>>>>>>> e65b975 (Result UI仕上げ: Luneaタイプライター／保存→MyPage反映／mypage API)
       sessionStorage.setItem('profile_pending', JSON.stringify(pending))
       location.href = '/profile/confirm'
     } catch (err) {
@@ -54,7 +63,11 @@ export default function ProfileFormClient() {
 
       <label className="grid gap-1 text-sm">
         <span>性別</span>
+<<<<<<< HEAD
         <select name="gender" className="px-3 py-2 rounded-lg bg白/5 border border-white/10">
+=======
+        <select name="gender" className="px-3 py-2 rounded-lg bg-white/5 border border-white/10">
+>>>>>>> e65b975 (Result UI仕上げ: Luneaタイプライター／保存→MyPage反映／mypage API)
           <option value="Male">男性</option>
           <option value="Female">女性</option>
           <option value="Other">その他</option>

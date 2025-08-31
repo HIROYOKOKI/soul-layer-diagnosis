@@ -3,8 +3,37 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import GlowButton from "@/app/ui/GlowButton"
 
+// ---- Local GlowButton（エイリアス不要・依存なし）----
+function GlowButton({
+  children,
+  variant = "primary",
+  className = "",
+  fullWidth = false,
+  disabled,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: "primary" | "ghost"
+  fullWidth?: boolean
+}) {
+  const base =
+    "rounded-full transition font-extrabold tracking-wide uppercase h-12 " +
+    (fullWidth ? "w-full " : "w-auto ")
+  const style =
+    variant === "primary"
+      ? "px-8 bg-gradient-to-r from-sky-500 to-indigo-500 text-white " +
+        "shadow-[0_0_18px_rgba(56,189,248,.45)] hover:shadow-[0_0_28px_rgba(56,189,248,.75)] " +
+        "active:translate-y-[1px] disabled:opacity-60"
+      : "px-6 bg-black text-white border border-white/20 hover:bg-white hover:text-black " +
+        "active:translate-y-[1px]"
+  return (
+    <button disabled={disabled} className={`${base}${style} ${className}`} {...props}>
+      {children}
+    </button>
+  )
+}
+
+// ---- Types / API ----
 export type ProfilePayload = {
   name: string
   birthday: string // YYYY-MM-DD
@@ -83,7 +112,7 @@ export default function ConfirmClient() {
           SOUL LAYER DIAGNOSIS
         </span>
         <span
-          className="h-8 w-8 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 ring-1 ring-sky-300/40 shadow-[0_0_22px_rgba(56,189,248,.65)] shrink-0"
+          className="h-10 w-10 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 ring-1 ring-sky-300/50 shadow-[0_0_28px_rgba(56,189,248,.75)] shrink-0"
           aria-hidden
         />
       </header>
@@ -108,11 +137,11 @@ export default function ConfirmClient() {
           )}
         </section>
 
-        {/* CTA：モバイル縦並び → sm以上で横並び中央 */}
-        <div className="mt-8 flex flex-col sm:flex-row justify-center items-stretch sm:items-center gap-4 sm:gap-6">
+        {/* CTA：常時横並び（狭幅は折り返し） */}
+        <div className="mt-8 flex flex-row justify-center items-center gap-4 flex-wrap">
           <GlowButton
             variant="ghost"
-            fullWidth
+            className="min-w-[160px]"
             onClick={() => router.push("/profile")}
           >
             修正する
@@ -120,7 +149,7 @@ export default function ConfirmClient() {
 
           <GlowButton
             variant="primary"
-            fullWidth
+            className="min-w-[200px]"
             disabled={loading}
             onClick={handleConfirm}
           >

@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import GlowButton from "@/app/ui/GlowButton"
 
 export type ProfilePayload = {
   name: string
@@ -31,7 +32,6 @@ type Pending = ProfilePayload
 
 export default function ConfirmClient() {
   const router = useRouter()
-
   const [p, setP] = useState<Pending | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,11 +48,9 @@ export default function ConfirmClient() {
     if (!p) return
     try {
       setLoading(true); setError(null)
-
       const res = await diagnoseProfile(p)
       sessionStorage.removeItem("profile_pending")
       sessionStorage.setItem("profile_result_luneaLines", JSON.stringify(res.luneaLines))
-
       try {
         const save = await fetch("/api/profile/save", {
           method: "POST",
@@ -62,13 +60,10 @@ export default function ConfirmClient() {
         })
         if (!save.ok) setError(`save_failed_${save.status}`)
       } catch { setError("save_failed_network") }
-
       router.push("/profile/result")
     } catch (e:any) {
       setError(e?.message || "diagnose_failed")
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   if (!p) return null
@@ -82,31 +77,23 @@ export default function ConfirmClient() {
         <div className="absolute inset-x-0 top-[44%] h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
       </div>
 
-      {/* ヘッダー：SOUL LAYER DIAGNOSIS（左）＋ ルネア診断・青光アイコン（右） */}
+      {/* ヘッダー：左テキスト / 右アイコン（safe-area上マージン） */}
       <header className="px-5 pt-[calc(env(safe-area-inset-top)+16px)] pb-4 max-w-6xl mx-auto flex items-center justify-between">
-        {/* 左：ブランドテキスト */}
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="text-[15px] md:text-base tracking-[0.18em] font-semibold whitespace-nowrap">
-            SOUL LAYER DIAGNOSIS
-          </span>
-        </div>
-        {/* 右：サブラベル＋青光アイコン */}
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="text-xs opacity-75 hidden xs:inline">ルネア診断</span>
-          <span
-            className="h-8 w-8 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 ring-1 ring-sky-300/40 shadow-[0_0_22px_rgba(56,189,248,.65)] shrink-0"
-            aria-hidden
-          />
-        </div>
+        <span className="text-[15px] md:text-base tracking-[0.18em] font-semibold">
+          SOUL LAYER DIAGNOSIS
+        </span>
+        <span
+          className="h-8 w-8 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 ring-1 ring-sky-300/40 shadow-[0_0_22px_rgba(56,189,248,.65)] shrink-0"
+          aria-hidden
+        />
       </header>
 
-      {/* 本文 */}
-      <div className="mx-auto w-full max-w-[720px] px-5 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+24px)]">
-        {/* タイトル */}
+      {/* 本文コンテナ（幅を締め、呼吸する余白） */}
+      <div className="mx-auto w-full max-w-[680px] px-5 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+24px)]">
         <h1 className="mt-1 text-[22px] sm:text-2xl font-bold tracking-wide">入力内容の確認</h1>
         <p className="text-sm opacity-75 mt-1">送信前にもう一度ご確認ください。</p>
 
-        {/* 情報カード（読みやすい幅・余白拡張・角を少し大きく） */}
+        {/* カード */}
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-6 sm:p-7 shadow-[0_20px_60px_rgba(0,0,0,.45)]">
           <dl className="grid gap-3 sm:gap-3.5 text-[15px] leading-[1.9]">
             <Item label="名前"     value={p.name} />
@@ -121,33 +108,26 @@ export default function ConfirmClient() {
           )}
         </section>
 
-        {/* カード外：ボタンは中央寄せ／モバイルは縦、タブレット以上で横並び */}
+        {/* CTA：モバイル縦並び → sm以上で横並び中央 */}
         <div className="mt-8 flex flex-col sm:flex-row justify-center items-stretch sm:items-center gap-4 sm:gap-6">
-          {/* 修正する：常時黒、hoverで反転。モバイルは幅いっぱい */}
-          <button
+          <GlowButton
+            variant="ghost"
+            fullWidth
             onClick={() => router.push("/profile")}
-            className="h-12 w-full sm:w-auto px-6 rounded-full bg-black text-white border border-white/20 hover:bg-white hover:text-black transition font-medium"
           >
             修正する
-          </button>
+          </GlowButton>
 
-          {/* この内容で診断：Glow Primary。モバイルは幅いっぱい */}
-          <button
-            onClick={handleConfirm}
+          <GlowButton
+            variant="primary"
+            fullWidth
             disabled={loading}
-            className={[
-              "btn-primary",
-              "h-12 w-full sm:w-auto px-8 rounded-full font-extrabold tracking-wide uppercase",
-              "bg-gradient-to-r from-sky-500 to-indigo-500",
-              "text-white shadow-[0_0_22px_rgba(79,70,229,.55)] hover:shadow-[0_0_30px_rgba(79,70,229,.85)]",
-              "transition disabled:opacity-60"
-            ].join(" ")}
+            onClick={handleConfirm}
           >
             {loading ? "診断中…" : "この内容で診断"}
-          </button>
+          </GlowButton>
         </div>
 
-        {/* フッター：中央配置（下部余白を多めに） */}
         <footer className="mt-10 sm:mt-12 pb-4 text-[11px] opacity-70 text-center">
           © 2025 EVΛƎ PROJECT
         </footer>
@@ -164,11 +144,3 @@ function Item({ label, value }: { label: string; value?: string | null }) {
     </div>
   )
 }
-
-/*
-Manual test cases:
-1) /profile で入力→確認→「この内容で診断」→ /profile/result へ遷移し、保存が反映される。
-2) /profile/confirm を直叩き→ /profile にリダイレクトされる。
-3) /api/profile/diagnose を強制500にするとエラー文言が表示される。
-4) /api/profile/save が404でも遷移は続行、画面下にエラー文言が出る。
-*/

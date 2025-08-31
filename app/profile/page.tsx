@@ -1,5 +1,5 @@
 'use client';
-
+import Image from "next/image"
 import { useState, type FormEvent, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -57,7 +57,13 @@ export default function ProfilePage() {
       {/* ヘッダー（ロゴ） */}
       <header className="py-6">
         <div className="mx-auto max-w-5xl px-5 flex items-center">
-          <img src="/soul-layer-diagnosis.png" alt="EVΛƎ" className="h-6 opacity-90" />
+          <Image
+  src="/evae-logo.svg"
+  alt="EVΛƎ"
+  width={120}   // 適切な実寸に調整
+  height={28}
+  className="inline-block"
+/>
         </div>
       </header>
 

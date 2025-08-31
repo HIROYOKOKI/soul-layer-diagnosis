@@ -1,82 +1,56 @@
-'use client'
+// app/profile/confirm/ConfirmClient.tsx
+"use client"
 
-import { useState } from 'react'
-import { useProfileDiagnose, type ProfilePayload } from './_hooks/useProfileDiagnose'
+import { useState } from "react"
+import { useProfileDiagnose, type ProfilePayload } from "../_hooks/useProfileDiagnose" // ← 修正
 
-export default function ProfileFormClient() {
+export default function ConfirmClient() {
   const diagnose = useProfileDiagnose()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<{ luneaLines: string[] } | null>(null)
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
-
-    const f = new FormData(e.currentTarget)
-    const payload: ProfilePayload = {
-      name: String(f.get('name') || ''),
-      birthday: String(f.get('birthday') || ''),
-      blood: String(f.get('blood') || ''),
-      gender: String(f.get('gender') || ''),
-      preference: (String(f.get('preference') || '') || null),
-    }
-
+  async function onSubmit(payload: ProfilePayload) {
     try {
-      await diagnose(payload)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setLoading(true)
+      setError(null)
+      const r = await diagnose(payload)
+      setResult(r)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
   }
 
+  // ここはHiroさんのUIに合わせて。例としてボタンだけ配置。
   return (
-    <form onSubmit={handleSubmit} className="max-w-xl mx-auto grid gap-4 p-6">
-      <h1 className="text-xl font-bold">プロフィール入力</h1>
+    <div className="p-6">
+      <button
+        onClick={() =>
+          onSubmit({
+            name: "Hiro",
+            birthday: "1985-05-05",
+            blood: "A",
+            gender: "Male",
+            preference: "Unset",
+          })
+        }
+        className="px-4 py-2 rounded bg-black text-white"
+        disabled={loading}
+      >
+        この内容で診断
+      </button>
 
-      <label className="grid gap-1 text-sm">
-        <span>名前</span>
-        <input name="name" type="text" required className="px-3 py-2 rounded-lg bg-white/5 border border-white/10" />
-      </label>
-
-      <label className="grid gap-1 text-sm">
-        <span>誕生日</span>
-        <input name="birthday" type="date" required className="px-3 py-2 rounded-lg bg-white/5 border border-white/10" />
-      </label>
-
-      <label className="grid gap-1 text-sm">
-        <span>血液型</span>
-        <select name="blood" className="px-3 py-2 rounded-lg bg-white/5 border border-white/10">
-          <option value="A">A</option>
-          <option value="B">B</option>
-          <option value="O">O</option>
-          <option value="AB">AB</option>
-        </select>
-      </label>
-
-      <label className="grid gap-1 text-sm">
-        <span>性別</span>
-        <select name="gender" className="px-3 py-2 rounded-lg bg-white/5 border border-white/10">
-          <option value="Male">男性</option>
-          <option value="Female">女性</option>
-          <option value="Other">その他</option>
-        </select>
-      </label>
-
-      <label className="grid gap-1 text-sm">
-        <span>恋愛対象（任意）</span>
-        <input name="preference" type="text" placeholder="例: 女性 / 男性 / 指定なし"
-               className="px-3 py-2 rounded-lg bg-white/5 border border-white/10" />
-      </label>
-
-      <div className="flex items-center gap-3 pt-2">
-        <button disabled={loading} type="submit"
-                className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10">
-          {loading ? '診断中…' : '診断する'}
-        </button>
-        {error && <p className="text-sm text-red-400">エラー：{error}</p>}
-      </div>
-    </form>
+      {loading && <p className="mt-3">診断中…</p>}
+      {error && <p className="mt-3 text-red-500">Error: {error}</p>}
+      {result && (
+        <div className="mt-4 space-y-2">
+          {result.luneaLines.map((line, i) => (
+            <p key={i} className="text-sm leading-relaxed">● {line}</p>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

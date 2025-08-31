@@ -82,8 +82,14 @@ export default function ConfirmClient() {
         <div className="absolute inset-x-0 top-[44%] h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
       </div>
 
-      {/* ヘッダー：テキストのみ */}
-      <header className="flex items-center justify-center px-5 py-6 max-w-6xl mx-auto">
+      {/* ヘッダー：青光アイコン + テキスト */}
+      <header className="flex items-center gap-3 px-5 py-6 max-w-6xl mx-auto">
+        {/* 青光アイコン */}
+        <span
+          className="h-8 w-8 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 ring-1 ring-sky-300/40 shadow-[0_0_22px_rgba(56,189,248,.65)]"
+          aria-hidden
+        />
+        {/* テキスト */}
         <span className="text-[15px] md:text-base tracking-[0.18em] font-semibold">
           SOUL LAYER DIAGNOSIS
         </span>

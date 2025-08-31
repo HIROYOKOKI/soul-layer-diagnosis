@@ -1,7 +1,7 @@
 // app/mypage/MyPageClient.tsx
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 
 type ProfileItem = {
@@ -47,7 +47,6 @@ function normalizeCode(code?: string): DailyCode | null {
 }
 
 function fmt(ts: string) {
-  // 表示は一旦ローカル時刻
   try {
     return new Date(ts).toLocaleString()
   } catch {
@@ -61,39 +60,50 @@ export default function MyPageClient() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     setError(null)
 
-    const ac = new AbortController()
     try {
-      // プロフィール最新
-      const pRes = await fetch("/api/mypage/profile-latest", {
-        cache: "no-store",
-        signal: ac.signal,
-      })
-      const pJson = (await pRes.json()) as ApiResp<ProfileItem>
-      if ("ok" in pJson && pJson.ok) setProfile(pJson.item ?? null)
+      const [pRes, dRes] = await Promise.all([
+        fetch("/api/mypage/profile-latest", { cache: "no-store" }),
+        fetch("/api/mypage/daily-latest", { cache: "no-store" }),
+      ])
 
-      // デイリー最新
-      const dRes = await fetch("/api/mypage/daily-latest", {
-        cache: "no-store",
-        signal: ac.signal,
-      })
-      const dJson = (await dRes.json()) as ApiResp<DailyItem>
+      const [pJson, dJson] = await Promise.all([
+        pRes.json() as Promise<ApiResp<ProfileItem>>,
+        dRes.json() as Promise<ApiResp<DailyItem>>,
+      ])
+
+      if ("ok" in pJson && pJson.ok) setProfile(pJson.item ?? null)
       if ("ok" in dJson && dJson.ok) setDaily(dJson.item ?? null)
+
+      if (("ok" in pJson && !pJson.ok) || ("ok" in dJson && !dJson.ok)) {
+        const msg =
+          (!("ok" in pJson) || pJson.ok) && "error" in dJson
+            ? dJson.error
+            : "error" in (pJson as ApiErr)
+              ? (pJson as ApiErr).error
+              : "unknown_error"
+        setError(msg)
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    // 初回ロード
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    let mounted = true
+    ;(async () => {
+      if (!mounted) return
+      await load()
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [load])
 
   const dailyCode = normalizeCode(daily?.code ?? "")
 
@@ -116,7 +126,7 @@ export default function MyPageClient() {
           <p className="text-sm">Error: {error}</p>
           <button
             className="mt-2 rounded bg-red-600 px-3 py-1.5 text-white text-sm"
-            onClick={() => load()}
+            onClick={load}
           >
             再読み込み
           </button>
@@ -173,14 +183,18 @@ export default function MyPageClient() {
           </div>
         )}
       </section>
+
+      {/* レーダー（プレビュー） */}
+      <EVAEPreviewRadar />
     </div>
   )
 }
+
 function EVAEPreviewRadar() {
   // 0〜1 の仮スコア（後でDBに接続）
   const scores = { E: 0.7, V: 0.4, "Λ": 0.6, "Ǝ": 0.5 } as const
   const keys = ["E", "V", "Λ", "Ǝ"] as const
-  const size = 220, cx = size/2, cy = size/2, r = 90
+  const size = 220, cx = size / 2, cy = size / 2, r = 90
 
   const angle = (i: number) => (Math.PI * 2 * i) / keys.length - Math.PI / 2
   const pt = (k: (typeof keys)[number], i: number) => {
@@ -190,31 +204,59 @@ function EVAEPreviewRadar() {
   const poly = keys.map((k, i) => pt(k, i).join(",")).join(" ")
 
   return (
-    <div className="p-4 rounded-2xl shadow bg-white">
+    <section className="p-4 rounded-2xl shadow bg-white">
       <h2 className="font-semibold text-lg mb-2">構造バランス（プレビュー）</h2>
       <svg width={size} height={size} className="block">
         {/* グリッド（白30%・1px相当） */}
         {[0.3, 0.6, 1].map((t, idx) => (
-          <circle key={idx} cx={cx} cy={cy} r={r * t} fill="none" stroke="rgba(0,0,0,.12)" strokeWidth="1" />
+          <circle
+            key={idx}
+            cx={cx}
+            cy={cy}
+            r={r * t}
+            fill="none"
+            stroke="rgba(0,0,0,.12)"
+            strokeWidth="1"
+          />
         ))}
         {/* 軸 */}
         {keys.map((_, i) => (
-          <line key={i}
-                x1={cx} y1={cy}
-                x2={cx + r * Math.cos(angle(i))}
-                y2={cy + r * Math.sin(angle(i))}
-                stroke="rgba(0,0,0,.12)" strokeWidth="1" />
+          <line
+            key={i}
+            x1={cx}
+            y1={cy}
+            x2={cx + r * Math.cos(angle(i))}
+            y2={cy + r * Math.sin(angle(i))}
+            stroke="rgba(0,0,0,.12)"
+            strokeWidth="1"
+          />
         ))}
-        {/* ポリゴン（4色グラデの代替：薄色塗り） */}
-        <polygon points={poly} fill="rgba(0,0,0,.06)" stroke="rgba(0,0,0,.35)" strokeWidth="2" />
+        {/* ポリゴン（4色グラデ代替：薄色塗り） */}
+        <polygon
+            points={poly}
+            fill="rgba(0,0,0,.06)"
+            stroke="rgba(0,0,0,.35)"
+            strokeWidth="2"
+        />
         {/* ラベル */}
         {keys.map((k, i) => {
-          const [x, y] = [cx + (r + 14) * Math.cos(angle(i)), cy + (r + 14) * Math.sin(angle(i))]
-          return <text key={k} x={x} y={y} textAnchor="middle" dominantBaseline="middle" fontSize="12">{k}</text>
+          const x = cx + (r + 14) * Math.cos(angle(i))
+          const y = cy + (r + 14) * Math.sin(angle(i))
+          return (
+            <text
+              key={k}
+              x={x}
+              y={y}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize="12"
+            >
+              {k}
+            </text>
+          )
         })}
       </svg>
       <p className="text-xs text-gray-500 mt-2">※ スコア未接続（後でDB値に置換）</p>
-    </div>
+    </section>
   )
 }
-

@@ -1,16 +1,17 @@
-// app/profile/result/page.tsx
-import { Suspense } from 'react'
-import ResultClient from './ResultClient'
+import { useRouter } from "next/navigation"
 
-// 実行時描画（SSGしない）
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
-// 注意：このファイルでは Hooks を import しない / 'use client' も書かない（Server）
-export default function Page() {
-  return (
-    <Suspense fallback={<div className="p-6 text-sm opacity-75">読み込み中…</div>}>
-      <ResultClient />
-    </Suspense>
-  )
+const router = useRouter()
+async function onSubmit(payload: any) {
+  const res = await fetch("/api/profile/diagnose", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+  const json = await res.json()
+  if (!json?.ok) {
+    alert("診断に失敗しました"); return
+  }
+  // 結果を一時保存して遷移
+  sessionStorage.setItem("lunea_profile_result", JSON.stringify(json.result.luneaLines))
+  router.push("/profile/result")
 }

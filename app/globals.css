@@ -248,6 +248,13 @@ button.header-settings svg.lucide.lucide-settings {
 }
 /* Settingsギアを常に細線化（どのアイコンライブラリでも効く） */
 button[aria-label="Settings"] svg { stroke-width: 1.1 !important; }
+/* FREEバッジが2個以上描画されたら、2個目以降は非表示 */
+.free-badge ~ .free-badge { display: none !important; }
+
+/* ギア線を常に細く（アイコン実装に依らず効かせる） */
+button[aria-label="Settings"] svg { stroke-width: 1.0 !important; }
+/* 塗りつぶしで太く見える場合の保険（ギアに限る） */
+button[aria-label="Settings"] svg [fill]:not([fill="none"]) { fill: none !important; }
 
 
 

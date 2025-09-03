@@ -1,8 +1,12 @@
+<<<<<<< Updated upstream
 // app/profile/confirm/ConfirmClient.tsx
+=======
+>>>>>>> Stashed changes
 "use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+<<<<<<< Updated upstream
 
 // GlowButton component updated to support variants and states (参考: ButtonsGallery)
 function GlowButton({
@@ -75,9 +79,19 @@ async function diagnoseProfile(payload: ProfilePayload): Promise<{ luneaLines: s
 }
 
 type Pending = ProfilePayload
+=======
+import { useProfileDiagnose, type ProfilePayload } from "../_hooks/useProfileDiagnose"
+>>>>>>> Stashed changes
+
+type Pending = ProfilePayload
 
 export default function ConfirmClient() {
   const router = useRouter()
+<<<<<<< Updated upstream
+=======
+  const diagnose = useProfileDiagnose()
+
+>>>>>>> Stashed changes
   const [p, setP] = useState<Pending | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -87,16 +101,33 @@ export default function ConfirmClient() {
       const raw = sessionStorage.getItem("profile_pending")
       if (!raw) { router.replace("/profile"); return }
       setP(JSON.parse(raw) as Pending)
+<<<<<<< Updated upstream
     } catch { router.replace("/profile") }
+=======
+    } catch {
+      router.replace("/profile")
+    }
+>>>>>>> Stashed changes
   }, [router])
 
   async function handleConfirm() {
     if (!p) return
     try {
+<<<<<<< Updated upstream
       setLoading(true); setError(null)
       const res = await diagnoseProfile(p)
       sessionStorage.removeItem("profile_pending")
       sessionStorage.setItem("profile_result_luneaLines", JSON.stringify(res.luneaLines))
+=======
+      setLoading(true)
+      setError(null)
+
+      const res = await diagnose(p) // { luneaLines: string[] }
+
+      sessionStorage.removeItem("profile_pending")
+      sessionStorage.setItem("profile_result_luneaLines", JSON.stringify(res.luneaLines))
+
+>>>>>>> Stashed changes
       try {
         const save = await fetch("/api/profile/save", {
           method: "POST",
@@ -105,22 +136,52 @@ export default function ConfirmClient() {
           cache: "no-store",
         })
         if (!save.ok) setError(`save_failed_${save.status}`)
+<<<<<<< Updated upstream
       } catch { setError("save_failed_network") }
       router.push("/profile/result")
     } catch (e:any) {
       setError(e?.message || "diagnose_failed")
     } finally { setLoading(false) }
+=======
+      } catch {
+        setError("save_failed_network")
+      }
+
+      router.push("/profile/result")
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
+    }
+>>>>>>> Stashed changes
   }
 
   if (!p) return null
 
   return (
+<<<<<<< Updated upstream
     <main className="min-h-[100dvh] relative text-white">
       {/* 背景 */}
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-black" />
         <div className="absolute inset-0 bg-[radial-gradient(640px_440px_at_50%_14%,rgba(56,189,248,0.18),transparent)]" />
         <div className="absolute inset-x-0 top-[44%] h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+=======
+    <div className="max-w-xl mx-auto p-6 space-y-4">
+      <h1 className="text-xl font-bold">入力内容の確認</h1>
+      <ul className="text-sm grid gap-1 opacity-90">
+        <li>名前：{p.name}</li>
+        <li>誕生日：{p.birthday}</li>
+        <li>血液型：{p.blood}</li>
+        <li>性別：{p.gender}</li>
+        {p.preference ? <li>恋愛対象：{p.preference}</li> : null}
+      </ul>
+      <div className="flex gap-3 pt-2">
+        <button onClick={() => router.push("/profile")} className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10">修正する</button>
+        <button disabled={loading} onClick={handleConfirm} className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10">
+          {loading ? "診断中…" : "この内容で診断"}
+        </button>
+>>>>>>> Stashed changes
       </div>
 
       {/* ヘッダー */}

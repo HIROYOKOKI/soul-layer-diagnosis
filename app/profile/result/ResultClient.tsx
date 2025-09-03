@@ -1,4 +1,7 @@
+<<<<<<< Updated upstream
 // app/profile/result/ResultClient.tsx
+=======
+>>>>>>> Stashed changes
 "use client"
 
 import { useEffect, useState } from "react"
@@ -12,7 +15,10 @@ export default function ResultClient() {
   const [step, setStep] = useState(0)
 
   useEffect(() => {
+<<<<<<< Updated upstream
     // セッションキー両対応
+=======
+>>>>>>> Stashed changes
     const raw =
       sessionStorage.getItem("profile_result_luneaLines") ??
       sessionStorage.getItem("lunea_profile_result")

@@ -24,11 +24,18 @@ export default function RegisterPage() {
 
     setLoading(true)
     try {
+<<<<<<< Updated upstream
       // ✅ supabase-browser が未実装でも落ちないように動的importに変更
       const mod = await import("@/lib/supabase-browser").catch(() => null as any)
       if (!mod?.getBrowserSupabase) {
         throw new Error("auth_unavailable") // あとで実装したらここは通らなくなる
       }
+=======
+      // 動的import（未実装でも落ちないガード）
+      const mod = await import("@/lib/supabase-browser").catch(() => null as any)
+      if (!mod?.getBrowserSupabase) throw new Error("auth_unavailable")
+
+>>>>>>> Stashed changes
       const supabase = await mod.getBrowserSupabase()
       const { error } = await supabase.auth.signUp({
         email,
@@ -38,8 +45,12 @@ export default function RegisterPage() {
       if (error) throw error
       setDone(true)
     } catch (err: unknown) {
+<<<<<<< Updated upstream
       const msg =
         err instanceof Error ? err.message : typeof err === "string" ? err : "登録に失敗しました"
+=======
+      const msg = err instanceof Error ? err.message : typeof err === "string" ? err : "登録に失敗しました"
+>>>>>>> Stashed changes
       setError(humanizeAuthError(msg))
     } finally {
       setLoading(false)
@@ -48,19 +59,18 @@ export default function RegisterPage() {
 
   return (
     <main style={styles.page}>
-      {/* 背景（CSSだけ） */}
       <div style={styles.bg} aria-hidden>
         <div style={styles.auraMain} />
         <div style={styles.auraSide} />
         <div style={styles.noise} />
       </div>
 
-      {/* 中央カード */}
       <section style={styles.card} aria-live="polite">
         <h1 style={styles.title}>新規登録</h1>
 
         {!done ? (
           <form onSubmit={handleSubmit} style={styles.form}>
+<<<<<<< Updated upstream
             <label htmlFor="email" style={styles.label}>
               メールアドレス
             </label>
@@ -97,10 +107,26 @@ export default function RegisterPage() {
                 aria-label={showPw ? "パスワードを隠す" : "パスワードを表示"}
                 style={styles.pwToggle}
               >
+=======
+            <label htmlFor="email" style={styles.label}>メールアドレス</label>
+            <input id="email" type="email" inputMode="email" autoComplete="email"
+                   placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)}
+                   required style={styles.input} />
+
+            <label htmlFor="password" style={styles.label}>パスワード</label>
+            <div style={{ position: "relative" }}>
+              <input id="password" type={showPw ? "text" : "password"} autoComplete="new-password"
+                     placeholder="8文字以上" value={password} onChange={(e) => setPassword(e.target.value)}
+                     required minLength={8} style={{ ...styles.input, paddingRight: 42 }} />
+              <button type="button" onClick={() => setShowPw((v) => !v)}
+                      aria-label={showPw ? "パスワードを隠す" : "パスワードを表示"}
+                      style={styles.pwToggle}>
+>>>>>>> Stashed changes
                 {showPw ? "🙈" : "👁️"}
               </button>
             </div>
 
+<<<<<<< Updated upstream
             <label htmlFor="confirm" style={styles.label}>
               パスワード（確認）
             </label>
@@ -115,6 +141,12 @@ export default function RegisterPage() {
               minLength={8}
               style={styles.input}
             />
+=======
+            <label htmlFor="confirm" style={styles.label}>パスワード（確認）</label>
+            <input id="confirm" type={showPw ? "text" : "password"} autoComplete="new-password"
+                   placeholder="もう一度入力" value={confirm} onChange={(e) => setConfirm(e.target.value)}
+                   required minLength={8} style={styles.input} />
+>>>>>>> Stashed changes
 
             <label style={styles.checkRow as CSSProperties}>
               <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
@@ -129,17 +161,25 @@ export default function RegisterPage() {
 
             <p style={styles.small}>
               すでにアカウントをお持ちですか？{" "}
+<<<<<<< Updated upstream
               <a href="/login/form" style={styles.link}>
                 ログイン
               </a>
+=======
+              <a href="/login/form" style={styles.link}>ログイン</a>
+>>>>>>> Stashed changes
             </p>
           </form>
         ) : (
           <div style={{ display: "grid", gap: 12 }}>
             <p style={{ margin: 0 }}>登録メールを送信しました。受信箱をご確認ください。</p>
+<<<<<<< Updated upstream
             <a href="/login/form" style={styles.linkBtn}>
               ログインページへ
             </a>
+=======
+            <a href="/login/form" style={styles.linkBtn}>ログインページへ</a>
+>>>>>>> Stashed changes
           </div>
         )}
       </section>

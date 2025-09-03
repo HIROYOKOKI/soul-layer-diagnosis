@@ -1,4 +1,7 @@
+<<<<<<< Updated upstream
 // app/profile/_hooks/useProfileDiagnose.ts
+=======
+>>>>>>> Stashed changes
 "use client"
 
 export type ProfilePayload = {
@@ -15,7 +18,11 @@ type DiagnoseErr = { ok: false; error: string }
 type DiagnoseResp = DiagnoseOk | DiagnoseErr
 
 export function useProfileDiagnose() {
+<<<<<<< Updated upstream
   // フックは“診断して結果を返すだけ”。画面遷移は呼び出し側で行う。
+=======
+  // 診断して結果を返すだけ（画面遷移は呼び出し側で）
+>>>>>>> Stashed changes
   return async function diagnose(payload: ProfilePayload): Promise<{ luneaLines: string[] }> {
     const res = await fetch("/api/profile/diagnose", {
       method: "POST",

@@ -3,7 +3,6 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import AppHeader from '@/app/components/AppHeader' // ← これを使う
 import AppSubHeaderTheme from '@/app/components/AppSubHeaderTheme' // ← 追加
 
 import {
@@ -37,7 +36,6 @@ export default function DailyCharacterPage() {
   return (
     <>
       {/* 共通ヘッダー */}
-      <AppHeader />
        <AppSubHeaderTheme /> 
 
       {/* 中央寄せコンテナ（左右余白・最大幅・上余白） */}

@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "../../components/AppHeader";
 
 type ThemeKey = "work" | "love" | "future" | "self";
 const LABEL: Record<ThemeKey, string> = {
@@ -49,7 +48,6 @@ export default function ThemeClient() {
 
   return (
     <div className="min-h-[100svh] bg-black text-white">
-   <AppHeader />
       <main className="px-5 pt-4 pb-28">
         <h1 className="text-xl font-semibold tracking-wide">テーマ選択</h1>
         <p className="text-white/60 text-sm mt-1">今のあなたに一番近いテーマを1つ選んでください。</p>

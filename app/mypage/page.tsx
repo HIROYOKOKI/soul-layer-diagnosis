@@ -1,3 +1,6 @@
+// app/mypage/page.tsx
 import MyPageClient from "./MyPageClient"
-export const metadata = { title: "MyPage | Soul Layer" }
-export default function Page() { return <MyPageClient /> }
+
+export default function MyPagePage() {
+  return <MyPageClient />
+}

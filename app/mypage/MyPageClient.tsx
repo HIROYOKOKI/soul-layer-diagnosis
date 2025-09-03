@@ -1,6 +1,8 @@
+// app/mypage/MyPageClient.tsx
 "use client"
 
 import { useEffect, useState } from "react"
+import { Settings } from "lucide-react" // ← 追加（細線ギア）
 
 type ProfileItem = { fortune?: string; personality?: string; partner?: string; created_at?: string | null }
 type DailyItem   = { code?: string; comment?: string; quote?: string; created_at?: string | null }
@@ -40,8 +42,28 @@ export default function MyPageClient() {
   const reload = () => location.reload()
 
   return (
-    <main className="min-h-[100dvh] px-5 py-8 text-white">
-      <h1 className="text-2xl font-bold mb-6">MyPage</h1>
+    <main className="min-h-[100dvh] px-5 py-6 text-white">
+      {/* ヘッダー（タイトル＋FREEバッジ＋設定ボタン） */}
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">MyPage</h1>
+        <div className="flex items-center gap-2">
+          {/* FREEバッジ（任意） */}
+          <span className="select-none rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide">
+            FREE
+          </span>
+          {/* 設定ボタン：線を細く＆ホバーでうっすらリング */}
+          <button
+            aria-label="Settings"
+            className="rounded-full p-2 hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+          >
+            <Settings
+              className="text-white"
+              size={20}          // アイコンサイズ
+              strokeWidth={1.25} // 線の太さ（細くしてシャープに）
+            />
+          </button>
+        </div>
+      </div>
 
       {loading && <p className="opacity-70">読み込み中…</p>}
       {error && (
@@ -52,29 +74,29 @@ export default function MyPageClient() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h2 className="text-sm uppercase tracking-wide opacity-70 mb-2">最新プロフィール診断</h2>
+          <h2 className="mb-2 text-sm uppercase tracking-wide opacity-70">最新プロフィール診断</h2>
           {!prof ? (
-            <p className="opacity-70 text-sm">まだありません。</p>
+            <p className="text-sm opacity-70">まだありません。</p>
           ) : (
             <div className="grid gap-1 text-sm">
               <div><span className="opacity-70">Fortune：</span>{prof.fortune || "—"}</div>
               <div><span className="opacity-70">Personality：</span>{prof.personality || "—"}</div>
               <div><span className="opacity-70">Partner：</span>{prof.partner || "—"}</div>
-              <div className="opacity-60 text-xs mt-1">{prof.created_at ? new Date(prof.created_at).toLocaleString() : ""}</div>
+              <div className="mt-1 text-xs opacity-60">{prof.created_at ? new Date(prof.created_at).toLocaleString() : ""}</div>
             </div>
           )}
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h2 className="text-sm uppercase tracking-wide opacity-70 mb-2">最新デイリー診断</h2>
+          <h2 className="mb-2 text-sm uppercase tracking-wide opacity-70">最新デイリー診断</h2>
           {!daily ? (
-            <p className="opacity-70 text-sm">まだありません。</p>
+            <p className="text-sm opacity-70">まだありません。</p>
           ) : (
             <div className="grid gap-1 text-sm">
               <div><span className="opacity-70">Code：</span>{daily.code || "—"}</div>
               <div><span className="opacity-70">Comment：</span>{daily.comment || "—"}</div>
               <div className="opacity-70">Quote：<span className="italic">{daily.quote || "—"}</span></div>
-              <div className="opacity-60 text-xs mt-1">{daily.created_at ? new Date(daily.created_at).toLocaleString() : ""}</div>
+              <div className="mt-1 text-xs opacity-60">{daily.created_at ? new Date(daily.created_at).toLocaleString() : ""}</div>
             </div>
           )}
         </section>

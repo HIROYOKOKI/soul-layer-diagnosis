@@ -43,4 +43,4 @@ export async function POST(req: Request) {
     const luneaLines: string[] = Array.isArray((pending as any)?.__mock_lines)
       ? (pending as any).__mock_lines
       : [
-          "観測が終わったよ。これが、きみの“現在の層”の響
+       

@@ -7,27 +7,26 @@ import { usePathname } from "next/navigation"
 
 export default function AppHeader() {
   const pathname = usePathname()
-  // /mypage または /mypage/... のとき true
   const isMyPage = pathname?.startsWith("/mypage")
 
   return (
     <header className="flex items-center justify-between px-5 py-3">
-      {/* 左：ロゴ + ブランド名 */}
+      {/* 左：丸いロゴ + ブランド名 */}
       <div className="flex items-center gap-3">
         <Image
           src="/icon-512.png"
           alt="Soul Layer Logo"
-          width={28}
-          height={28}
+          width={32}
+          height={32}
           priority
-          className="drop-shadow-[0_0_6px_rgba(56,189,248,0.8)]"
+          className="rounded-full drop-shadow-[0_0_8px_rgba(56,189,248,0.85)]"
         />
         <span className="text-sm tracking-[0.25em] text-white/70">
           SOUL LAYER DIAGNOSIS
         </span>
       </div>
 
-      {/* 右：FREEは常時、⚙️は /mypage 配下のみ */}
+      {/* 右：FREE常時＋⚙️はMyPage配下だけ */}
       <div className="flex items-center gap-2">
         <span className="free-badge px-3 py-1 text-xs rounded-full border border-white/20 bg-white/10 text-white/80">
           FREE

@@ -2,55 +2,44 @@
 import { NextResponse } from "next/server"
 import { getSupabaseAdmin } from "../../../../lib/supabase-admin"
 
-type MaybeTextObj = string | { text?: string } | null | undefined
-type MaybeLine = string | { type?: string; label?: string; text?: string }
-
-function toText(v: MaybeTextObj): string {
-  if (v == null) return ""
-  if (typeof v === "string") {
-    try {
-      const j = JSON.parse(v)
-      return (j && typeof j === "object" && "text" in j) ? String((j as any).text ?? "") : v
-    } catch { return v }
-  }
-  return String(v.text ?? "")
-}
-
-function extractFromLines(lines: unknown) {
-  const arr = Array.isArray(lines) ? (lines as MaybeLine[]).map(x => toText(x as any)) : []
-  const fortune     = arr[1] ?? arr[0] ?? ""
-  const personality = arr[2] ?? ""
-  const partner     = arr[3] ?? ""
-  return { fortune, personality, partner }
+type SaveBody = {
+  fortune?: string
+  personality?: string
+  work?: string
+  partner?: string
 }
 
 export async function POST(req: Request) {
-  const sb = getSupabaseAdmin()
-  if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 })
+  try {
+    const sb = getSupabaseAdmin()
+    if (!sb) {
+      return NextResponse.json({ ok: false, error: "supabase_env_missing" }, { status: 500 })
+    }
 
-  let body: any
-  try { body = await req.json() } catch { return NextResponse.json({ ok:false, error:"invalid_json" }, { status:400 }) }
+    const body = (await req.json()) as SaveBody
+    const { fortune, personality, work, partner } = body || {}
 
-  const payload = Array.isArray(body?.luneaLines)
-    ? extractFromLines(body.luneaLines)
-    : {
-        fortune:     toText(body?.fortune),
-        personality: toText(body?.personality),
-        partner:     toText(body?.partner),
-      }
+    // 最低限のバリデーション（空文字はnull化）
+    const row = {
+      fortune: (fortune || "").trim() || null,
+      personality: (personality || "").trim() || null,
+      work: (work || "").trim() || null,
+      partner: (partner || "").trim() || null,
+      // created_at は Supabase 側の default now() を利用
+    }
 
-  if (!payload.fortune && !payload.personality && !payload.partner) {
-    return NextResponse.json({ ok:false, error:"empty_payload" }, { status:400 })
+    // 4つ全部が空ならエラー
+    if (!row.fortune && !row.personality && !row.work && !row.partner) {
+      return NextResponse.json({ ok: false, error: "empty_detail" }, { status: 400 })
+    }
+
+    const { data, error } = await sb.from("profile_results").insert(row).select("*").maybeSingle()
+    if (error) {
+      return NextResponse.json({ ok: false, error: "supabase_insert_failed", detail: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ ok: true, item: data })
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message || "failed" }, { status: 500 })
   }
-
-  const { data, error } = await sb
-    .from("profile_results")
-    .insert([payload])
-    .select("created_at")
-    .maybeSingle()
-
-  if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 })
-  return NextResponse.json({ ok:true, saved:true, created_at: data?.created_at ?? null }, {
-    headers: { "Cache-Control": "no-store" }
-  })
 }

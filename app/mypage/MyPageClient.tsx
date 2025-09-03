@@ -7,7 +7,7 @@ import {
   EVAETrendChart,
   EVAEChartSquares,
   EVAEColorBadges,
-} from "@/app/_components/EVAECharts"
+} from "@/components/EVAECharts"
 
 type ProfileItem = { fortune?: string; personality?: string; partner?: string; created_at?: string | null }
 type DailyItem   = { code?: string; comment?: string; quote?: string; created_at?: string | null }

@@ -246,6 +246,8 @@ svg.lucide.lucide-settings { display: none !important; }
 button.header-settings svg.lucide.lucide-settings {
   display: inline-block !important;
 }
+/* Settingsギアを常に細線化（どのアイコンライブラリでも効く） */
+button[aria-label="Settings"] svg { stroke-width: 1.1 !important; }
 
 
 

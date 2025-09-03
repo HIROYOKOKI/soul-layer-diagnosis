@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import GlowButton from "@/app/_components/GlowButton"
+import GlowButton from "@/app/components/GlowButton"
 
 export default function ProfileFormClient() {
   const router = useRouter()

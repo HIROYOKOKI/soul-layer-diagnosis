@@ -1,7 +1,7 @@
 // app/layout.tsx
 import "./globals.css"
 import type { Metadata } from "next"
-import AppHeader from "@/components/AppHeader"  // ← aliasでcomponentsを参照
+import AppHeader from "@/components/AppHeader"
 
 export const metadata: Metadata = {
   title: "Soul Layer Diagnosis",
@@ -10,11 +10,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ja">
+    <html lang="ja" className="overflow-x-hidden">
       <body className="bg-black text-white overflow-x-hidden">
         {/* ヘッダーはここで1回だけ */}
         <AppHeader />
-        <main className="min-h-[100dvh]">{children}</main>
+        <main className="min-h-[100dvh] w-full max-w-full overflow-x-hidden">
+          {children}
+        </main>
       </body>
     </html>
   )

@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 
 type ProfileLatest = {
   fortune?: string | null
@@ -25,10 +26,14 @@ function normalizeCode(raw?: string | null): "E" | "V" | "Λ" | "Ǝ" | "" {
 }
 
 export default function MyPageClient() {
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [profile, setProfile] = useState<ProfileLatest | null>(null)
   const [daily, setDaily] = useState<DailyLatest | null>(null)
+
+  const goProfile = () => router.push("/profile")
+  const goDaily = () => router.push("/daily/question")
 
   useEffect(() => {
     async function run() {
@@ -58,8 +63,34 @@ export default function MyPageClient() {
     <div className="mx-auto max-w-3xl p-6 space-y-6">
       <h1 className="text-xl font-semibold text-white">マイページ</h1>
 
-      {loading && <div className="text-white/70">…読込中</div>}
+      {/* ローディング骨組み */}
+      {loading && (
+        <div className="space-y-4">
+          {/* プロフィール骨組み */}
+          <div className="animate-pulse rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="h-4 w-40 bg-white/10 rounded mb-4" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="rounded-xl border border-white/10 bg-black/20 p-4">
+                  <div className="h-3 w-24 bg-white/10 rounded mb-2" />
+                  <div className="h-4 w-full bg-white/10 rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* デイリー骨組み */}
+          <div className="animate-pulse rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="h-4 w-32 bg-white/10 rounded" />
+              <div className="h-3 w-28 bg-white/10 rounded" />
+            </div>
+            <div className="h-4 w-full bg-white/10 rounded mb-2" />
+            <div className="h-3 w-1/2 bg-white/10 rounded" />
+          </div>
+        </div>
+      )}
 
+      {/* エラー */}
       {error && (
         <div className="space-y-3">
           <div className="text-sm text-red-300">エラー: {error}</div>
@@ -72,32 +103,59 @@ export default function MyPageClient() {
         </div>
       )}
 
+      {/* 本体 */}
       {!loading && !error && (
         <>
           {/* プロフィール最新（4ブロック） */}
           <section className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[inset_0_0_12px_rgba(255,255,255,.04)]">
             <div className="text-cyan-300 font-semibold mb-3">プロフィール診断（最新）</div>
             {profile ? (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-                  <h3 className="text-white/80 text-sm mb-1">総合運勢</h3>
-                  <p className="text-white/90 leading-relaxed text-[15px]">{profile.fortune || "—"}</p>
-                </article>
-                <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-                  <h3 className="text-white/80 text-sm mb-1">性格傾向</h3>
-                  <p className="text-white/90 leading-relaxed text-[15px]">{profile.personality || "—"}</p>
-                </article>
-                <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-                  <h3 className="text-white/80 text-sm mb-1">仕事運</h3>
-                  <p className="text-white/90 leading-relaxed text-[15px]">{profile.work || "—"}</p>
-                </article>
-                <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-                  <h3 className="text-white/80 text-sm mb-1">理想のパートナー像</h3>
-                  <p className="text-white/90 leading-relaxed text-[15px]">{profile.partner || "—"}</p>
-                </article>
-              </div>
+              <>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <article className="rounded-xl border border-white/10 bg-black/20 p-4">
+                    <h3 className="text-white/80 text-sm mb-1">総合運勢</h3>
+                    <p className="text-white/90 leading-relaxed text-[15px]">
+                      {profile.fortune || "—"}
+                    </p>
+                  </article>
+                  <article className="rounded-xl border border-white/10 bg-black/20 p-4">
+                    <h3 className="text-white/80 text-sm mb-1">性格傾向</h3>
+                    <p className="text-white/90 leading-relaxed text-[15px]">
+                      {profile.personality || "—"}
+                    </p>
+                  </article>
+                  <article className="rounded-xl border border-white/10 bg-black/20 p-4">
+                    <h3 className="text-white/80 text-sm mb-1">仕事運</h3>
+                    <p className="text-white/90 leading-relaxed text-[15px]">
+                      {profile.work || "—"}
+                    </p>
+                  </article>
+                  <article className="rounded-xl border border-white/10 bg-black/20 p-4">
+                    <h3 className="text-white/80 text-sm mb-1">理想のパートナー像</h3>
+                    <p className="text-white/90 leading-relaxed text-[15px]">
+                      {profile.partner || "—"}
+                    </p>
+                  </article>
+                </div>
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={goProfile}
+                    className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10"
+                  >
+                    プロフィール診断へ
+                  </button>
+                </div>
+              </>
             ) : (
-              <p className="text-white/70 text-sm">まだプロフィール診断の結果がありません。</p>
+              <p className="text-white/70 text-sm">
+                まだプロフィール診断の結果がありません。
+                <button
+                  onClick={goProfile}
+                  className="ml-2 underline decoration-white/30 hover:decoration-white/60"
+                >
+                  いますぐ診断する
+                </button>
+              </p>
             )}
           </section>
 
@@ -110,10 +168,28 @@ export default function MyPageClient() {
             {daily ? (
               <>
                 <p className="text-white/90 leading-relaxed mb-2">{daily.comment || "—"}</p>
-                {daily.quote && <p className="text-white/60 italic text-sm">「{daily.quote}」</p>}
+                {daily.quote && (
+                  <p className="text-white/60 italic text-sm">「{daily.quote}」</p>
+                )}
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={goDaily}
+                    className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10"
+                  >
+                    デイリー診断へ
+                  </button>
+                </div>
               </>
             ) : (
-              <p className="text-white/70 text-sm">まだデイリー診断の結果がありません。</p>
+              <p className="text-white/70 text-sm">
+                まだデイリー診断の結果がありません。
+                <button
+                  onClick={goDaily}
+                  className="ml-2 underline decoration-white/30 hover:decoration-white/60"
+                >
+                  今日の1問へ
+                </button>
+              </p>
             )}
           </section>
 

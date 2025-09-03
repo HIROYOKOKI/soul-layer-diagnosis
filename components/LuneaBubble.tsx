@@ -11,7 +11,7 @@ export type LuneaBubbleProps = {
   speed?: number
 }
 
-export function LuneaBubble({ text, speed = 18 }: LuneaBubbleProps) {
+export default function LuneaBubble({ text, speed = 30 }: LuneaBubbleProps) {
   const [out, setOut] = useState("")
 
   useEffect(() => {
@@ -43,5 +43,3 @@ export function LuneaBubble({ text, speed = 18 }: LuneaBubbleProps) {
     </div>
   )
 }
-
-export default LuneaBubble

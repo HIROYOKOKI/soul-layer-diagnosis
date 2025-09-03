@@ -242,18 +242,19 @@ html, body { background:#000; color:#fff; }
 /* いったん全てのlucide-settingsを非表示 */
 svg.lucide.lucide-settings { display: none !important; }
 
-/* ヘッダーだけ再表示（header-settings ボタン配下） */
-button.header-settings svg.lucide.lucide-settings {
-  display: inline-block !important;
-}
-/* Settingsギアを常に細線化（どのアイコンライブラリでも効く） */
-button[aria-label="Settings"] svg { stroke-width: 1.1 !important; }
 /* FREEバッジが2個以上描画されたら、2個目以降は非表示 */
 .free-badge ~ .free-badge { display: none !important; }
 
 /* ギア線を常に細く（アイコン実装に依らず効かせる） */
 button[aria-label="Settings"] svg { stroke-width: 1.0 !important; }
 /* 塗りつぶしで太く見える場合の保険（ギアに限る） */
+button[aria-label="Settings"] svg [fill]:not([fill="none"]) { fill: none !important; }
+/* FREEバッジが複数描画された場合、2個目以降を隠す（保険） */
+.free-badge ~ .free-badge { display: none !important; }
+
+/* ギア線は常に極細に（ライブラリ差異があっても効く） */
+button[aria-label="Settings"] svg { stroke-width: 1.0 !important; }
+/* 塗りつぶしで太く見えるケースを無効化（ギア限定） */
 button[aria-label="Settings"] svg [fill]:not([fill="none"]) { fill: none !important; }
 
 

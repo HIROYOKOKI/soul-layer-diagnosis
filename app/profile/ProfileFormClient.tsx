@@ -15,16 +15,17 @@ export default function ProfileFormClient() {
     setLoading(true)
 
     const f = new FormData(e.currentTarget)
+    const rawPref = String(f.get("preference") || "")
     const pending = {
       name: String(f.get("name") || ""),
       birthday: String(f.get("birthday") || ""),
       blood: String(f.get("blood") || ""),
       gender: String(f.get("gender") || ""),
-      preference: (String(f.get("preference") || "") || null),
+      // 空文字は null 扱い（任意）
+      preference: rawPref === "" ? null : rawPref,
     }
 
     try {
-      // 確認画面で表示するため一時保存 → 遷移
       sessionStorage.setItem("profile_pending", JSON.stringify(pending))
       router.push("/profile/confirm")
     } catch (err) {
@@ -39,7 +40,7 @@ export default function ProfileFormClient() {
       <h1 className="text-xl font-bold">プロフィール入力</h1>
 
       <label className="grid gap-1 text-sm">
-        <span>名前</span>
+        <span>ニックネーム</span>
         <input name="name" type="text" required className="px-3 py-2 rounded-lg bg-white/5 border border-white/10" />
       </label>
 
@@ -69,19 +70,27 @@ export default function ProfileFormClient() {
 
       <label className="grid gap-1 text-sm">
         <span>恋愛対象（任意）</span>
-        <input
+        <select
           name="preference"
-          type="text"
-          placeholder="例: 女性 / 男性 / 指定なし"
           className="px-3 py-2 rounded-lg bg-white/5 border border-white/10"
-        />
+          defaultValue=""
+        >
+          <option value="">選択しない</option>
+          <option value="Female">女性</option>
+          <option value="Male">男性</option>
+          <option value="Both">どちらも</option>
+        </select>
       </label>
 
       <div className="flex items-center gap-3 pt-2">
         <button
           disabled={loading}
           type="submit"
-          className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10"
+          className="relative inline-flex items-center justify-center rounded-full px-6 py-3
+                     bg-gradient-to-r from-cyan-500 to-indigo-500 text-white font-semibold tracking-wide
+                     shadow-[0_0_32px_rgba(56,189,248,0.35)]
+                     hover:shadow-[0_0_42px_rgba(99,102,241,0.55)]
+                     border border-white/10 transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loading ? "送信中…" : "確認へ"}
         </button>

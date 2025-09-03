@@ -1,144 +1,128 @@
 // app/mypage/MyPageClient.tsx
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import {
-  EVAEPolarChart,
-  EVAETrendChart,
-  EVAEChartSquares,
-  EVAEColorBadges,
-} from "@/components/EVAECharts"
+import React, { useEffect, useState } from "react"
 
-type ProfileItem = { fortune?: string; personality?: string; partner?: string; created_at?: string | null }
-type DailyItem   = { code?: string; comment?: string; quote?: string; created_at?: string | null }
-type ApiResp<T>  = { ok: boolean; item: T | null; error?: string }
+type ProfileLatest = {
+  fortune?: string | null
+  personality?: string | null
+  work?: string | null
+  partner?: string | null
+  created_at?: string
+}
+type DailyLatest = {
+  code?: string | null
+  comment?: string | null
+  quote?: string | null
+  created_at?: string
+}
 
-// ダミー（0..1）
-const DUMMY_VALS = { E: 0.62, V: 0.78, L: 0.45, Eexists: 0.68 }
-
-function nudgeFromCode(code?: string) {
-  const x = (code || "").trim()
-  const k = x === "∃" || x === "ヨ" ? "Eexists" : x === "A" ? "L" : x
-  const base = { ...DUMMY_VALS }
-  if (k === "E") base.E = Math.min(1, base.E + 0.10)
-  else if (k === "V") base.V = Math.min(1, base.V + 0.10)
-  else if (k === "L") base.L = Math.min(1, base.L + 0.10)
-  else if (k === "Eexists") base.Eexists = Math.min(1, base.Eexists + 0.10)
-  return base
+function normalizeCode(raw?: string | null): "E" | "V" | "Λ" | "Ǝ" | "" {
+  const x = (raw || "").trim()
+  if (x === "∃" || x === "ヨ") return "Ǝ"
+  if (x === "A") return "Λ"
+  return (["E", "V", "Λ", "Ǝ"].includes(x) ? x : "") as any
 }
 
 export default function MyPageClient() {
-  const [prof,  setProf]  = useState<ProfileItem | null>(null)
-  const [daily, setDaily] = useState<DailyItem   | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [profile, setProfile] = useState<ProfileLatest | null>(null)
+  const [daily, setDaily] = useState<DailyLatest | null>(null)
 
   useEffect(() => {
-    let cancelled = false
     async function run() {
       try {
-        setError(null); setLoading(true)
+        setError(null)
+        setLoading(true)
         const [p, d] = await Promise.all([
-          fetch("/api/mypage/profile-latest", { cache:"no-store" })
-            .then(r=>r.json() as Promise<ApiResp<ProfileItem>>),
-          fetch("/api/mypage/daily-latest",   { cache:"no-store" })
-            .then(r=>r.json() as Promise<ApiResp<DailyItem>>),
+          fetch("/api/mypage/profile-latest", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/mypage/daily-latest", { cache: "no-store" }).then((r) => r.json()),
         ])
-        if (!cancelled) {
-          if (!p.ok) throw new Error(p.error || "profile_latest_failed")
-          if (!d.ok) throw new Error(d.error || "daily_latest_failed")
-          setProf(p.item ?? null)
-          setDaily(d.item ?? null)
-        }
-      } catch (e:any) {
-        if (!cancelled) setError(e?.message || "fetch_failed")
+        if (!p?.ok) throw new Error(p?.error || "profile_latest_failed")
+        if (!d?.ok) throw new Error(d?.error || "daily_latest_failed")
+        setProfile(p.item ?? null)
+        setDaily(d.item ?? null)
+      } catch (e: any) {
+        setError(e?.message || "failed")
       } finally {
-        if (!cancelled) setLoading(false)
+        setLoading(false)
       }
     }
     run()
-    return () => { cancelled = true }
   }, [])
 
-  const reload = () => location.reload()
-
-  // 中央レーダー値（ダミー＋codeの軽い反映）
-  const radarVals = useMemo(() => nudgeFromCode(daily?.code), [daily?.code])
+  const c = normalizeCode(daily?.code)
 
   return (
-    <main className="min-h-[100dvh] px-5 py-8 text-white">
-      {/* ヘッダー下レイアウト */}
-      <section className="rounded-3xl bg-white/5 border border-white/10 p-5 md:p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-          {/* 左：プロフィール塊 */}
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-[radial-gradient(circle_at_center,#1fb6ff_0%,#05070a_70%)] ring-1 ring-white/15" />
-            <div className="leading-tight">
-              <div className="text-lg font-semibold">Hiro</div>
-              <div className="text-xs text-white/60">ID: 0001</div>
-            </div>
-          </div>
+    <div className="mx-auto max-w-3xl p-6 space-y-6">
+      <h1 className="text-xl font-semibold text-white">マイページ</h1>
 
-          {/* 中央：現在のテーマ（ダミー表記） */}
-          <div className="text-center md:text-left">
-            <div className="text-xs tracking-wide text-white/60">現在のテーマ</div>
-            <div className="text-2xl font-bold">self</div>
-            <div className="text-xs text-white/50">2025-08-30</div>
-          </div>
+      {loading && <div className="text-white/70">…読込中</div>}
 
-          {/* 右：バッジ群 */}
-          <div className="flex md:justify-end gap-3">
-            <span className="px-3 py-1 rounded-full border border-white/20 bg-white/10 text-xs">FREE</span>
-            <button aria-label="settings"
-              className="w-9 h-9 rounded-full border border-white/20 bg-white/10 grid place-items-center">
-              <span className="text-lg">⚙️</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 直近メッセージカード */}
-        <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm text-white/80">直近のメッセージ</h3>
-            <button className="text-xs text-cyan-300/90 hover:underline">Premiumで解放 →</button>
-          </div>
-          <div className="mt-3 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full grid place-items-center text-sm font-bold"
-                 style={{ background: "radial-gradient(circle at center,#7E22CE, #281337 70%)" }}>
-              Ǝ
-            </div>
-            <div>
-              <div className="text-sm">{daily?.comment || "静かに観察したい"}</div>
-              <div className="text-xs text-white/50 mt-0.5">
-                {daily?.created_at ? new Date(daily.created_at).toLocaleDateString() : "2025-08-30"}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 中央：レーダーチャート */}
-      <section className="mt-8 rounded-3xl bg-white/5 border border-white/10 p-6">
-        <div className="flex flex-col items-center gap-4">
-          <EVAEColorBadges values={radarVals} />
-          <EVAEPolarChart values={radarVals} />
-          <EVAEChartSquares />
-        </div>
-      </section>
-
-      {/* 下段：時系列（ダミー） */}
-      <section className="mt-8 rounded-3xl bg-white/5 border border-white/10 p-6">
-        <h2 className="text-sm uppercase tracking-wide opacity-70 mb-3">時系列（7 / 30 / 90日・ダミー）</h2>
-        <EVAETrendChart />
-      </section>
-
-      {/* 既存エラーハンドリング */}
-      {loading && <p className="opacity-70 mt-4">読み込み中…</p>}
       {error && (
-        <div className="mt-4 text-sm text-red-300">
-          取得に失敗しました（{error}） <button onClick={reload} className="underline">再読み込み</button>
+        <div className="space-y-3">
+          <div className="text-sm text-red-300">エラー: {error}</div>
+          <button
+            className="px-3 py-2 rounded border border-white/20 hover:bg-white/10"
+            onClick={() => location.reload()}
+          >
+            再試行
+          </button>
         </div>
       )}
-    </main>
+
+      {!loading && !error && (
+        <>
+          {/* プロフィール最新（4ブロック） */}
+          <section className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[inset_0_0_12px_rgba(255,255,255,.04)]">
+            <div className="text-cyan-300 font-semibold mb-3">プロフィール診断（最新）</div>
+            {profile ? (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <article className="rounded-xl border border-white/10 bg-black/20 p-4">
+                  <h3 className="text-white/80 text-sm mb-1">総合運勢</h3>
+                  <p className="text-white/90 leading-relaxed text-[15px]">{profile.fortune || "—"}</p>
+                </article>
+                <article className="rounded-xl border border-white/10 bg-black/20 p-4">
+                  <h3 className="text-white/80 text-sm mb-1">性格傾向</h3>
+                  <p className="text-white/90 leading-relaxed text-[15px]">{profile.personality || "—"}</p>
+                </article>
+                <article className="rounded-xl border border-white/10 bg-black/20 p-4">
+                  <h3 className="text-white/80 text-sm mb-1">仕事運</h3>
+                  <p className="text-white/90 leading-relaxed text-[15px]">{profile.work || "—"}</p>
+                </article>
+                <article className="rounded-xl border border-white/10 bg-black/20 p-4">
+                  <h3 className="text-white/80 text-sm mb-1">理想のパートナー像</h3>
+                  <p className="text-white/90 leading-relaxed text-[15px]">{profile.partner || "—"}</p>
+                </article>
+              </div>
+            ) : (
+              <p className="text-white/70 text-sm">まだプロフィール診断の結果がありません。</p>
+            )}
+          </section>
+
+          {/* デイリー最新 */}
+          <section className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[inset_0_0_12px_rgba(255,255,255,.04)]">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-pink-300 font-semibold">デイリー診断（最新）</div>
+              <div className="text-white/60 text-sm">{c ? `構造コード：${c}` : ""}</div>
+            </div>
+            {daily ? (
+              <>
+                <p className="text-white/90 leading-relaxed mb-2">{daily.comment || "—"}</p>
+                {daily.quote && <p className="text-white/60 italic text-sm">「{daily.quote}」</p>}
+              </>
+            ) : (
+              <p className="text-white/70 text-sm">まだデイリー診断の結果がありません。</p>
+            )}
+          </section>
+
+          {/* 将来のレーダー用スペース（空のダミー） */}
+          <section className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-5">
+            <div className="text-white/60 text-sm">（予備）構造バランス可視化スペース</div>
+          </section>
+        </>
+      )}
+    </div>
   )
 }

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import AppHeader from '@/app/components/AppHeader'
 import AppSubHeaderTheme from '@/app/components/AppSubHeaderTheme'
 import type { StructureCode } from '@/app/_data/characters/lunea'
 

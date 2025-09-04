@@ -3,11 +3,13 @@
 
 import Image from "next/image"
 import { Settings } from "lucide-react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 
 export default function AppHeader() {
   const pathname = usePathname() || ""
-  // /mypage または /mypage/... を厳密判定（ロケール/末尾スラなしもOK）
+  const router = useRouter()
+
+  // /mypage または /mypage/... を判定
   const isMyPage = /^\/mypage(?:\/|$)/.test(pathname)
 
   return (
@@ -27,23 +29,25 @@ export default function AppHeader() {
         </span>
       </div>
 
-      {/* 右：FREE（常時）＋ 設定（/mypage配下のみ） */}
+      {/* 右：FREE（常時）＋ 設定（/mypage配下のみ表示） */}
       <div className="flex items-center gap-2">
         <span className="free-badge px-3 py-1 text-xs rounded-full border border-white/20 bg-white/10 text-white/80">
           FREE
         </span>
 
-        <button
-          aria-label="Settings"
-          // hidden を使わず、/mypage以外は visibility: hidden にしてレイアウト崩れ回避
-          style={{ visibility: isMyPage ? "visible" : "hidden" }}
-          className="rounded-full p-2 hover:bg-white/5 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30"
-        >
-          <Settings
-            className="w-5 h-5 text-sky-400 [stroke-width:1.05] drop-shadow-[0_0_6px_rgba(56,189,248,0.85)]"
-            strokeWidth={1.05}
-          />
-        </button>
+        {isMyPage && (
+          <button
+            type="button"
+            aria-label="Settings"
+            onClick={() => router.push("/settings")}
+            className="rounded-full p-2 hover:bg-white/5 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30"
+          >
+            <Settings
+              className="w-5 h-5 text-sky-400 [stroke-width:1.05] drop-shadow-[0_0_6px_rgba(56,189,248,0.85)]"
+              strokeWidth={1.05}
+            />
+          </button>
+        )}
       </div>
     </header>
   )

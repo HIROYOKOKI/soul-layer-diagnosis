@@ -1,7 +1,10 @@
 // app/theme/apply/page.tsx
 "use client";
 
-import { Suspense, useEffect } from "react";
+export const dynamic = "force-dynamic"; // 事前レンダリングさせない
+export const revalidate = 0;
+
+import React, { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function ApplyInner() {
@@ -9,27 +12,24 @@ function ApplyInner() {
   const qs = useSearchParams();
 
   useEffect(() => {
-    const q = qs.get("to");
-    // ① ?to=... があれば優先、無ければ sessionStorage の選択、最後に "dev"
-    const theme =
-      q ||
+    // ① ?to=... 優先 → ② sessionStorage の選択 → ③ "dev"
+    const next =
+      qs.get("to") ||
       (typeof window !== "undefined"
         ? sessionStorage.getItem("evae_theme_selected")
         : null) ||
       "dev";
 
     try {
-      // あなたのプロジェクトで参照しているキー名に合わせてください
-      localStorage.setItem("ev-theme", theme);
-      sessionStorage.setItem("evae_theme_selected", theme);
-      // <html data-theme="..."> に反映している場合はここで反映してもOK
-      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem("ev-theme", next);
+      sessionStorage.setItem("evae_theme_selected", next);
+      // data-theme を使っている場合のみ
+      document.documentElement.setAttribute("data-theme", next);
     } catch {
-      // 失敗しても致命的ではないのでそのまま遷移
+      // 何もしない（致命的ではない）
     }
 
     const redirect = qs.get("redirect") || "/mypage";
-    // 履歴を残さず目的地へ
     router.replace(redirect);
     router.refresh();
   }, [qs, router]);
@@ -41,12 +41,11 @@ function ApplyInner() {
   );
 }
 
-export default function Page() {
-  // useSearchParams を Suspense でラップ
+export default function ApplyPage() {
+  // useSearchParams() を Suspense でラップ
   return (
     <Suspense fallback={<div className="p-8 text-white/70">読み込み中…</div>}>
       <ApplyInner />
     </Suspense>
   );
 }
-apply/page.tsx

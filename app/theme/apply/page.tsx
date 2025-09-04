@@ -1,10 +1,10 @@
 // app/theme/apply/page.tsx
 "use client";
 
-export const dynamic = "force-dynamic"; // 事前レンダリングさせない
-export const revalidate = 0;
+// ❌ revalidate を export しない（ここは完全CSRでOK）
+// ❌ dynamic も消して大丈夫です
 
-import React, { Suspense, useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function ApplyInner() {
@@ -12,7 +12,6 @@ function ApplyInner() {
   const qs = useSearchParams();
 
   useEffect(() => {
-    // ① ?to=... 優先 → ② sessionStorage の選択 → ③ "dev"
     const next =
       qs.get("to") ||
       (typeof window !== "undefined"
@@ -23,10 +22,9 @@ function ApplyInner() {
     try {
       localStorage.setItem("ev-theme", next);
       sessionStorage.setItem("evae_theme_selected", next);
-      // data-theme を使っている場合のみ
       document.documentElement.setAttribute("data-theme", next);
     } catch {
-      // 何もしない（致命的ではない）
+      // no-op
     }
 
     const redirect = qs.get("redirect") || "/mypage";
@@ -42,7 +40,6 @@ function ApplyInner() {
 }
 
 export default function ApplyPage() {
-  // useSearchParams() を Suspense でラップ
   return (
     <Suspense fallback={<div className="p-8 text-white/70">読み込み中…</div>}>
       <ApplyInner />

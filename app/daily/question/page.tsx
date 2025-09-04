@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+/* どんな値でも文字列にして安全に描画 */
 const safeText = (v: unknown) =>
   typeof v === "string" || typeof v === "number"
     ? String(v)
@@ -16,15 +17,14 @@ const safeText = (v: unknown) =>
         }
       })();
 
-
 /* =========================
    型
    ========================= */
 type EV = "E" | "V" | "Λ" | "Ǝ";
 type QResp = {
   ok: boolean;
-  question?: string;
-  choices?: string[]; // 4択想定
+  question?: unknown;       // ← APIが配列/オブジェクトを返しても落ちないよう unknown
+  choices?: unknown[];      // 4択
   seed?: string | number;
   error?: string;
 };
@@ -34,9 +34,9 @@ type DReq = {
 };
 type DResp = {
   ok: boolean;
-  code?: EV;               // E / V / Λ / Ǝ
-  comment?: string;        // 一言コメント
-  quote?: string;          // 格言など
+  code?: string;
+  comment?: unknown;
+  quote?: unknown;
   navigator?: string | null;
   error?: string;
 };
@@ -57,8 +57,10 @@ function normalizeCode(x?: string | null): EV | null {
 
 function getThemeForLog() {
   // UIテーマ（配色）と診断テーマ（devログ分離）は別レイヤー
-  // dev分離用に "ev-theme"（配色）とは別で "dev" を優先的に入れる運用
-  const t = (typeof localStorage !== "undefined" ? localStorage.getItem("ev-theme") : null) || "dev";
+  const t =
+    (typeof localStorage !== "undefined"
+      ? localStorage.getItem("ev-theme")
+      : null) || "dev";
   return t;
 }
 
@@ -89,13 +91,21 @@ export default function DailyQuestionPage() {
       const res = await fetch("/api/lunea/question", { cache: "no-store" });
       const data: QResp = await res.json();
       if (!data.ok) throw new Error(data.error || "failed_question");
-      setQ(data.question || "きょうの直感で選んでください。");
-      const cs = (data.choices && data.choices.length >= 4 ? data.choices.slice(0, 4) : [
-        "A：勢いよく進める",
-        "B：まずは発想を広げる",
-        "C：手順と基準を決めて進める",
-        "D：小さく試して観察する",
-      ]);
+
+      // どんな形でも文字列に整形
+      const question = safeText(data.question) || "きょうの直感で選んでください。";
+      const csRaw =
+        Array.isArray(data.choices) && data.choices.length >= 4
+          ? data.choices.slice(0, 4)
+          : [
+              "A：勢いよく進める",
+              "B：まずは発想を広げる",
+              "C：手順と基準を決めて進める",
+              "D：小さく試して観察する",
+            ];
+      const cs = csRaw.map(safeText);
+
+      setQ(question);
       setChoices(cs);
     } catch (e: any) {
       setError(e?.message ?? "question_error");
@@ -106,6 +116,7 @@ export default function DailyQuestionPage() {
 
   useEffect(() => {
     fetchQuestion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ---------- Q2. 診断の実行 ---------- */
@@ -122,13 +133,14 @@ export default function DailyQuestionPage() {
       });
       const data: DResp = await res.json();
       if (!data.ok) throw new Error(data.error || "failed_diagnose");
-      const code = normalizeCode(data.code) || "E";
+
+      const code = normalizeCode(safeText(data.code)) || "E";
       setResult({
         code,
-        comment: data.comment || "",
-        quote: data.quote || "",
+        comment: safeText(data.comment),
+        quote: safeText(data.quote),
       });
-      // 触感フィードバック
+
       (navigator as any)?.vibrate?.(8);
     } catch (e: any) {
       setError(e?.message ?? "diagnose_error");
@@ -194,7 +206,7 @@ export default function DailyQuestionPage() {
         {/* エラー */}
         {error && (
           <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm">
-            うまく読み込めませんでした（{error}）。もう一度お試しください。
+            うまく読み込めませんでした（{safeText(error)}）。もう一度お試しください。
           </div>
         )}
 
@@ -202,18 +214,19 @@ export default function DailyQuestionPage() {
         <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
           <div className="text-white/70 text-sm">今日の質問</div>
           <p className="mt-1 text-lg leading-relaxed">
-            {loading ? "…生成中" : q}
+            {loading ? "…生成中" : safeText(q)}
           </p>
 
           <div className="mt-4 grid grid-cols-1 gap-3">
             {choices.map((c, i) => {
-              const active = selected === c;
+              const label = safeText(c);                 // ← ラベルを確実に文字列化
+              const active = selected === label;         // ← 比較もラベルで統一
               return (
                 <button
                   key={i}
                   type="button"
                   disabled={loading || !!result}
-                  onClick={() => setSelected(c)}
+                  onClick={() => setSelected(label)}     // ← 文字列を保持
                   className={[
                     "w-full text-left rounded-xl px-4 py-3 border transition",
                     active
@@ -221,7 +234,7 @@ export default function DailyQuestionPage() {
                       : "border-white/10 bg-white/5 hover:bg-white/8",
                   ].join(" ")}
                 >
-                  {c}
+                  {label}
                 </button>
               );
             })}
@@ -277,14 +290,14 @@ export default function DailyQuestionPage() {
               <div className="mt-2 flex items-center gap-3">
                 {codeBadge(result.code)}
               </div>
-              <p className="mt-3 leading-relaxed">{result.comment}</p>
+              <p className="mt-3 leading-relaxed">{safeText(result.comment)}</p>
             </div>
 
             {!!result.quote && (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
                 <div className="text-sm text-white/60">きょうの言葉</div>
                 <blockquote className="mt-2 text-base leading-relaxed">
-                  “{result.quote}”
+                  “{safeText(result.quote)}”
                 </blockquote>
               </div>
             )}

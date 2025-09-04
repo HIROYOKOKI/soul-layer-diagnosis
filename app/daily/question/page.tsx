@@ -3,6 +3,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+const safeText = (v: unknown) =>
+  typeof v === "string" || typeof v === "number"
+    ? String(v)
+    : v == null
+    ? ""
+    : (() => {
+        try {
+          return JSON.stringify(v);
+        } catch {
+          return String(v);
+        }
+      })();
+
+
 /* =========================
    型
    ========================= */

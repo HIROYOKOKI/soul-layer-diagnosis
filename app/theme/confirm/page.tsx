@@ -1,59 +1,74 @@
 // app/theme/confirm/page.tsx
-"use client"
+"use client";
 
-import { useRouter, useSearchParams } from "next/navigation"
-import { useCallback } from "react"
+import { Suspense, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function ThemeConfirmPage() {
-  const router = useRouter()
-  const qs = useSearchParams()
-  // ?to=dev|prod|free など、テーマ名をクエリでもらう想定（なければ "dev"）
-  const nextTheme = (qs.get("to") || "dev").trim()
-  // 適用後の遷移先（指定なければ /mypage）
-  const redirect = qs.get("redirect") || "/mypage"
+function ConfirmInner() {
+  const router = useRouter();
+  const qs = useSearchParams();
+
+  // /theme/confirm?to=work&redirect=/mypage の想定
+  const nextTheme = (qs.get("to") || "dev").trim();
+  const redirect = qs.get("redirect") || "/mypage";
+
+  const handleBack = useCallback(() => {
+    router.back();
+  }, [router]);
 
   const handleApply = useCallback(() => {
     try {
-      // ここでテーマを保存（アプリで参照しているキー名に合わせてください）
-      localStorage.setItem("ev-theme", nextTheme)
-      // 必要なら sessionStorage や cookie もここで
-      // 例: document.cookie = `ev-theme=${nextTheme}; path=/; max-age=31536000`
-
-      // 反映のための画面遷移
-      router.push(redirect)
-      router.refresh()
+      // UI適用用キー（あなたのプロジェクトで参照するキー名に合わせてください）
+      localStorage.setItem("ev-theme", nextTheme);
+      // ついでに選択保持（不要なら削除OK）
+      sessionStorage.setItem("evae_theme_selected", nextTheme);
     } catch {
-      // 失敗時はテーマ選択画面へ戻す
-      router.push("/theme")
+      // 失敗しても致命的ではないので静かに続行
     }
-  }, [nextTheme, redirect, router])
+    router.push(redirect);
+    router.refresh();
+  }, [nextTheme, redirect, router]);
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="text-2xl font-semibold mb-3">テーマを変更しますか？</h1>
-      <p className="text-sm text-white/70 mb-8">
-        テーマを変更すると、保存済みの一部履歴がリセットされる場合があります。
-      </p>
+    <div className="min-h-[100svh] bg-black text-white">
+      <main className="mx-auto max-w-2xl px-6 py-12">
+        <h1 className="text-2xl font-semibold mb-3">テーマを変更しますか？</h1>
+        <p className="text-sm text-white/70 mb-8">
+          テーマを変更すると、保存済みの一部履歴がリセットされる場合があります。
+        </p>
 
-      <div className="flex gap-3">
-        <button
-          onClick={() => router.back()}
-          className="rounded-lg px-4 py-2 bg-neutral-700/60 hover:bg-neutral-600"
-        >
-          いいえ（戻る）
-        </button>
-        <button
-          onClick={handleApply}
-          className="rounded-lg px-4 py-2 bg-sky-600 hover:bg-sky-500"
-        >
-          はい、変更する
-        </button>
-      </div>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="rounded-lg px-4 py-2 bg-neutral-700/60 hover:bg-neutral-600"
+          >
+            いいえ（戻る）
+          </button>
+          <button
+            type="button"
+            onClick={handleApply}
+            className="rounded-lg px-4 py-2 bg-sky-600 hover:bg-sky-500"
+          >
+            はい、変更する
+          </button>
+        </div>
 
-      <div className="mt-6 text-xs text-white/50">
-        適用テーマ：<span className="font-mono">{nextTheme}</span> ／ 遷移先：{" "}
-        <span className="font-mono">{redirect}</span>
-      </div>
+        <div className="mt-6 text-xs text-white/50 space-x-2">
+          <span>適用テーマ：<span className="font-mono">{nextTheme}</span></span>
+          <span>／</span>
+          <span>遷移先：<span className="font-mono">{redirect}</span></span>
+        </div>
+      </main>
     </div>
-  )
+  );
+}
+
+export default function Page() {
+  // ✅ useSearchParams を Suspense でラップ（Next.js 警告の解消）
+  return (
+    <Suspense fallback={<div className="p-8 text-white/70">読み込み中…</div>}>
+      <ConfirmInner />
+    </Suspense>
+  );
 }

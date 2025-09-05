@@ -23,7 +23,7 @@ type PendingV2 = {
 
 // 固定出題（ベース診断）
 const QUESTION =
-  'Q. あなたが人生で最も大切にしたいものはどれですか？（選んだ順に順位付けしてください）'
+  'Q. あなたが人生で最も大切にしたいものはどれですか？（大切と思う順番に順位をつけてください。）'
 
 // 固定4択（E/V/Λ/Ǝ対応）
 const CHOICES: Array<{ code: EV; label: string; desc: string }> = [

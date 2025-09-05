@@ -14,9 +14,25 @@ type PendingV2 = {
   _meta: {
     ts: number
     v: 'quick-v2'
-    presentModel: 'EΛVƎ'
-    futureModel: 'EVΛƎ'
+    presentModel: 'EΛVƎ' // 確定した現在=顕在
+    futureModel: 'EVΛƎ'  // 未確定の未来=潜在
     question: string
+  }
+}
+
+// 先頭コードで型を決定（簡潔版）
+function decideModel(top: EV) {
+  if (top === 'E' || top === 'Λ') {
+    return {
+      key: 'EΛVƎ',
+      title: '確定した現在（顕在意識）',
+      note: '観測済み・いま確定している層を優位に扱う傾向',
+    }
+  }
+  return {
+    key: 'EVΛƎ',
+    title: '未確定の未来（潜在意識）',
+    note: 'これから収束していく可能性の層を優位に扱う傾向',
   }
 }
 
@@ -28,11 +44,10 @@ export default function ResultClient() {
     try {
       const raw = sessionStorage.getItem('structure_quick_pending')
       if (!raw) {
-        router.replace('/structure/quick') // データなければ戻す
+        router.replace('/structure/quick')
         return
       }
       const parsed = JSON.parse(raw) as PendingV2
-      // 最低限のバリデーション
       if (!parsed?.order || parsed.order.length !== 4) {
         router.replace('/structure/quick')
         return
@@ -44,18 +59,10 @@ export default function ResultClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const orderList = useMemo(() => {
-    if (!data) return []
-    return data.order.map((code, i) => ({
-      rank: i + 1,
-      code,
-      label: data.labels[code],
-      hint: data.baseHints[code]?.comment,
-      point: data.points[code],
-    }))
-  }, [data])
+  const top = useMemo<EV | null>(() => (data ? data.order[0] : null), [data])
+  const model = useMemo(() => (top ? decideModel(top) : null), [top])
 
-  if (!data) {
+  if (!data || !top || !model) {
     return (
       <div className="min-h-screen grid place-items-center bg-black text-white">
         <p className="text-sm text-white/70">観測結果を読み込んでいます…</p>
@@ -71,10 +78,10 @@ export default function ResultClient() {
 
       <main className="flex-1 flex items-start justify-center px-5">
         <div className="w-full max-w-md pt-2 pb-10">
-          {/* ルネア演出（最小） */}
+          {/* ルネア最小セリフ */}
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4 mb-5">
             <p className="text-sm leading-relaxed">
-              観測が終わったよ。これが、きみの<strong className="mx-1">基礎層</strong>だね。
+              観測が終わったよ。きみの<strong className="mx-1">型</strong>は──
             </p>
             <p className="text-xs text-white/60 mt-1">
               （モデル整理：<span className="font-mono">EΛVƎ</span>=確定した現在/顕在、
@@ -82,23 +89,19 @@ export default function ResultClient() {
             </p>
           </div>
 
-          {/* 基礎層：順位表示 */}
-          <h2 className="text-lg font-bold mb-3">基礎層（あなたの優先順位）</h2>
-          <ol className="space-y-2">
-            {orderList.map(({ rank, label, hint, point, code }) => (
-              <li key={code} className="rounded-xl border border-white/12 bg-white/5 p-3">
-                <div className="flex items-center justify-between">
-                  <div className="font-semibold">
-                    {rank}位：{label}
-                  </div>
-                  <div className="text-xs text-white/70">+{point}pt</div>
-                </div>
-                {hint && <p className="text-xs text-white/70 mt-1">{hint}</p>}
-              </li>
-            ))}
-          </ol>
+          {/* 型だけ表示 */}
+          <div className="rounded-2xl border border-white/12 bg-white/5 p-4">
+            <div className="text-xs text-white/60">MODEL</div>
+            <div className="mt-1 text-2xl font-extrabold tracking-wider">{model.key}</div>
+            <div className="mt-1 text-sm text-white/80">{model.title}</div>
+            <p className="mt-2 text-xs text-white/70">{model.note}</p>
 
-          {/* 次への導線（ここでプロフィール診断UIと統合表示してもOK） */}
+            <div className="mt-4 text-xs text-white/60">
+              主導コード：<span className="font-semibold">{top}</span>
+            </div>
+          </div>
+
+          {/* 導線 */}
           <div className="mt-6 grid gap-3">
             <button
               className="w-full rounded-lg bg-pink-600 py-2 font-bold hover:bg-pink-500"

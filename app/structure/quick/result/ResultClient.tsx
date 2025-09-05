@@ -14,25 +14,25 @@ type PendingV2 = {
   _meta: {
     ts: number
     v: 'quick-v2'
-    presentModel: 'EΛVƎ' // 確定した現在=顕在
-    futureModel: 'EVΛƎ'  // 未確定の未来=潜在
+    presentModel: 'EΛVƎ'
+    futureModel: 'EVΛƎ'
     question: string
   }
 }
 
-// 先頭コードで型を決定（簡潔版）
+// 先頭コードで型を決定（→ 現実思考型 / 未来志向型）
 function decideModel(top: EV) {
   if (top === 'E' || top === 'Λ') {
     return {
       key: 'EΛVƎ',
-      title: '確定した現在（顕在意識）',
-      note: '観測済み・いま確定している層を優位に扱う傾向',
+      title: '現実思考型',
+      note: '「確定した現在」を基準に考えるタイプ。今あるものを重視して行動します。',
     }
   }
   return {
     key: 'EVΛƎ',
-    title: '未確定の未来（潜在意識）',
-    note: 'これから収束していく可能性の層を優位に扱う傾向',
+    title: '未来志向型',
+    note: '「未確定の未来」を基準に考えるタイプ。可能性やこれからの変化を重視します。',
   }
 }
 
@@ -56,8 +56,7 @@ export default function ResultClient() {
     } catch {
       router.replace('/structure/quick')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [router])
 
   const top = useMemo<EV | null>(() => (data ? data.order[0] : null), [data])
   const model = useMemo(() => (top ? decideModel(top) : null), [top])
@@ -81,19 +80,17 @@ export default function ResultClient() {
           {/* ルネア最小セリフ */}
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4 mb-5">
             <p className="text-sm leading-relaxed">
-              観測が終わったよ。きみの<strong className="mx-1">型</strong>は──
-            </p>
-            <p className="text-xs text-white/60 mt-1">
-              （モデル整理：<span className="font-mono">EΛVƎ</span>=確定した現在/顕在、
-              <span className="font-mono ml-1">EVΛƎ</span>=未確定の未来/潜在）
+              観測が終わったよ。きみの<strong className="mx-1">基礎層タイプ</strong>は──
             </p>
           </div>
 
           {/* 型だけ表示 */}
           <div className="rounded-2xl border border-white/12 bg-white/5 p-4">
-            <div className="text-xs text-white/60">MODEL</div>
-            <div className="mt-1 text-2xl font-extrabold tracking-wider">{model.key}</div>
-            <div className="mt-1 text-sm text-white/80">{model.title}</div>
+            <div className="text-xs text-white/60">TYPE</div>
+            <div className="mt-1 text-2xl font-extrabold tracking-wider">
+              {model.title}
+            </div>
+            <div className="mt-1 text-sm text-white/80">({model.key})</div>
             <p className="mt-2 text-xs text-white/70">{model.note}</p>
 
             <div className="mt-4 text-xs text-white/60">

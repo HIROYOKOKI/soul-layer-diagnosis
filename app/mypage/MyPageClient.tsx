@@ -1,16 +1,21 @@
-// app/mypage/MyPageClient.tsx
 "use client"
 
 import React, { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
+type EV = "E" | "V" | "Λ" | "Ǝ"
+
 type ProfileLatest = {
   fortune?: string | null
   personality?: string | null
-  work?: string | null
   partner?: string | null
   created_at?: string
+  // クイック基礎層
+  base_model?: "EΛVƎ" | "EVΛƎ" | null
+  base_order?: EV[] | null
+  base_points?: Record<EV, number> | null
 }
+
 type DailyLatest = {
   code?: string | null
   comment?: string | null
@@ -18,11 +23,17 @@ type DailyLatest = {
   created_at?: string
 }
 
-function normalizeCode(raw?: string | null): "E" | "V" | "Λ" | "Ǝ" | "" {
+function normalizeCode(raw?: string | null): EV | "" {
   const x = (raw || "").trim()
   if (x === "∃" || x === "ヨ") return "Ǝ"
   if (x === "A") return "Λ"
   return (["E", "V", "Λ", "Ǝ"].includes(x) ? x : "") as any
+}
+
+function toTypeLabel(model?: string | null) {
+  if (model === "EΛVƎ") return "現実思考型"
+  if (model === "EVΛƎ") return "未来志向型"
+  return null
 }
 
 export default function MyPageClient() {
@@ -58,40 +69,22 @@ export default function MyPageClient() {
   }, [])
 
   const c = normalizeCode(daily?.code)
+  const typeLabel = toTypeLabel(profile?.base_model)
 
   return (
-    <div className="mx-auto max-w-3xl p-6 space-y-6">
-      <h1 className="text-xl font-semibold text-white">マイページ</h1>
+    <div className="min-h-screen bg-black text-white px-5 py-8 max-w-md mx-auto">
+      <h1 className="text-xl font-bold mb-5">マイページ</h1>
 
-      {/* ローディング骨組み */}
+      {/* ローディング */}
       {loading && (
         <div className="space-y-4">
-          {/* プロフィール骨組み */}
-          <div className="animate-pulse rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="h-4 w-40 bg-white/10 rounded mb-4" />
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="rounded-xl border border-white/10 bg-black/20 p-4">
-                  <div className="h-3 w-24 bg-white/10 rounded mb-2" />
-                  <div className="h-4 w-full bg-white/10 rounded" />
-                </div>
-              ))}
-            </div>
-          </div>
-          {/* デイリー骨組み */}
-          <div className="animate-pulse rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="h-4 w-32 bg-white/10 rounded" />
-              <div className="h-3 w-28 bg-white/10 rounded" />
-            </div>
-            <div className="h-4 w-full bg-white/10 rounded mb-2" />
-            <div className="h-3 w-1/2 bg-white/10 rounded" />
-          </div>
+          <div className="animate-pulse rounded-2xl border border-white/10 bg-white/5 p-5 h-28" />
+          <div className="animate-pulse rounded-2xl border border-white/10 bg-white/5 p-5 h-40" />
         </div>
       )}
 
       {/* エラー */}
-      {error && (
+      {error && !loading && (
         <div className="space-y-3">
           <div className="text-sm text-red-300">エラー: {error}</div>
           <button
@@ -106,71 +99,45 @@ export default function MyPageClient() {
       {/* 本体 */}
       {!loading && !error && (
         <>
-          {/* プロフィール最新（4ブロック） */}
-          <section className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[inset_0_0_12px_rgba(255,255,255,.04)]">
-            <div className="text-cyan-300 font-semibold mb-3">プロフィール診断（最新）</div>
-            {profile ? (
-              <>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-                    <h3 className="text-white/80 text-sm mb-1">総合運勢</h3>
-                    <p className="text-white/90 leading-relaxed text-[15px]">
-                      {profile.fortune || "—"}
-                    </p>
-                  </article>
-                  <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-                    <h3 className="text-white/80 text-sm mb-1">性格傾向</h3>
-                    <p className="text-white/90 leading-relaxed text-[15px]">
-                      {profile.personality || "—"}
-                    </p>
-                  </article>
-                  <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-                    <h3 className="text-white/80 text-sm mb-1">仕事運</h3>
-                    <p className="text-white/90 leading-relaxed text-[15px]">
-                      {profile.work || "—"}
-                    </p>
-                  </article>
-                  <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-                    <h3 className="text-white/80 text-sm mb-1">理想のパートナー像</h3>
-                    <p className="text-white/90 leading-relaxed text-[15px]">
-                      {profile.partner || "—"}
-                    </p>
-                  </article>
+          {/* 基礎層（クイック診断） */}
+          <section className="mb-5 rounded-2xl border border-white/12 bg-white/5 p-4">
+            <h2 className="text-sm font-bold mb-2">基礎層（クイック診断）</h2>
+
+            {profile && typeLabel ? (
+              <div className="text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center rounded-lg border border-white/20 bg-white/10 px-2 py-1 text-xs">
+                    {typeLabel}
+                  </span>
+                  <span className="text-xs text-white/60">（{profile.base_model}）</span>
                 </div>
-                <div className="flex gap-3 mt-4">
-                  <button
-                    onClick={goProfile}
-                    className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10"
-                  >
-                    プロフィール診断へ
-                  </button>
-                </div>
-              </>
+                {Array.isArray(profile.base_order) && profile.base_order.length === 4 && (
+                  <div className="mt-2 text-xs text-white/80">
+                    順番：{profile.base_order.join(" → ")}
+                  </div>
+                )}
+              </div>
             ) : (
-              <p className="text-white/70 text-sm">
-                まだプロフィール診断の結果がありません。
+              <div className="text-sm text-white/60">
+                まだクイック診断が登録されていません。
                 <button
                   onClick={goProfile}
                   className="ml-2 underline decoration-white/30 hover:decoration-white/60"
                 >
                   いますぐ診断する
                 </button>
-              </p>
+              </div>
             )}
           </section>
 
-          {/* デイリー最新 */}
-          <section className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[inset_0_0_12px_rgba(255,255,255,.04)]">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-pink-300 font-semibold">デイリー診断（最新）</div>
-              <div className="text-white/60 text-sm">{c ? `構造コード：${c}` : ""}</div>
-            </div>
+          {/* 最新デイリー */}
+          <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
+            <h2 className="text-sm font-bold mb-2">最新デイリー</h2>
             {daily ? (
-              <>
-                <p className="text-white/90 leading-relaxed mb-2">{daily.comment || "—"}</p>
-                {daily.quote && (
-                  <p className="text-white/60 italic text-sm">「{daily.quote}」</p>
-                )}
+              <div className="text-sm">
+                <div>コード：<span className="font-semibold">{c || "—"}</span></div>
+                {daily.comment && <p className="mt-1 text-white/80">{daily.comment}</p>}
+                {daily.quote && <p className="mt-2 text-xs text-white/60">“{daily.quote}”</p>}
                 <div className="flex gap-3 mt-4">
                   <button
                     onClick={goDaily}
@@ -179,22 +146,22 @@ export default function MyPageClient() {
                     デイリー診断へ
                   </button>
                 </div>
-              </>
+              </div>
             ) : (
-              <p className="text-white/70 text-sm">
-                まだデイリー診断の結果がありません。
+              <div className="text-sm text-white/60">
+                まだ記録がありません。
                 <button
                   onClick={goDaily}
                   className="ml-2 underline decoration-white/30 hover:decoration-white/60"
                 >
                   今日の1問へ
                 </button>
-              </p>
+              </div>
             )}
           </section>
 
-          {/* 将来のレーダー用スペース（空のダミー） */}
-          <section className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-5">
+          {/* 予備スペース */}
+          <section className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-5 mt-5">
             <div className="text-white/60 text-sm">（予備）構造バランス可視化スペース</div>
           </section>
         </>

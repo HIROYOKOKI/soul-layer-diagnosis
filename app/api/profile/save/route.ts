@@ -1,12 +1,18 @@
 // app/api/profile/save/route.ts
 import { NextResponse } from "next/server"
-import { getSupabaseAdmin } from "../../../../lib/supabase-admin"
+import { getSupabaseAdmin } from "@/lib/supabase-admin"
 
-type SaveBody = {
-  fortune?: string
-  personality?: string
-  work?: string
-  partner?: string
+// 受け取り想定の型
+type Body = {
+  user_id?: string | null
+  // プロフィール診断の要約（既存）
+  fortune?: string | null
+  personality?: string | null
+  partner?: string | null
+  // クイック基礎層（今回追加）
+  base_model?: "EΛVƎ" | "EVΛƎ" | null
+  base_order?: ("E" | "V" | "Λ" | "Ǝ")[] | null
+  base_points?: Record<"E" | "V" | "Λ" | "Ǝ", number> | null
 }
 
 export async function POST(req: Request) {
@@ -16,30 +22,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "supabase_env_missing" }, { status: 500 })
     }
 
-    const body = (await req.json()) as SaveBody
-    const { fortune, personality, work, partner } = body || {}
+    const body = (await req.json()) as Body
 
-    // 最低限のバリデーション（空文字はnull化）
+    // 軽いバリデーション（必要最小限）
+    if (!body) {
+      return NextResponse.json({ ok: false, error: "empty_body" }, { status: 400 })
+    }
+    if (body.base_order && body.base_order.length !== 4) {
+      return NextResponse.json({ ok: false, error: "invalid_base_order" }, { status: 400 })
+    }
+
+    // INSERT 用レコード整形（未指定はnullで保存）
     const row = {
-      fortune: (fortune || "").trim() || null,
-      personality: (personality || "").trim() || null,
-      work: (work || "").trim() || null,
-      partner: (partner || "").trim() || null,
-      // created_at は Supabase 側の default now() を利用
+      user_id: body.user_id ?? null,
+      fortune: body.fortune ?? null,
+      personality: body.personality ?? null,
+      partner: body.partner ?? null,
+      base_model: body.base_model ?? null,
+      base_order: body.base_order ?? null,     // text[] へ
+      base_points: body.base_points ?? null,   // jsonb へ
     }
 
-    // 4つ全部が空ならエラー
-    if (!row.fortune && !row.personality && !row.work && !row.partner) {
-      return NextResponse.json({ ok: false, error: "empty_detail" }, { status: 400 })
-    }
+    const { data, error } = await sb
+      .from("profile_results")
+      .insert([row])
+      .select("id, created_at, base_model")
+      .maybeSingle()
 
-    const { data, error } = await sb.from("profile_results").insert(row).select("*").maybeSingle()
     if (error) {
-      return NextResponse.json({ ok: false, error: "supabase_insert_failed", detail: error.message }, { status: 500 })
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ ok: true, item: data })
+    return NextResponse.json({ ok: true, id: data?.id, created_at: data?.created_at, base_model: data?.base_model })
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || "failed" }, { status: 500 })
+    return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 })
   }
 }

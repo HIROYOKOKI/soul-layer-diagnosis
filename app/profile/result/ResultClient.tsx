@@ -4,7 +4,6 @@
 import React, { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import LuneaBubble from "@/components/LuneaBubble"
-// 既に GlowButton がある想定。無ければ一旦 <button> で代用してください
 import GlowButton from "@/components/GlowButton"
 
 type Pending = {
@@ -18,7 +17,7 @@ type Pending = {
 type DiagnoseDetail = {
   fortune?: string      // 総合運勢 150-200文字
   personality?: string  // 性格傾向 150-200文字
-  work?: string         // 仕事運 80-100文字
+  work?: string         // 仕事運 80-100文字（DBには保存しない）
   partner?: string      // 理想のパートナー像 80-100文字
 }
 
@@ -34,7 +33,7 @@ type DiagnoseOk = {
 type DiagnoseNg = { ok: false; error: string }
 type DiagnoseResp = DiagnoseOk | DiagnoseNg
 
-// ---------- helpers (安全に取り出す) ----------
+// ---------- helpers ----------
 function chooseCardTexts(lines: string[]) {
   const xs = (lines || [])
     .map((s) => (typeof s === "string" ? s.trim() : ""))
@@ -57,9 +56,32 @@ function initialStep(len: number) {
 const FALLBACK_MAIN =
   "行動の火種が灯っているね。小さく始めるほど、軌道は早く整うよ。"
 
+// クイック基礎層（sessionStorage から取り出し → 型を決定）
+function getQuickBase() {
+  try {
+    const raw = typeof window !== "undefined" ? sessionStorage.getItem("structure_quick_pending") : null
+    if (!raw) return null
+    const p = JSON.parse(raw) as {
+      order: Array<"E" | "V" | "Λ" | "Ǝ">
+      points?: Record<"E" | "V" | "Λ" | "Ǝ", number>
+    }
+    if (!p?.order || p.order.length !== 4) return null
+    const top = p.order[0]
+    const base_model = top === "E" || top === "Λ" ? "EΛVƎ" : "EVΛƎ"
+    return {
+      base_model,
+      base_order: p.order,
+      base_points: p.points ?? { E: 0, V: 0, Λ: 0, Ǝ: 0 },
+    }
+  } catch {
+    return null
+  }
+}
+
 export default function ResultClient() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lines, setLines] = useState<string[]>([])
   const [detail, setDetail] = useState<DiagnoseDetail | null>(null)
@@ -93,10 +115,35 @@ export default function ResultClient() {
         const ls = (json.result.luneaLines ?? []).filter(Boolean)
         setLines(ls)
         setDetail(json.result.detail ?? null)
-        setStep(initialStep(ls.length)) // まず 0〜2 行表示
+        setStep(initialStep(ls.length))
+
+        // ▼ 保存（プロフィール＋基礎層）を1行で
+        const quick = getQuickBase()
+        setSaving(true)
+        const saveRes = await fetch("/api/profile/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: null, // 認証導入後に置換
+            fortune: json.result.detail?.fortune ?? null,
+            personality: json.result.detail?.personality ?? null,
+            partner: json.result.detail?.partner ?? null,
+            ...(quick ?? {}), // base_model / base_order / base_points
+          }),
+        })
+
+        if (!saveRes.ok && saveRes.status !== 409) {
+          const j = await saveRes.json().catch(() => ({}))
+          // 409 = 既に保存済み（once guard）。それ以外は警告だけ出す
+          console.warn("profile/save failed:", j?.error ?? saveRes.statusText)
+        } else {
+          // 一時データは任意でクリア
+          try { sessionStorage.removeItem("structure_quick_pending") } catch {}
+        }
       } catch (e: any) {
         setError(e?.message || "failed")
       } finally {
+        setSaving(false)
         setLoading(false)
       }
     }
@@ -152,7 +199,7 @@ export default function ResultClient() {
 
             {step < lines.length && (
               <div className="pt-1">
-                <GlowButton size="sm" variant="primary" onClick={next}>
+                <GlowButton size="sm" variant="primary" onClick={next} disabled={saving}>
                   次へ
                 </GlowButton>
               </div>
@@ -164,9 +211,10 @@ export default function ResultClient() {
       {/* 下部：デモ調の“結果カード” */}
       {!loading && !error && (
         <section className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[inset_0_0_12px_rgba(255,255,255,.04),0_0_0_1px_rgba(255,255,255,.03)]">
-          <div className="text-cyan-300 font-semibold mb-2">{resultTitle}</div>
+          <div className="text-cyan-300 font-semibold mb-2">
+            {resultTitle} {saving && <span className="text-white/60 text-xs ml-2">保存中…</span>}
+          </div>
 
-          {/* detail があれば4ブロック、無ければフォールバック */}
           {detail ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <article className="rounded-xl border border-white/10 bg-black/20 p-4">
@@ -209,10 +257,11 @@ export default function ResultClient() {
             <button
               onClick={restart}
               className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10"
+              disabled={saving}
             >
               もう一度
             </button>
-            <GlowButton variant="primary" size="sm" onClick={toMyPage}>
+            <GlowButton variant="primary" size="sm" onClick={toMyPage} disabled={saving}>
               マイページへ
             </GlowButton>
           </div>

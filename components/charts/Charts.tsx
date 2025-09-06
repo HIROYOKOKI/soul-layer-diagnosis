@@ -85,11 +85,13 @@ export function RadarChart({ values, size = 260 }: { values: EVAEVector; size?: 
 
 /* ==================== Line Chart ==================== */
 export function TimeSeriesChart({ data }: { data: SeriesPoint[] }) {
-  const step = 28
-  const width = data.length*step + 80
-  const height = 260
-  const pad = { l:56, r:46, t:18, b:40 }
-
+  const n = data.length
+  const step = n <= 7 ? 28 : n <= 30 ? 14 : 8
+  const width = data.length * step + 80
+  const height = 280   // 少し高く
+  const pad = { l: 56, r: 46, t: 18, b: 40 }
+  ...
+}
   const x = (i:number)=> pad.l + i*step
   const y = (v:number)=> pad.t + (height - pad.t - pad.b) * (1 - clamp01(v))
   const line = (arr:number[])=> arr.map((v,i)=>`${x(i)},${y(v)}`).join(" ")

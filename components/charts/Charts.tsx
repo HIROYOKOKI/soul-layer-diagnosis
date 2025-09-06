@@ -2,7 +2,13 @@
 
 import React, { useId, useMemo, useState } from "react"
 
-/** ===================== Types & Utils ===================== */
+/****************************************************
+ * Charts (Radar + Line)
+ * - Radar: ラベル E/V/Λ/Ǝ を各色で表示、面は最大スコア色、縁は Ǝ (#B833F5)
+ * - Line : 7/30/90 切替向けの描画（※横スクロールは呼び出し側で）
+ ****************************************************/
+
+/* ===================== Types & Utils ===================== */
 export type EVAEVector = {
   E: number
   V: number
@@ -36,9 +42,9 @@ function dominantKey(values: EVAEVector): "E" | "V" | "Λ" | "Ǝ" {
   return entries[0][0]
 }
 
-/** ==================== Radar Chart ==================== */
+/* ==================== Radar Chart ==================== */
 export function RadarChart({ values, size = 260 }: { values: EVAEVector; size?: number }) {
-  // マージンを確保してラベルが切れないように
+  // ラベルが切れないよう余白を確保
   const margin = 18
   const cx = size / 2
   const cy = size / 2
@@ -64,7 +70,7 @@ export function RadarChart({ values, size = 260 }: { values: EVAEVector; size?: 
   const dom = dominantKey(values)
   const fillColor = colorFor(dom)
 
-  // 余白込みのviewBox
+  // 余白込みの viewBox（テキストが切れない）
   const vb = `-${margin} -${margin} ${size + margin * 2} ${size + margin * 2}`
   const gid = (useId() || "gid").replace(/[^a-zA-Z0-9_-]/g, "")
 
@@ -91,7 +97,7 @@ export function RadarChart({ values, size = 260 }: { values: EVAEVector; size?: 
         {/* glow */}
         <defs>
           <radialGradient id={`glow-${gid}`} cx="50%" cy="50%">
-            <stop offset="0%" stopColor="rgba(184,51,245,0.40)" />
+            <stop offset="0%"  stopColor="rgba(184,51,245,0.40)" />
             <stop offset="100%" stopColor="rgba(184,51,245,0.00)" />
           </radialGradient>
           <filter id={`blur-${gid}`} x="-50%" y="-50%" width="200%" height="200%">
@@ -99,14 +105,14 @@ export function RadarChart({ values, size = 260 }: { values: EVAEVector; size?: 
           </filter>
         </defs>
         <polygon points={points} fill={`url(#glow-${gid})`} filter={`url(#blur-${gid})`} />
-        {/* 縁はƎ色固定 */}
+        {/* 縁は Ǝ の紫を維持 */}
         <polygon points={points} fill={fillColor} opacity={0.25} stroke={PALETTE.Eexists} strokeOpacity={0.5} />
       </svg>
     </div>
   )
 }
 
-/** ==================== Line Chart ==================== */
+/* ==================== Line Chart ==================== */
 export function TimeSeriesChart({ data }: { data: SeriesPoint[] }) {
   const step = 28
   const width = data.length * step + 80
@@ -122,7 +128,8 @@ export function TimeSeriesChart({ data }: { data: SeriesPoint[] }) {
   const vStep = Math.max(1, Math.ceil(data.length / 10))
 
   return (
-    <svg width={width} height={height}>
+    // 👇 baselineによる縦切れを防ぐ
+    <svg className="block" width={width} height={height}>
       {/* axes */}
       <line x1={pad.l} y1={y(0)} x2={width - pad.r} y2={y(0)} stroke={TICK_COLOR} />
       <line x1={pad.l} y1={pad.t} x2={pad.l} y2={height - pad.b} stroke={TICK_COLOR} />
@@ -141,13 +148,10 @@ export function TimeSeriesChart({ data }: { data: SeriesPoint[] }) {
   )
 }
 
-/** ============ Demo (optional, not required by MyPage) ============ */
+/* ============ Demo (optional) ============ */
 function buildSampleSeries(days = 30): SeriesPoint[] {
   let seed = 42
-  const rand = () => {
-    seed = (seed * 1664525 + 1013904223) >>> 0
-    return seed / 2 ** 32
-  }
+  const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32 }
   const today = new Date()
   const out: SeriesPoint[] = []
   for (let i = days - 1; i >= 0; i--) {
@@ -188,6 +192,7 @@ export default function ChartsPreview() {
               ))}
             </div>
           </div>
+          {/* 横スクロールは呼び出し側で付ける想定。デモでは不要のため直描画 */}
           <TimeSeriesChart data={series} />
         </section>
       </div>

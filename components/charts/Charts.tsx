@@ -127,9 +127,8 @@ export function TimeSeriesChart({ data }: { data: SeriesPoint[] }) {
   const ticksY = [0, 0.25, 0.5, 0.75, 1]
   const vStep = Math.max(1, Math.ceil(data.length / 10))
 
-  return (
-    // 👇 baselineによる縦切れを防ぐ
-    <svg className="block" width={width} height={height}>
+  rreturn (
+  <svg className="block" width={width} height={height}>
       {/* axes */}
       <line x1={pad.l} y1={y(0)} x2={width - pad.r} y2={y(0)} stroke={TICK_COLOR} />
       <line x1={pad.l} y1={pad.t} x2={pad.l} y2={height - pad.b} stroke={TICK_COLOR} />

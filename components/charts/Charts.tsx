@@ -6,7 +6,7 @@ import React, { useId } from "react"
 export type EVAEVector = { E: number; V: number; Eexists: number; L?: number; ["Λ"]?: number }
 export type SeriesPoint = { date: string; E: number; V: number; L: number; Eexists: number }
 
-const PALETTE = { E: "#FF4500", V: "#1E3A8A", L: "#84CC16", Eexists: "#B833F5" } as const
+const PALETTE = { E: "#FF4500", V: "#1E3A8A", L: "#84CC16", Eexists: "#b833f5" } as const
 const TICK_COLOR = "rgba(255,255,255,0.10)"
 
 function clamp01(v: unknown) { const n = typeof v === "number" ? v : Number(v); return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0 }
@@ -84,33 +84,52 @@ export function RadarChart({ values, size = 260 }: { values: EVAEVector; size?: 
 }
 
 /* ==================== Line Chart ==================== */
+/* ==================== Line Chart ==================== */
 export function TimeSeriesChart({ data }: { data: SeriesPoint[] }) {
   const n = data.length
-  const step = n <= 7 ? 28 : n <= 30 ? 14 : 8
-  const width = data.length * step + 80
-  const height = 280   // 少し高く
+  const step = n <= 7 ? 28 : n <= 30 ? 14 : 8           // 日数に応じて横幅を調整
+  const width = n * step + 80
+  const height = 280                                     // 少し高く
   const pad = { l: 56, r: 46, t: 18, b: 40 }
-}
-  const x = (i:number)=> pad.l + i*step
-  const y = (v:number)=> pad.t + (height - pad.t - pad.b) * (1 - clamp01(v))
-  const line = (arr:number[])=> arr.map((v,i)=>`${x(i)},${y(v)}`).join(" ")
-  const colors = { E:PALETTE.E, V:PALETTE.V, L:PALETTE.L, Eexists:PALETTE.Eexists }
 
-  const ticksY = [0,0.25,0.5,0.75,1]
-  const vStep  = Math.max(1, Math.ceil(data.length/10))
+  const x = (i: number) => pad.l + i * step
+  const y = (v: number) => pad.t + (height - pad.t - pad.b) * (1 - clamp01(v))
+  const line = (arr: number[]) => arr.map((v, i) => `${x(i)},${y(v)}`).join(" ")
+  const colors = { E: PALETTE.E, V: PALETTE.V, L: PALETTE.L, Eexists: PALETTE.Eexists }
+
+  const ticksY = [0, 0.25, 0.5, 0.75, 1]
+  const vStep = Math.max(1, Math.ceil(n / 10))
 
   return (
     <svg className="block" width={width} height={height}>
-      <line x1={pad.l} y1={y(0)} x2={width-pad.r} y2={y(0)} stroke={TICK_COLOR}/>
-      <line x1={pad.l} y1={pad.t} x2={pad.l} y2={height-pad.b} stroke={TICK_COLOR}/>
-      {ticksY.map(ty=> <line key={ty} x1={pad.l} y1={y(ty)} x2={width-pad.r} y2={y(ty)} stroke={TICK_COLOR}/>)}
-      {Array.from({length:data.length},(_,i)=>
-        i%vStep===0 ? <line key={`vg-${i}`} x1={x(i)} y1={pad.t} x2={x(i)} y2={height-pad.b} stroke="rgba(255,255,255,0.06)"/> : null
+      {/* axes */}
+      <line x1={pad.l} y1={y(0)} x2={width - pad.r} y2={y(0)} stroke={TICK_COLOR} />
+      <line x1={pad.l} y1={pad.t} x2={pad.l} y2={height - pad.b} stroke={TICK_COLOR} />
+
+      {/* horizontal grid */}
+      {ticksY.map((ty) => (
+        <line key={ty} x1={pad.l} y1={y(ty)} x2={width - pad.r} y2={y(ty)} stroke={TICK_COLOR} />
+      ))}
+
+      {/* vertical grid */}
+      {Array.from({ length: n }, (_, i) =>
+        i % vStep === 0 ? (
+          <line
+            key={`vg-${i}`}
+            x1={x(i)}
+            y1={pad.t}
+            x2={x(i)}
+            y2={height - pad.b}
+            stroke="rgba(255,255,255,0.06)"
+          />
+        ) : null
       )}
-      <polyline fill="none" stroke={colors.E} strokeWidth={2} points={line(data.map(d=>d.E))}/>
-      <polyline fill="none" stroke={colors.V} strokeWidth={2} points={line(data.map(d=>d.V))}/>
-      <polyline fill="none" stroke={colors.L} strokeWidth={2} points={line(data.map(d=>d.L))}/>
-      <polyline fill="none" stroke={colors.Eexists} strokeWidth={2} points={line(data.map(d=>d.Eexists))}/>
+
+      {/* series */}
+      <polyline fill="none" stroke={colors.E} strokeWidth={2} points={line(data.map((d) => d.E))} />
+      <polyline fill="none" stroke={colors.V} strokeWidth={2} points={line(data.map((d) => d.V))} />
+      <polyline fill="none" stroke={colors.L} strokeWidth={2} points={line(data.map((d) => d.L))} />
+      <polyline fill="none" stroke={colors.Eexists} strokeWidth={2} points={line(data.map((d) => d.Eexists))} />
     </svg>
   )
 }

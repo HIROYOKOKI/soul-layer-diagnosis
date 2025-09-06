@@ -1,12 +1,18 @@
+// app/mypage/MyPageClient.tsx
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { RadarChart, TimeSeriesChart, type EVAEVector, type SeriesPoint } from "@/components/charts/Charts"
+import {
+  RadarChart,
+  TimeSeriesChart,
+  type EVAEVector,
+  type SeriesPoint,
+} from "@/components/charts/Charts"
 
 /* =============================================================
-   MyPage 完全版（レーダー全体表示対応 + Line 正規化）
+   MyPage 完全版（レーダー全体表示 + Line 正規化 + 横スクロール）
    ============================================================= */
 
 type EV = "E" | "V" | "Λ" | "Ǝ"
@@ -19,9 +25,14 @@ type ProfileLatest = {
   base_model?: "EΛVƎ" | "EVΛƎ" | null
   base_order?: EV[] | null
 }
-type DailyLatest = { code?: string | null; comment?: string | null; quote?: string | null; created_at?: string }
+type DailyLatest = {
+  code?: string | null
+  comment?: string | null
+  quote?: string | null
+  created_at?: string
+}
 
-// Charts types（エイリアス）
+// Charts types（alias）
 type EVAEVectorLocal = EVAEVector
 type SeriesPointLocal = SeriesPoint
 
@@ -36,8 +47,16 @@ function toTypeLabel(model?: string | null) {
 function fmt(dt?: string) {
   try {
     const d = dt ? new Date(dt) : new Date()
-    return new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(d)
-  } catch { return "" }
+    return new Intl.DateTimeFormat("ja-JP", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(d)
+  } catch {
+    return ""
+  }
 }
 const FALLBACK_USER = { name: "Hiro", idNo: "0001", avatar: "/icon-512.png" }
 const CURRENT_THEME = "self"
@@ -51,7 +70,12 @@ const clamp01 = (v: unknown) => {
 // Ǝ は Eexists、Λ と L はどちらでも可に揃える
 function normalizeToday(v: any): EVAEVectorLocal {
   const L = typeof v?.L === "number" ? v.L : (typeof v?.["Λ"] === "number" ? v["Λ"] : 0)
-  return { E: clamp01(v?.E), V: clamp01(v?.V), L: clamp01(L), Eexists: clamp01(v?.Eexists ?? v?.["Ǝ"]) }
+  return {
+    E: clamp01(v?.E),
+    V: clamp01(v?.V),
+    L: clamp01(L),
+    Eexists: clamp01(v?.Eexists ?? v?.["Ǝ"]),
+  }
 }
 function normalizeSeries(list: any[]): SeriesPointLocal[] {
   return (list ?? []).map((d) => {
@@ -84,7 +108,8 @@ export default function MyPageClient() {
     let alive = true
     ;(async () => {
       try {
-        setError(null); setLoading(true)
+        setError(null)
+        setLoading(true)
         const [p, d] = await Promise.all([
           fetch("/api/mypage/profile-latest", { cache: "no-store" }).then((r) => r.json()),
           fetch("/api/mypage/daily-latest", { cache: "no-store" }).then((r) => r.json()),
@@ -95,12 +120,14 @@ export default function MyPageClient() {
         setProfile(p.item ?? null)
         setDaily(d.item ?? null)
       } catch (e: any) {
-        if (alive) setError(e?.message || "failed")
+        if (!alive) setError(e?.message || "failed")
       } finally {
         if (alive) setLoading(false)
       }
     })()
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [])
 
   // チャートデータ
@@ -126,14 +153,17 @@ export default function MyPageClient() {
         // フォールバック
         const d = new Date()
         const mock = Array.from({ length: range }, (_, i) => {
-          const dt = new Date(d); dt.setDate(dt.getDate() - (range - 1 - i))
+          const dt = new Date(d)
+          dt.setDate(dt.getDate() - (range - 1 - i))
           return { date: dt.toISOString().slice(0, 10), E: 0.6, V: 0.6, L: 0.6, Eexists: 0.6 }
         })
         setToday({ E: 0.6, V: 0.6, L: 0.6, Eexists: 0.6 })
         setSeries(mock)
       }
     })()
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [range])
 
   const typeLabel = toTypeLabel(profile?.base_model)
@@ -141,6 +171,9 @@ export default function MyPageClient() {
 
   const goDaily = () => router.push("/daily/question")
   const goSettings = () => router.push("/settings")
+
+  if (loading) return <div className="p-6 text-white/70">読み込み中…</div>
+  if (error) return <div className="p-6 text-red-400">エラー: {error}</div>
 
   return (
     <div className="min-h-screen bg-black text-white px-5 py-6 max-w-md mx-auto">
@@ -232,19 +265,20 @@ export default function MyPageClient() {
               </div>
             </div>
 
+            {/* 横スクロールで広く見せるラッパー */}
             <div className="rounded-xl bg-black/25 border border-white/10">
-              <div className="overflow-x-auto py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {series ? (
-                  <TimeSeriesChart data={series} />
-                ) : (
-                  <div className="h-56 grid place-items-center text-white/60 text-sm">読み込み中…</div>
-                )}
+              <div className="overflow-x-auto py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,transparent_0,black_16px,black_calc(100%-16px),transparent_100%)] overscroll-x-contain">
+                <div className="inline-block pr-4">
+                  {series ? (
+                    <TimeSeriesChart data={series} />
+                  ) : (
+                    <div className="h-56 grid place-items-center text-white/60 text-sm">読み込み中…</div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {chartsErr && (
-              <div className="mt-2 text-[11px] text-red-300/80">[{chartsErr}] フォールバック表示中</div>
-            )}
+            {chartsErr && <div className="mt-2 text-[11px] text-red-300/80">[{chartsErr}] フォールバック表示中</div>}
           </div>
         </div>
       </section>
@@ -257,10 +291,7 @@ export default function MyPageClient() {
             デイリー診断
             <div className="text-[11px] text-white/60 mt-1">1問 / 今日のゆらぎ</div>
           </button>
-          <button
-            className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-white/50 cursor-not-allowed"
-            title="近日公開"
-          >
+          <button className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-white/50 cursor-not-allowed" title="近日公開">
             診断タイプを選ぶ
             <div className="text-[11px] text-white/40 mt-1">Weekly / Monthly（予定）</div>
           </button>

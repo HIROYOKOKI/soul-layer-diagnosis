@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { RadarChart, TimeSeriesChart, type EVAEVector, type SeriesPoint } from "./Charts" // ← 修正：EVAEPolarChartではなくRadarChart
+import { RadarChart, TimeSeriesChart, type EVAEVector, type SeriesPoint } from "@/components/charts/Charts"
 
 /* =============================================================
    MyPage 完全版（レーダー全体表示対応）

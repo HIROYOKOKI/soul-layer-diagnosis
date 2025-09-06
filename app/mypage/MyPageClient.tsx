@@ -3,10 +3,12 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { RadarChart, TimeSeriesChart, type EVAEVector, type SeriesPoint } from "./Charts" // ← 修正：EVAEPolarChartではなくRadarChart
 
-/* =========================
-   Types
-   ========================= */
+/* =============================================================
+   MyPage 完全版（レーダー全体表示対応）
+   ============================================================= */
+
 type EV = "E" | "V" | "Λ" | "Ǝ"
 
 type ProfileLatest = {
@@ -17,12 +19,11 @@ type ProfileLatest = {
   base_model?: "EΛVƎ" | "EVΛƎ" | null
   base_order?: EV[] | null
 }
-
 type DailyLatest = { code?: string | null; comment?: string | null; quote?: string | null; created_at?: string }
 
 // Charts types
-type EVAEVector = { E: number; V: number; Eexists: number; L?: number; ["Λ"]?: number }
-type SeriesPoint = { date: string; E: number; V: number; L: number; Eexists: number }
+type EVAEVectorLocal = EVAEVector
+type SeriesPointLocal = SeriesPoint
 
 /* =========================
    Utils
@@ -41,139 +42,6 @@ function fmt(dt?: string) {
 const FALLBACK_USER = { name: "Hiro", idNo: "0001", avatar: "/icon-512.png" }
 const CURRENT_THEME = "self"
 
-// palette
-const PALETTE = { E: "#FF4500", V: "#1E3A8A", L: "#84CC16", Eexists: "#B833F5" } as const
-const TICK_COLOR = "rgba(255,255,255,0.10)"
-
-// helpers
-function clamp01(v: unknown) { const n = typeof v === "number" ? v : Number(v); return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0 }
-function valForLabel(values: EVAEVector, label: EV) {
-  if (label === "E") return clamp01(values.E)
-  if (label === "V") return clamp01(values.V)
-  if (label === "Λ") return clamp01(values["Λ"] ?? values.L)
-  return clamp01(values.Eexists) // Ǝ
-}
-function dominantKey(values: EVAEVector): EV {
-  const arr: Array<[EV, number]> = [["E", valForLabel(values,"E")], ["V", valForLabel(values,"V")], ["Λ", valForLabel(values,"Λ")], ["Ǝ", valForLabel(values,"Ǝ")]]
-  arr.sort((a,b)=>b[1]-a[1]); return arr[0][0]
-}
-function normalizeToday(v: any): EVAEVector {
-  const L = typeof v?.L === "number" ? v.L : (typeof v?.["Λ"] === "number" ? v["Λ"] : 0)
-  return { E: Number(v?.E ?? 0), V: Number(v?.V ?? 0), L, ["Λ"]: undefined, Eexists: Number(v?.Eexists ?? v?.["Ǝ"] ?? 0) }
-}
-function normalizeSeries(list: any[]): SeriesPoint[] {
-  return (list ?? []).map((d) => ({
-    date: String(d?.date ?? "").slice(0,10),
-    E: Number(d?.E ?? 0), V: Number(d?.V ?? 0),
-    L: Number(d?.L ?? d?.["Λ"] ?? 0),
-    Eexists: Number(d?.Eexists ?? d?.["Ǝ"] ?? 0),
-  }))
-}
-
-/* ==================== */
-/* Radar Chart          */
-/* ==================== */
-export function RadarChart({ values, size = 260 }: { values: EVAEVector; size?: number }) {
-  const margin = 18;                         // ラベル用の余白
-  const cx = size / 2;
-  const cy = size / 2;
-  const r  = Math.max(0, size / 2 - margin); // 余白ぶん縮める
-
-  const axes = [
-    { label: "E" as const, angle: -90 },
-    { label: "V" as const, angle: 0 },
-    { label: "Λ" as const, angle: 90 },
-    { label: "Ǝ" as const, angle: 180 },
-  ];
-
-  const polar = (angleDeg: number, scale: number) => {
-    const rad = (Math.PI/180) * angleDeg;
-    const rr  = r * clamp01(scale);
-    return [cx + rr * Math.cos(rad), cy + rr * Math.sin(rad)] as const;
-  };
-
-  const pts    = axes.map(a => polar(a.angle, valForLabel(values, a.label)));
-  const points = pts.map(([x,y]) => `${x},${y}`).join(" ");
-  const colorFor = (lbl: "E"|"V"|"Λ"|"Ǝ") =>
-    lbl==="E" ? PALETTE.E : lbl==="V" ? PALETTE.V : lbl==="Λ" ? PALETTE.L : PALETTE.Eexists;
-
-  const dom       = dominantKey(values);
-  const fillColor = colorFor(dom);
-
-  // 余白込みの viewBox にする
-  const vb = `-${margin} -${margin} ${size + margin*2} ${size + margin*2}`;
-
-  return (
-    <div className="w-full flex items-center justify-center">
-      <svg width={size} height={size} viewBox={vb} preserveAspectRatio="xMidYMid meet">
-        {/* grid */}
-        {[0.25, 0.5, 0.75, 1].map(t => (
-          <circle key={t} cx={cx} cy={cy} r={r*t} fill="none" stroke="rgba(255,255,255,0.12)" />
-        ))}
-        {/* axes + labels */}
-        {axes.map(a => {
-          const [x,y] = polar(a.angle, 1);
-          const c = colorFor(a.label);
-          return (
-            <g key={a.label}>
-              <line x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(255,255,255,0.15)" />
-              <text x={x} y={y} dy={a.angle===90?12:a.angle===-90?-6:4} fontSize={13} fontWeight={700} fill={c}>
-                {a.label}
-              </text>
-            </g>
-          );
-        })}
-        {/* glow */}
-        <defs>
-          <radialGradient id="glow" cx="50%" cy="50%">
-            <stop offset="0%"  stopColor="rgba(184,51,245,0.40)" />
-            <stop offset="100%" stopColor="rgba(184,51,245,0.00)" />
-          </radialGradient>
-          <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
-          </filter>
-        </defs>
-        <polygon points={points} fill="url(#glow)" filter="url(#blur)" />
-        {/* 縁はƎ色のまま */}
-        <polygon points={points} fill={fillColor} opacity={0.25} stroke={PALETTE.Eexists} strokeOpacity={0.5} />
-      </svg>
-    </div>
-  );
-}
-
-/* =========================
-   Charts: Line
-   ========================= */
-function TimeSeriesChart({ data }: { data: SeriesPoint[] }) {
-  const step=28, width=data.length*step+80, height=260
-  const pad={l:56,r:46,t:18,b:40}
-  const x=(i:number)=> pad.l + i*step
-  const y=(v:number)=> pad.t+(height-pad.t-pad.b)*(1-clamp01(v))
-  const line=(arr:number[])=> arr.map((v,i)=>`${x(i)},${y(v)}`).join(" ")
-  const colors={E:PALETTE.E,V:PALETTE.V,L:PALETTE.L,Eexists:PALETTE.Eexists}
-  const ticksY=[0,0.25,0.5,0.75,1]
-  const vStep=Math.max(1,Math.ceil(data.length/10))
-
-  return (
-    <svg width={width} height={height}>
-      {/* axes */}
-      <line x1={pad.l} y1={y(0)} x2={width-pad.r} y2={y(0)} stroke={TICK_COLOR}/>
-      <line x1={pad.l} y1={pad.t} x2={pad.l} y2={height-pad.b} stroke={TICK_COLOR}/>
-      {/* horizontal grid */}
-      {ticksY.map(ty=> (<line key={ty} x1={pad.l} y1={y(ty)} x2={width-pad.r} y2={y(ty)} stroke={TICK_COLOR}/>))}
-      {/* vertical grid */}
-      {Array.from({length:data.length},(_,i)=> i%vStep===0 ? (
-        <line key={`vg-${i}`} x1={x(i)} y1={pad.t} x2={x(i)} y2={height-pad.b} stroke="rgba(255,255,255,0.06)"/>
-      ):null)}
-      {/* series */}
-      <polyline fill="none" stroke={colors.E} strokeWidth={2} points={line(data.map(d=>d.E))}/>
-      <polyline fill="none" stroke={colors.V} strokeWidth={2} points={line(data.map(d=>d.V))}/>
-      <polyline fill="none" stroke={colors.L} strokeWidth={2} points={line(data.map(d=>d.L))}/>
-      <polyline fill="none" stroke={colors.Eexists} strokeWidth={2} points={line(data.map(d=>d.Eexists))}/>
-    </svg>
-  )
-}
-
 export default function MyPageClient() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -182,9 +50,9 @@ export default function MyPageClient() {
   const [daily, setDaily] = useState<DailyLatest | null>(null)
 
   // charts states
-  const [range, setRange] = useState<7|30|90>(30)  // 要件：初期30日
-  const [today, setToday] = useState<EVAEVector | null>(null)
-  const [series, setSeries] = useState<SeriesPoint[] | null>(null)
+  const [range, setRange] = useState<7|30|90>(30)  // 初期30日
+  const [today, setToday] = useState<EVAEVectorLocal | null>(null)
+  const [series, setSeries] = useState<SeriesPointLocal[] | null>(null)
   const [chartsErr, setChartsErr] = useState<string | null>(null)
 
   useEffect(() => {
@@ -210,7 +78,6 @@ export default function MyPageClient() {
     return () => { alive = false }
   }, [])
 
-  // charts fetcher
   useEffect(() => {
     let alive = true
     ;(async ()=> {
@@ -225,12 +92,12 @@ export default function MyPageClient() {
         const tJson = await tRes.json()
         const sJson = await sRes.json()
         if (!alive) return
-        setToday(normalizeToday(tJson?.scores ?? tJson))
-        setSeries(normalizeSeries(sJson))
+        setToday((tJson?.scores ?? tJson) as EVAEVectorLocal)
+        setSeries(sJson as SeriesPointLocal[])
       } catch(e:any) {
         if (!alive) return
         setChartsErr(e?.message ?? "charts fetch error")
-        // fallback: safe constant values
+        // fallback
         const d = new Date()
         const mock = Array.from({length:range},(_,i)=> {
           const dt = new Date(d); dt.setDate(dt.getDate()-(range-1-i))
@@ -251,7 +118,7 @@ export default function MyPageClient() {
 
   return (
     <div className="min-h-screen bg-black text-white px-5 py-6 max-w-md mx-auto">
-      {/* 1) クイック診断の型（上部中央） */}
+      {/* 1) クイック診断の型 */}
       <div className="text-center mb-3">
         <span className={`inline-block rounded-lg px-3 py-1 text-sm border
           ${profile?.base_model === "EΛVƎ"
@@ -261,7 +128,7 @@ export default function MyPageClient() {
         </span>
       </div>
 
-      {/* 2) プロフィール行（名前/IDはアイコン横中央）＋ 設定ボタン */}
+      {/* 2) プロフィール行 */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-3">
           <Image src={FALLBACK_USER.avatar} alt="Profile Icon" width={48} height={48}
@@ -280,12 +147,12 @@ export default function MyPageClient() {
         </button>
       </div>
 
-      {/* 3) テーマ＆日時（アイコン直下・左端揃え） */}
+      {/* 3) テーマ＆日時 */}
       <div className="mb-4 text-[11px] text-white/50">
         テーマ: {CURRENT_THEME}<span className="opacity-40 mx-1">•</span>{nowStr}
       </div>
 
-      {/* 4) 直近メッセージカード */}
+      {/* 4) 直近メッセージ */}
       <section className="mb-4 rounded-2xl border border-white/12 bg-white/5 p-4">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-sm font-bold">直近のメッセージ</h2>
@@ -296,24 +163,18 @@ export default function MyPageClient() {
         </p>
       </section>
 
-      {/* 5) 構造ビジュアル（Radar ↔ Line 横スライド / 初期は Radar） */}
+      {/* 5) 構造チャート（横スライド／初期はRadar） */}
       <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-bold">
-            <span>Radar (</span>
-            <span style={{color:PALETTE.E}}>E</span><span className="mx-1"> / </span>
-            <span style={{color:PALETTE.V}}>V</span><span className="mx-1"> / </span>
-            <span style={{color:PALETTE.L}}>Λ</span><span className="mx-1"> / </span>
-            <span style={{color:PALETTE.Eexists}}>Ǝ</span><span>)</span>
-          </h2>
-          <div className="text-[11px] text-white/60">横スワイプ可</div>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-bold">構造バランス</h2>
+          <div className="text-[11px] text-white/60">Radar / Line（横スワイプ）</div>
         </div>
 
         <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {/* Slide 1: Radar (default) */}
-          <div className="min-w-full snap-center">
-            <div className="grid place-items-center h-56 rounded-xl bg-black/25 border border-white/10">
-              {today ? <RadarChart values={today}/> : <div className="text-white/60 text-sm">読み込み中…</div>}
+          {/* Slide 1: Radar */}
+          <div className="min-w-full snap-center flex justify-center">
+            <div className="w-full max-w-xs"> {/* ← h-56 を削除して切れ防止 */}
+              {today ? <RadarChart values={today} size={260} /> : <div className="text-xs text-white/50">No Data</div>}
             </div>
           </div>
 
@@ -332,15 +193,6 @@ export default function MyPageClient() {
             <div className="grid place-items-center rounded-xl bg-black/25 border border-white/10">
               {series ? <TimeSeriesChart data={series}/> : <div className="h-56 grid place-items-center text-white/60 text-sm">読み込み中…</div>}
             </div>
-            <div className="mt-2 flex items-center gap-4 text-[11px]">
-              {(["E","V","L","Eexists"] as const).map(k=>(
-                <div key={k} className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded" style={{background:(PALETTE as any)[k]}} />
-                  <span className="text-white/80" style={{color:(PALETTE as any)[k]}}>{k==="L"?"Λ":k==="Eexists"?"Ǝ":k}</span>
-                </div>
-              ))}
-            </div>
-            {chartsErr && <div className="mt-2 text-[11px] text-red-300/80">[{chartsErr}] フォールバック表示中</div>}
           </div>
         </div>
       </section>

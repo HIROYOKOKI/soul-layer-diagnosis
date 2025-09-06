@@ -190,7 +190,8 @@ export default function MyPageClient() {
                 ))}
               </div>
             </div>
-            <div className="grid place-items-center rounded-xl bg-black/25 border border-white/10">
+<div className="rounded-xl bg-black/25 border border-white/10 overflow-x-auto py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+
               {series ? <TimeSeriesChart data={series}/> : <div className="h-56 grid place-items-center text-white/60 text-sm">読み込み中…</div>}
             </div>
           </div>

@@ -90,7 +90,6 @@ export function TimeSeriesChart({ data }: { data: SeriesPoint[] }) {
   const width = data.length * step + 80
   const height = 280   // 少し高く
   const pad = { l: 56, r: 46, t: 18, b: 40 }
-  ...
 }
   const x = (i:number)=> pad.l + i*step
   const y = (v:number)=> pad.t + (height - pad.t - pad.b) * (1 - clamp01(v))

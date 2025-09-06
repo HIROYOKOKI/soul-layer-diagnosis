@@ -180,15 +180,16 @@ export default function MyPageClient() {
       {/* 1) クイック診断の型 */}
       <div className="text-center mb-3">
         <span
-          className={`inline-block rounded-lg px-3 py-1 text-sm border ${
-            profile?.base_model === "EΛVƎ"
-              ? "border-cyan-400/30 bg-cyan-400/15 text-cyan-200"
-              : "border-pink-400/30 bg-pink-400/15 text-pink-200"
-          }`}
-        >
-          {typeLabel ?? "—"}
-          {typeLabel ? `（${profile?.base_model}）` : ""}
-        </span>
+  className={`inline-block rounded-lg px-3 py-1 text-sm border`}
+  style={{
+    borderColor: profile?.base_model === "EΛVƎ" ? "#b833f5" : "#FF4500",
+    backgroundColor: profile?.base_model === "EΛVƎ" ? "#b833f522" : "#FF450022", // 薄めの背景
+    color: profile?.base_model === "EΛVƎ" ? "#b833f5" : "#FF4500",
+  }}
+>
+  {typeLabel ?? "—"}
+  {typeLabel ? `（${profile?.base_model}）` : ""}
+</span>
       </div>
 
       {/* 2) プロフィール行 */}

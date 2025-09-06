@@ -70,55 +70,75 @@ function normalizeSeries(list: any[]): SeriesPoint[] {
   }))
 }
 
-/* =========================
-   Charts: Radar
-   ========================= */
-function RadarChart({ values }: { values: EVAEVector }) {
-  const size = 300, cx = size/2, cy = size/2, r = 115
-  const axes: Array<{label:EV; angle:number; color:string}> = [
-    { label:"E", angle:-90, color:PALETTE.E },
-    { label:"V", angle:0,   color:PALETTE.V },
-    { label:"Λ", angle:90,  color:PALETTE.L },
-    { label:"Ǝ", angle:180, color:PALETTE.Eexists },
-  ]
-  const polar = (ang:number, s:number) => {
-    const rad = ang * Math.PI/180, rr = r * clamp01(s)
-    return [cx + rr*Math.cos(rad), cy + rr*Math.sin(rad)] as const
-  }
-  const pts = axes.map(a => polar(a.angle, valForLabel(values, a.label)))
-  const points = pts.map(([x,y]) => `${x},${y}`).join(" ")
-  const dom = dominantKey(values)
-  const fillColor = dom==="E"?PALETTE.E:dom==="V"?PALETTE.V:dom==="Λ"?PALETTE.L:PALETTE.Eexists
+/* ==================== */
+/* Radar Chart          */
+/* ==================== */
+export function RadarChart({ values, size = 260 }: { values: EVAEVector; size?: number }) {
+  const margin = 18;                         // ラベル用の余白
+  const cx = size / 2;
+  const cy = size / 2;
+  const r  = Math.max(0, size / 2 - margin); // 余白ぶん縮める
+
+  const axes = [
+    { label: "E" as const, angle: -90 },
+    { label: "V" as const, angle: 0 },
+    { label: "Λ" as const, angle: 90 },
+    { label: "Ǝ" as const, angle: 180 },
+  ];
+
+  const polar = (angleDeg: number, scale: number) => {
+    const rad = (Math.PI/180) * angleDeg;
+    const rr  = r * clamp01(scale);
+    return [cx + rr * Math.cos(rad), cy + rr * Math.sin(rad)] as const;
+  };
+
+  const pts    = axes.map(a => polar(a.angle, valForLabel(values, a.label)));
+  const points = pts.map(([x,y]) => `${x},${y}`).join(" ");
+  const colorFor = (lbl: "E"|"V"|"Λ"|"Ǝ") =>
+    lbl==="E" ? PALETTE.E : lbl==="V" ? PALETTE.V : lbl==="Λ" ? PALETTE.L : PALETTE.Eexists;
+
+  const dom       = dominantKey(values);
+  const fillColor = colorFor(dom);
+
+  // 余白込みの viewBox にする
+  const vb = `-${margin} -${margin} ${size + margin*2} ${size + margin*2}`;
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      {[0.25,0.5,0.75,1].map(t=>(
-        <circle key={t} cx={cx} cy={cy} r={r*t} fill="none" stroke="rgba(255,255,255,0.12)" />
-      ))}
-      {axes.map(a=>{
-        const [x,y]=polar(a.angle,1)
-        return (
-          <g key={a.label}>
-            <line x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(255,255,255,0.15)" />
-            <text x={x} y={y} dy={a.angle===90?12:a.angle===-90?-6:4} fontSize={13} fontWeight={700} fill={a.color}>{a.label}</text>
-          </g>
-        )
-      })}
-      {/* glow */}
-      <defs>
-        <radialGradient id="glow" cx="50%" cy="50%">
-          <stop offset="0%" stopColor="rgba(184,51,245,0.40)" />
-          <stop offset="100%" stopColor="rgba(184,51,245,0.00)" />
-        </radialGradient>
-        <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
-        </filter>
-      </defs>
-      <polygon points={points} fill="url(#glow)" filter="url(#blur)" />
-      {/* 縁は Ǝ 紫のまま */}
-      <polygon points={points} fill={fillColor} opacity={0.25} stroke={PALETTE.Eexists} strokeOpacity={0.5} />
-    </svg>
-  )
+    <div className="w-full flex items-center justify-center">
+      <svg width={size} height={size} viewBox={vb} preserveAspectRatio="xMidYMid meet">
+        {/* grid */}
+        {[0.25, 0.5, 0.75, 1].map(t => (
+          <circle key={t} cx={cx} cy={cy} r={r*t} fill="none" stroke="rgba(255,255,255,0.12)" />
+        ))}
+        {/* axes + labels */}
+        {axes.map(a => {
+          const [x,y] = polar(a.angle, 1);
+          const c = colorFor(a.label);
+          return (
+            <g key={a.label}>
+              <line x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(255,255,255,0.15)" />
+              <text x={x} y={y} dy={a.angle===90?12:a.angle===-90?-6:4} fontSize={13} fontWeight={700} fill={c}>
+                {a.label}
+              </text>
+            </g>
+          );
+        })}
+        {/* glow */}
+        <defs>
+          <radialGradient id="glow" cx="50%" cy="50%">
+            <stop offset="0%"  stopColor="rgba(184,51,245,0.40)" />
+            <stop offset="100%" stopColor="rgba(184,51,245,0.00)" />
+          </radialGradient>
+          <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
+          </filter>
+        </defs>
+        <polygon points={points} fill="url(#glow)" filter="url(#blur)" />
+        {/* 縁はƎ色のまま */}
+        <polygon points={points} fill={fillColor} opacity={0.25} stroke={PALETTE.Eexists} strokeOpacity={0.5} />
+      </svg>
+    </div>
+  );
 }
 
 /* =========================

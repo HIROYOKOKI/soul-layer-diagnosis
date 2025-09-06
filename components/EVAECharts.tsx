@@ -8,25 +8,17 @@ import {
   type SeriesPoint,
 } from "@/components/charts/Charts"
 
-/** 
- * EVAEPolarChart
- * - Charts.tsx の RadarChart をラップ
- * - size は必要に応じて 220/240/260 へ変更可（デフォ 260）
+/**
+ * Radar ラッパー
+ * - size は端末に合わせて 220/240/260 で調整可（既定 260）
  */
-export function EVAEPolarChart({
-  values,
-  size = 260,
-}: {
-  values: EVAEVector
-  size?: number
-}) {
+export function EVAEPolarChart({ values, size = 260 }: { values: EVAEVector; size?: number }) {
   return <RadarChart values={values} size={size} />
 }
 
 /**
- * EVAETrendChart
- * - Charts.tsx の TimeSeriesChart を横スクロール付きでラップ
- * - /mypage 側が 30/90日でも右端まで見れる
+ * Line ラッパー
+ * - 30/90日で横幅が広くなるので、ここで横スクロールを付与
  */
 export function EVAETrendChart({ data }: { data: SeriesPoint[] }) {
   return (
@@ -36,17 +28,13 @@ export function EVAETrendChart({ data }: { data: SeriesPoint[] }) {
   )
 }
 
-/**
- * 以降は簡易プレースホルダ
- * 必要になったら本実装に差し替え
- */
+/** まだ使わないのでプレースホルダのままでOK（後で実装） */
 export function EVAEChartSquares() {
   return <div className="text-white/80 text-sm">Squares (coming soon)</div>
 }
-
 export function EVAEColorBadges() {
   return <div className="text-white/80 text-sm">Badges (coming soon)</div>
 }
 
-/* 型を re-export しておくと、呼び出し側が型だけここから輸入できて便利 */
+/** 型だけここから取りたい時のために re-export */
 export type { EVAEVector, SeriesPoint } from "@/components/charts/Charts"

@@ -177,19 +177,19 @@ export default function MyPageClient() {
 
   return (
     <div className="min-h-screen bg-black text-white px-5 py-6 max-w-md mx-auto">
-      {/* 1) クイック診断の型 */}
+      {/* 1) クイック診断の型（カラー仕様：EΛVƎ=#b833f5 / EVΛƎ=#FF4500） */}
       <div className="text-center mb-3">
         <span
-  className={`inline-block rounded-lg px-3 py-1 text-sm border`}
-  style={{
-    borderColor: profile?.base_model === "EΛVƎ" ? "#b833f5" : "#FF4500",
-    backgroundColor: profile?.base_model === "EΛVƎ" ? "#b833f522" : "#FF450022", // 薄めの背景
-    color: profile?.base_model === "EΛVƎ" ? "#b833f5" : "#FF4500",
-  }}
->
-  {typeLabel ?? "—"}
-  {typeLabel ? `（${profile?.base_model}）` : ""}
-</span>
+          className="inline-block rounded-lg px-3 py-1 text-sm border"
+          style={{
+            borderColor: profile?.base_model === "EΛVƎ" ? "#b833f5" : "#FF4500",
+            backgroundColor: profile?.base_model === "EΛVƎ" ? "#b833f522" : "#FF450022",
+            color: profile?.base_model === "EΛVƎ" ? "#b833f5" : "#FF4500",
+          }}
+        >
+          {typeLabel ?? "—"}
+          {typeLabel ? `（${profile?.base_model}）` : ""}
+        </span>
       </div>
 
       {/* 2) プロフィール行 */}

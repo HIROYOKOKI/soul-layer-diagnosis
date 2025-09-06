@@ -10,7 +10,6 @@ type ProfileLatest = {
   personality?: string | null
   partner?: string | null
   created_at?: string
-  // クイック基礎層
   base_model?: "EΛVƎ" | "EVΛƎ" | null
   base_order?: EV[] | null
   base_points?: Record<EV, number> | null
@@ -36,6 +35,21 @@ function toTypeLabel(model?: string | null) {
   return null
 }
 
+function toTypeBadgeClass(model?: "EΛVƎ" | "EVΛƎ" | null) {
+  // バッジ色（現実=青系、未来=ピンク系）
+  return model === "EΛVƎ"
+    ? "bg-cyan-400/15 text-cyan-200 border-cyan-400/30"
+    : "bg-pink-400/15 text-pink-200 border-pink-400/30"
+}
+
+function fmt(dt?: string) {
+  try {
+    if (!dt) return ""
+    const d = new Date(dt)
+    return new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" }).format(d)
+  } catch { return "" }
+}
+
 export default function MyPageClient() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -47,7 +61,8 @@ export default function MyPageClient() {
   const goDaily = () => router.push("/daily/question")
 
   useEffect(() => {
-    async function run() {
+    let alive = true
+    ;(async () => {
       try {
         setError(null)
         setLoading(true)
@@ -55,17 +70,18 @@ export default function MyPageClient() {
           fetch("/api/mypage/profile-latest", { cache: "no-store" }).then((r) => r.json()),
           fetch("/api/mypage/daily-latest", { cache: "no-store" }).then((r) => r.json()),
         ])
+        if (!alive) return
         if (!p?.ok) throw new Error(p?.error || "profile_latest_failed")
         if (!d?.ok) throw new Error(d?.error || "daily_latest_failed")
         setProfile(p.item ?? null)
         setDaily(d.item ?? null)
       } catch (e: any) {
-        setError(e?.message || "failed")
+        if (alive) setError(e?.message || "failed")
       } finally {
-        setLoading(false)
+        if (alive) setLoading(false)
       }
-    }
-    run()
+    })()
+    return () => { alive = false }
   }, [])
 
   const c = normalizeCode(daily?.code)
@@ -77,9 +93,9 @@ export default function MyPageClient() {
 
       {/* ローディング */}
       {loading && (
-        <div className="space-y-4">
-          <div className="animate-pulse rounded-2xl border border-white/10 bg-white/5 p-5 h-28" />
-          <div className="animate-pulse rounded-2xl border border-white/10 bg-white/5 p-5 h-40" />
+        <div className="space-y-4 animate-pulse">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 h-28" />
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 h-40" />
         </div>
       )}
 
@@ -99,18 +115,36 @@ export default function MyPageClient() {
       {/* 本体 */}
       {!loading && !error && (
         <>
-          {/* 基礎層（クイック診断） */}
-          <section className="mb-5 rounded-2xl border border-white/12 bg-white/5 p-4">
-            <h2 className="text-sm font-bold mb-2">基礎層（クイック診断）</h2>
+          {/* 基礎層カード */}
+          <section
+            className="rounded-2xl border border-white/12 bg-white/5 p-4 transition-opacity duration-500 opacity-100"
+            style={{ animation: "fadeIn .4s ease both" }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-bold">基礎層（クイック診断）</h2>
+              {profile?.created_at && (
+                <span className="text-[11px] text-white/50">更新: {fmt(profile.created_at)}</span>
+              )}
+            </div>
 
             {profile && typeLabel ? (
               <div className="text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center rounded-lg border border-white/20 bg-white/10 px-2 py-1 text-xs">
+                  <span
+                    className={`inline-flex items-center rounded-lg border px-2 py-1 text-xs ${toTypeBadgeClass(
+                      profile.base_model || null
+                    )}`}
+                    title={
+                      profile.base_model === "EΛVƎ"
+                        ? "確定した現在を基準に考えるタイプ"
+                        : "未確定の未来を基準に考えるタイプ"
+                    }
+                  >
                     {typeLabel}
                   </span>
                   <span className="text-xs text-white/60">（{profile.base_model}）</span>
                 </div>
+
                 {Array.isArray(profile.base_order) && profile.base_order.length === 4 && (
                   <div className="mt-2 text-xs text-white/80">
                     順番：{profile.base_order.join(" → ")}
@@ -130,9 +164,18 @@ export default function MyPageClient() {
             )}
           </section>
 
-          {/* 最新デイリー */}
-          <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
-            <h2 className="text-sm font-bold mb-2">最新デイリー</h2>
+          {/* デイリーカード */}
+          <section
+            className="mt-4 rounded-2xl border border-white/12 bg-white/5 p-4 transition-opacity duration-500 opacity-100"
+            style={{ animation: "fadeIn .6s ease both" }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-bold">最新デイリー</h2>
+              {daily?.created_at && (
+                <span className="text-[11px] text-white/50">更新: {fmt(daily.created_at)}</span>
+              )}
+            </div>
+
             {daily ? (
               <div className="text-sm">
                 <div>コード：<span className="font-semibold">{c || "—"}</span></div>
@@ -161,11 +204,17 @@ export default function MyPageClient() {
           </section>
 
           {/* 予備スペース */}
-          <section className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-5 mt-5">
+          <section className="mt-4 rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-5">
             <div className="text-white/60 text-sm">（予備）構造バランス可視化スペース</div>
           </section>
         </>
       )}
+
+      {/* Keyframe（小さなフェード） */}
+      <style jsx global>{`
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); }
+                            to   { opacity: 1; transform: translateY(0); } }
+      `}</style>
     </div>
   )
 }

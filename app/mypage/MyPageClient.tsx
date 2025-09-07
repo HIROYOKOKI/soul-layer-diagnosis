@@ -15,6 +15,7 @@ import {
    MyPage 完全版（本番）
    - レーダー：完全表示（size=260）/ ラベル色 / 面＝最大色 / 縁＝Ǝ紫
    - ライン：7/30/90 切替・0..1正規化・横スクロール対応
+   - 修正：オレンジ枠の「−」ボタンが見えない問題 → text-color指定
    ============================================================= */
 
 type EV = "E" | "V" | "Λ" | "Ǝ"
@@ -34,7 +35,7 @@ type DailyLatest = {
   created_at?: string
 }
 
-// alias（読みやすさ用）
+// alias
 type EVAEVectorLocal = EVAEVector
 type SeriesPointLocal = SeriesPoint
 
@@ -75,6 +76,29 @@ function normalizeSeries(list: any[]): SeriesPointLocal[] {
       E: clamp01(d?.E), V: clamp01(d?.V), L: clamp01(L), Eexists: clamp01(d?.Eexists ?? d?.["Ǝ"]),
     }
   })
+}
+
+/* ============== UI Parts ============== */
+// 「−」の見えない問題に対処したミニボタン
+function MinusBadge({ onClick }: { onClick?: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="collapse"
+      onClick={onClick}
+      className="
+        flex items-center justify-center w-10 h-10 rounded-xl
+        border bg-black/60
+        border-orange-500/90 text-orange-500
+        text-xl font-bold leading-none
+        shadow-[0_0_10px_rgba(249,115,22,0.35)]
+        hover:bg-black/70 hover:shadow-[0_0_14px_rgba(249,115,22,0.5)]
+        transition
+      "
+    >
+      −
+    </button>
+  )
 }
 
 /* ============== Component ============== */
@@ -164,7 +188,12 @@ export default function MyPageClient() {
   return (
     <div className="min-h-screen bg-black text-white px-5 py-6 max-w-md mx-auto">
       {/* 1) クイック診断の型（色仕様：EΛVƎ=紫 / EVΛƎ=橙） */}
-      <div className="text-center mb-3">
+      <div className="text-center mb-3 relative">
+        {/* 浮遊する「−」バッジ：中央上部（スクショ再現） */}
+        <div className="absolute -top-6 left-1/2 -translate-x-1/2">
+          <MinusBadge />
+        </div>
+
         <span
           className="inline-block rounded-lg px-3 py-1 text-sm border"
           style={{

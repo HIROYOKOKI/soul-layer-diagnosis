@@ -15,6 +15,7 @@ import {
    MyPage 完全版（本番）
    - レーダー：完全表示（size=260）/ ラベル色 / 面＝最大色 / 縁＝Ǝ紫
    - ライン：7/30/90 切替・0..1正規化・横スクロール対応
+   - 追加：base_model の正規化 & フォールバック表示
    ============================================================= */
 
 type EV = "E" | "V" | "Λ" | "Ǝ"
@@ -34,7 +35,7 @@ type DailyLatest = {
   created_at?: string
 }
 
-// alias（読みやすさ用）
+// alias
 type EVAEVectorLocal = EVAEVector
 type SeriesPointLocal = SeriesPoint
 
@@ -47,11 +48,22 @@ const clamp01 = (v: unknown) => {
   return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0
 }
 
-function toTypeLabel(model?: string | null) {
-  if (model === "EΛVƎ") return "現実思考型"
-  if (model === "EVΛƎ") return "未来志向型"
+// 入力の取りこぼしを防ぐ（空白・重複・余計な文字に耐性）
+function normalizeModel(s?: string | null): "EΛVƎ" | "EVΛƎ" | null {
+  if (!s) return null
+  const t = String(s).replace(/\s+/g, "")
+  if (t.includes("EΛVƎ")) return "EΛVƎ"
+  if (t.includes("EVΛƎ")) return "EVΛƎ"
   return null
 }
+
+function toTypeLabel(model?: string | null) {
+  const m = normalizeModel(model)
+  if (m === "EΛVƎ") return "現実思考型"
+  if (m === "EVΛƎ") return "未来志向型"
+  return null
+}
+
 function fmt(dt?: string) {
   try {
     const d = dt ? new Date(dt) : new Date()
@@ -152,6 +164,7 @@ export default function MyPageClient() {
     return () => { alive = false }
   }, [range])
 
+  const normalizedModel = normalizeModel(profile?.base_model)
   const typeLabel = toTypeLabel(profile?.base_model)
   const nowStr = fmt()
 
@@ -165,16 +178,22 @@ export default function MyPageClient() {
     <div className="min-h-screen bg-black text-white px-5 py-6 max-w-md mx-auto">
       {/* 1) クイック診断の型（色仕様：EΛVƎ=紫 / EVΛƎ=橙） */}
       <div className="text-center mb-3">
-        <span
-          className="inline-block rounded-lg px-3 py-1 text-sm border"
-          style={{
-            borderColor: profile?.base_model === "EΛVƎ" ? "#B833F5" : "#FF4500",
-            backgroundColor: profile?.base_model === "EΛVƎ" ? "#B833F522" : "#FF450022",
-            color: profile?.base_model === "EΛVƎ" ? "#B833F5" : "#FF4500",
-          }}
-        >
-          {typeLabel ?? "—"}{typeLabel ? `（${profile?.base_model}）` : ""}
-        </span>
+        {typeLabel ? (
+          <span
+            className="inline-block rounded-lg px-3 py-1 text-sm border"
+            style={{
+              borderColor: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
+              backgroundColor: normalizedModel === "EΛVƎ" ? "#B833F522" : "#FF450022",
+              color: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
+            }}
+          >
+            {typeLabel}（{normalizedModel}）
+          </span>
+        ) : (
+          <span className="inline-block rounded-lg px-3 py-1 text-xs border border-white/15 text-white/60 bg-white/5">
+            クイック診断はまだありません
+          </span>
+        )}
       </div>
 
       {/* 2) プロフィール行 */}
@@ -278,5 +297,4 @@ export default function MyPageClient() {
       </section>
     </div>
   )
-}　
-
+}

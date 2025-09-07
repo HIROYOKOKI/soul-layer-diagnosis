@@ -7,9 +7,10 @@ import GlowButton from "@/components/GlowButton"
 type Pending = {
   name: string
   birthday: string
-  blood: "A" | "B" | "O" | "AB" | ""
-  gender: "Male" | "Female" | "Other" | ""
-  preference: "Female" | "Male" | "Both" | "" | null
+  birthTime: string | null        // 任意 ("HH:mm")
+  birthPlace: string | null       // 任意 ("City, Country")
+  sex: "Male" | "Female" | "Other" | ""            // 任意
+  preference: "Female" | "Male" | "Both" | "None" | "Other" | "" | null // 任意
 }
 
 export default function ProfileFormClient() {
@@ -27,9 +28,11 @@ export default function ProfileFormClient() {
     const pending: Pending = {
       name: String(f.get("name") || ""),
       birthday: String(f.get("birthday") || ""),
-      blood: (String(f.get("blood") || "") as Pending["blood"]),
-      gender: (String(f.get("gender") || "") as Pending["gender"]),
-      preference: rawPref === "" ? null : (rawPref as Pending["preference"]),
+      birthTime: (String(f.get("birthTime") || "") || "").trim() === "" ? null : String(f.get("birthTime")),
+      birthPlace: (String(f.get("birthPlace") || "") || "").trim() === "" ? null : String(f.get("birthPlace")),
+      sex: (String(f.get("sex") || "") as Pending["sex"]),
+      preference:
+        rawPref === "" ? null : (rawPref as Pending["preference"]),
     }
 
     try {
@@ -66,25 +69,43 @@ export default function ProfileFormClient() {
         />
       </label>
 
+      {/* 任意：出生時間 */}
       <label className="grid gap-1 text-sm">
-        <span>血液型</span>
-        <select name="blood" className="px-3 py-2 rounded-lg bg-white/5 border border-white/10" defaultValue="A">
-          <option value="A">A</option>
-          <option value="B">B</option>
-          <option value="O">O</option>
-          <option value="AB">AB</option>
-        </select>
+        <span>出生時間（任意）</span>
+        <input
+          name="birthTime"
+          type="time"
+          className="px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+        />
       </label>
 
+      {/* 任意：出生地 */}
       <label className="grid gap-1 text-sm">
-        <span>性別</span>
-        <select name="gender" className="px-3 py-2 rounded-lg bg-white/5 border border-white/10" defaultValue="Male">
+        <span>出生地（任意）</span>
+        <input
+          name="birthPlace"
+          type="text"
+          placeholder="Tokyo, JP / Los Angeles, US など"
+          className="px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+        />
+      </label>
+
+      {/* 任意：性別 */}
+      <label className="grid gap-1 text-sm">
+        <span>性別（任意）</span>
+        <select
+          name="sex"
+          className="px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+          defaultValue=""
+        >
+          <option value="">選択しない</option>
           <option value="Male">男性</option>
           <option value="Female">女性</option>
           <option value="Other">その他</option>
         </select>
       </label>
 
+      {/* 任意：恋愛対象 */}
       <label className="grid gap-1 text-sm">
         <span>恋愛対象（任意）</span>
         <select
@@ -96,6 +117,8 @@ export default function ProfileFormClient() {
           <option value="Female">女性</option>
           <option value="Male">男性</option>
           <option value="Both">どちらも</option>
+          <option value="None">なし</option>
+          <option value="Other">その他</option>
         </select>
       </label>
 

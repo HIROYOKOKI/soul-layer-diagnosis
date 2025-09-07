@@ -5,7 +5,9 @@ export type ProfilePending = {
   birthday: string // "YYYY-MM-DD"
   birthTime?: string | null
   birthPlace?: string | null
-  sex?: string | null
+  gender?: "Male" | "Female" | "Other" | string | null // 旧フィールド互換
+  sex?: string | null                                    // 新フィールド（どちらでもOK）
+  blood?: "A" | "B" | "O" | "AB" | string | null        // 旧UI互換
   preference?: string | null
   theme?: string | null
 }

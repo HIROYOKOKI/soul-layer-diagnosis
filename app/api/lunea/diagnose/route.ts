@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   if (ai) {
     const r = await ai.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.7,
+   
       messages: [{ role:"system", content: sys }, { role:"user", content: user }],
     })
     comment = r.choices[0]?.message?.content?.trim() || comment

@@ -35,9 +35,23 @@ export default function ConfirmClient() {
     }, 160) // ← 演出が見える最短の待機（120–180ms推奨）
   }
 
-  function goNext() {
-    router.push("/profile/result")
+function goNext() {
+  try {
+    const raw = sessionStorage.getItem("structure_quick_pending")
+    const quick = raw ? JSON.parse(raw) : null
+    if (!quick?.order || quick.order.length !== 4) {
+      // Quick未実施 → Quickへ。完了後に /profile/result へ戻す
+      const returnTo = encodeURIComponent("/profile/result")
+      router.push(`/structure/quick?return=${returnTo}`)
+      return
+    }
+  } catch {
+    const returnTo = encodeURIComponent("/profile/result")
+    router.push(`/structure/quick?return=${returnTo}`)
+    return
   }
+  router.push("/profile/result")
+}
 
   if (!data) {
     return (

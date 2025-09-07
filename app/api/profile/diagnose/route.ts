@@ -147,3 +147,4 @@ export async function POST(req: Request) {
     )
   }
 }
+console.log("Model in use:", process.env.OPENAI_PROFILE_MODEL)

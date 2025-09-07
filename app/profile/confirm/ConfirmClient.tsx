@@ -29,7 +29,6 @@ export default function ConfirmClient() {
     router.push("/profile")
   }
   async function goNext() {
-    // ここで /api/profile/diagnose を呼ぶ → 結果ページへ遷移（後で実装）
     router.push("/profile/result")
   }
 
@@ -47,10 +46,10 @@ export default function ConfirmClient() {
   const showPref = (v: Pending["preference"]) => (v && v !== "" ? v : "選択しない")
 
   return (
-    <div className="max-w-xl mx-auto p-6 space-y-4">
+    <div className="max-w-xl mx-auto p-6 space-y-6">
       <h1 className="text-xl font-bold">確認</h1>
 
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm grid gap-2">
+      <div className="rounded-2xl bg-white/[0.03] p-4 text-sm grid gap-2">
         <div><span className="opacity-70">名前 / ニックネーム：</span>{data.name}</div>
         <div><span className="opacity-70">誕生日：</span>{data.birthday}</div>
         <div><span className="opacity-70">出生時間（任意）：</span>{show(data.birthTime)}</div>
@@ -59,11 +58,20 @@ export default function ConfirmClient() {
         <div><span className="opacity-70">恋愛対象（任意）：</span>{showPref(data.preference)}</div>
       </div>
 
-      <div className="flex justify-between pt-2">
-        <button onClick={goBack} className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10">
+      {/* 縦並びのボタン */}
+      <div className="space-y-3">
+        <button
+          onClick={goBack}
+          className="w-full rounded-xl border border-white/20 px-4 py-3 text-white hover:bg-white/10"
+        >
           戻る
         </button>
-        <GlowButton onClick={goNext} variant="primary" size="sm">
+        <GlowButton
+          onClick={goNext}
+          variant="primary"
+          size="sm"
+          className="w-full h-12"
+        >
           この内容で診断
         </GlowButton>
       </div>

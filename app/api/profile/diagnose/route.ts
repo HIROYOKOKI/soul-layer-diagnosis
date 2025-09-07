@@ -100,7 +100,7 @@ export async function POST(req: Request) {
         { role: "system", content: system },
         { role: "user", content: JSON.stringify(user) },
       ],
-      temperature: 0.7,
+ 
     })
 
     const raw = resp.choices?.[0]?.message?.content || "{}"

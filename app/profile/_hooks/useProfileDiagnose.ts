@@ -1,43 +1,70 @@
-<<<<<<< Updated upstream
 // app/profile/_hooks/useProfileDiagnose.ts
-=======
->>>>>>> Stashed changes
 "use client"
 
-export type ProfilePayload = {
-  name: string
-  birthday: string      // YYYY-MM-DD
-  blood: string
-  gender: string
-  preference?: string | null
-  theme?: string | null
+import { useCallback, useState } from "react"
+
+export type ProfileInput = {
+  name: string                // 必須（ニックネーム可）
+  birthday: string            // 必須 "YYYY-MM-DD"
+  birthTime?: string | null   // 任意 "HH:mm"（わからなければ null）
+  birthPlace?: string | null  // 任意 例: "Tokyo, JP"
+  sex?: "Male" | "Female" | "Other" | null         // 任意（性別）
+  preference?: "Male" | "Female" | "Both" | "None" | "Other" | null // 任意（恋愛対象）
+  theme?: "dev" | "prod"      // 既存運用に合わせて（デフォルト dev）
 }
 
-type DiagnoseOk  = { ok: true;  result: { luneaLines: string[] } }
-type DiagnoseErr = { ok: false; error: string }
-type DiagnoseResp = DiagnoseOk | DiagnoseErr
+export type DiagnoseState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "error"; error: string }
+  | {
+      status: "done"
+      result: {
+        // APIの戻りに合わせて適宜
+        luneaLines: string[]
+        detail?: Record<string, unknown>
+      }
+    }
 
 export function useProfileDiagnose() {
-<<<<<<< Updated upstream
-  // フックは“診断して結果を返すだけ”。画面遷移は呼び出し側で行う。
-=======
-  // 診断して結果を返すだけ（画面遷移は呼び出し側で）
->>>>>>> Stashed changes
-  return async function diagnose(payload: ProfilePayload): Promise<{ luneaLines: string[] }> {
-    const res = await fetch("/api/profile/diagnose", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      // 本番DB汚し防止：theme が未指定なら dev を付与
-      body: JSON.stringify({ theme: "dev", ...payload }),
-      cache: "no-store",
-    })
+  const [state, setState] = useState<DiagnoseState>({ status: "idle" })
 
-    if (!res.ok) throw new Error(`HTTP_${res.status}`)
+  const diagnose = useCallback(async (input: ProfileInput) => {
+    setState({ status: "loading" })
 
-    const json = (await res.json()) as DiagnoseResp
-    if ("ok" in json && json.ok && json.result) {
-      return { luneaLines: json.result.luneaLines }
+    try {
+      // 任意項目は null に正規化（空文字が来てもOKにする）
+      const payload = {
+        name: input.name,
+        birthday: input.birthday,
+        birthTime: input.birthTime ? input.birthTime : null,
+        birthPlace: input.birthPlace ? input.birthPlace : null,
+        sex: input.sex ?? null,
+        preference: input.preference ?? null,
+        theme: input.theme ?? "dev",
+      }
+
+      const res = await fetch("/api/profile/diagnose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const t = await res.text()
+        throw new Error(`HTTP ${res.status} ${t}`)
+      }
+
+      const json = await res.json()
+      if (!json?.ok) throw new Error(json?.error ?? "unknown_error")
+
+      setState({ status: "done", result: json.result })
+      return json.result
+    } catch (e: any) {
+      setState({ status: "error", error: e?.message ?? String(e) })
+      return null
     }
-    throw new Error((json as DiagnoseErr)?.error || "profile_diagnose_failed")
-  }
+  }, [])
+
+  return { state, diagnose }
 }

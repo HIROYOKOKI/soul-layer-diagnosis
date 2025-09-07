@@ -51,7 +51,8 @@ export default function ProfileFormClient() {
         <h1 className="text-xl font-bold tracking-wide text-white/90 sm:text-2xl">プロフィール入力</h1>
         <p className="mt-1 text-sm text-white/50 sm:text-base">診断に必要な最小限の情報だけを入力してください</p>
       </div>
-      <div className="relative rounded-2xl border border-white/10 bg-white/[0.03] p-8 shadow-[0_0_40px_rgba(184,51,245,0.08)] backdrop-blur min-h-[520px]">
+     <div className="relative rounded-2xl bg-white/[0.03] p-6 sm:p-8 min-h-[520px] shadow-[0_0_40px_rgba(184,51,245,0.08)] backdrop-blur">
+
         <div className="pointer-events-none absolute -inset-px rounded-2xl opacity-70 [background:radial-gradient(120px_80px_at_10%_0%,rgba(0,255,255,.1),transparent),radial-gradient(120px_80px_at_100%_0%,rgba(184,51,245,.1),transparent)]" />
         <form onSubmit={handleSubmit} className="relative grid gap-6">
           <Field label="ニックネーム" icon={<User className="h-4 w-4" />} required>

@@ -57,7 +57,9 @@ function getQuickBase() {
 const CODE_LABELS = { E: "衝動・情熱", V: "可能性・夢", "Λ": "選択・葛藤", "Ǝ": "観測・静寂" } as const
 const CODE_COLORS = { E: "#FF4500", V: "#1E3A8A", "Λ": "#84CC16", "Ǝ": "#B833F5" } as const
 
-export default function ResultClient() {
+// app/profile/result/ResultClient.tsx
+export { default } from "@/components/result/ProfileResultClient"
+
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

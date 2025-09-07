@@ -1,3 +1,5 @@
-// app/profile/result/page.tsx
-import ResultClient from "./ResultClient"
-export default function Page(){ return <ResultClient /> }
+import ProfileResultClient from "@/components/result/ProfileResultClient"
+
+export default function Page() {
+  return <ProfileResultClient />
+}

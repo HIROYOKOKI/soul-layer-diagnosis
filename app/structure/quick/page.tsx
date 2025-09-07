@@ -1,5 +1,5 @@
-import ProfileResultClient from "@/components/result/ProfileResultClient"
-
+// app/structure/quick/page.tsx
+import QuickClient from "./QuickClient" // ← あなたのクイック判定UI
 export default function Page() {
-  return <ProfileResultClient />
+  return <QuickClient />
 }

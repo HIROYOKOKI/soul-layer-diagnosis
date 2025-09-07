@@ -2,7 +2,7 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import LuneaBubble from "@/components/LuneaBubble"
 import GlowButton from "@/components/GlowButton"
 
@@ -26,7 +26,7 @@ type DiagnoseOk = {
   result: {
     name: string
     summary?: string
-    luneaLines: string[] // 受け取るが使わない
+    luneaLines: string[]
     detail?: DiagnoseDetail
   }
 }
@@ -58,8 +58,8 @@ const CODE_COLORS = { E: "#FF4500", V: "#1E3A8A", "Λ": "#84CC16", "Ǝ": "#B833F
 
 export default function ProfileResultClient() {
   const router = useRouter()
+  const pathname = usePathname()
 
-  // ガード & 表示用ステート
   const [quickBase, setQuickBase] = useState<ReturnType<typeof getQuickBase> | null>(null)
   const [guardChecked, setGuardChecked] = useState(false)
 
@@ -69,22 +69,20 @@ export default function ProfileResultClient() {
   const [detail, setDetail] = useState<DiagnoseDetail | null>(null)
   const [step, setStep] = useState(0)
 
-  // ---------- Guard #1: Quick 未実施なら即リダイレクト ----------
   useEffect(() => {
     const qb = getQuickBase()
     if (!qb?.base_order || qb.base_order.length !== 4) {
+      if (pathname?.startsWith("/structure/quick")) return
       const returnTo = encodeURIComponent("/profile/result")
       router.replace(`/structure/quick?return=${returnTo}`)
       return
     }
     setQuickBase(qb)
     setGuardChecked(true)
-  }, [router])
+  }, [router, pathname])
 
-  // ---------- Guard #2: Guard通過後にのみ API 実行 ----------
   useEffect(() => {
     if (!guardChecked) return
-
     ;(async () => {
       try {
         setError(null)
@@ -128,7 +126,6 @@ export default function ProfileResultClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guardChecked])
 
-  // ルネアは detail をセリフ化して順に表示（短文は使わない）
   const bubbles = useMemo(() => {
     const arr: Array<{label: string; text: string}> = []
     if (detail?.fortune)     arr.push({ label: "総合運勢",           text: detail.fortune.trim() })
@@ -147,14 +144,12 @@ export default function ProfileResultClient() {
   const topCode = quickBase?.base_order?.[0]
   const titleText = topCode ? `傾向：${topCode}（${CODE_LABELS[topCode]}）が強め` : "診断結果"
 
-  // Guardの途中（リダイレクト準備中）は何も描画しない
   if (!guardChecked) return null
 
   return (
     <div className="mx-auto max-w-3xl p-6 space-y-8">
       <h1 className="sr-only">プロフィール診断結果</h1>
 
-      {/* タイトル＋カラー付きコードチップ */}
       <section className="space-y-2">
         <div className="text-cyan-300 font-semibold">
           {titleText} {saving && <span className="text-white/60 text-xs ml-2">保存中…</span>}
@@ -173,7 +168,6 @@ export default function ProfileResultClient() {
         </div>
       </section>
 
-      {/* ルネアの連続セリフ（白トーンで統一） */}
       <div className="space-y-4">
         {loading && <div className="text-white/80">…観測中。きみの“いま”を読み解いているよ。</div>}
         {error && <div className="text-sm text-red-300">エラー : {error}</div>}
@@ -186,7 +180,6 @@ export default function ProfileResultClient() {
         )}
       </div>
 
-      {/* ボタン群：縦並び。次へ＝EVΛƎパープル、もう一度＝軽グロー、マイページへ＝既存Glow */}
       {!loading && !error && (
         <div className="space-y-3">
           {step < bubbles.length && (

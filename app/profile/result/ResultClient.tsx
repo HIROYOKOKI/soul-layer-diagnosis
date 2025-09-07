@@ -26,7 +26,7 @@ type DiagnoseOk = {
   result: {
     name: string
     summary?: string
-    luneaLines: string[]       // ← 受け取るが使わない
+    luneaLines: string[] // 受け取るが使わない
     detail?: DiagnoseDetail
   }
 }
@@ -38,7 +38,7 @@ function initialStep(len: number) {
   return Math.min(1, Math.max(0, Math.floor(len)))
 }
 
-// sessionStorage からクイック基礎層を取得（タイトル＆チップ用）
+// タイトル＆チップ用：クイック基礎層（sessionStorage）
 function getQuickBase() {
   try {
     const raw = typeof window !== "undefined" ? sessionStorage.getItem("structure_quick_pending") : null
@@ -74,8 +74,8 @@ export default function ResultClient() {
 
         const raw = typeof window !== "undefined" ? sessionStorage.getItem("profile_pending") : null
         if (!raw) throw new Error("no_profile_pending")
-
         const pending = JSON.parse(raw) as Pending
+
         const resp = await fetch("/api/profile/diagnose", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -87,6 +87,7 @@ export default function ResultClient() {
 
         const d = json.result.detail ?? null
         setDetail(d)
+
         const qb = getQuickBase()
         setQuickBase(qb)
 
@@ -118,14 +119,14 @@ export default function ResultClient() {
     run()
   }, [])
 
-  // ルネアの吹き出しは「短いセリフ」ではなく detail を順に表示
+  // ルネアは短文ではなく detail をセリフ化して順に表示
   const bubbles = useMemo(() => {
-    const arr: string[] = []
-    if (detail?.fortune)     arr.push(detail.fortune.trim())
-    if (detail?.personality) arr.push(detail.personality.trim())
-    if (detail?.work)        arr.push(detail.work.trim())
-    if (detail?.partner)     arr.push(detail.partner.trim())
-    return arr.filter(Boolean)
+    const arr: Array<{label: string; text: string}> = []
+    if (detail?.fortune)     arr.push({ label: "総合運勢",           text: detail.fortune.trim() })
+    if (detail?.personality) arr.push({ label: "性格傾向",           text: detail.personality.trim() })
+    if (detail?.work)        arr.push({ label: "仕事運",             text: detail.work.trim() })
+    if (detail?.partner)     arr.push({ label: "理想のパートナー像", text: detail.partner.trim() })
+    return arr
   }, [detail])
 
   useEffect(() => {
@@ -144,7 +145,7 @@ export default function ResultClient() {
     <div className="mx-auto max-w-3xl p-6 space-y-8">
       <h1 className="sr-only">プロフィール診断結果</h1>
 
-      {/* タイトル＋コードチップ */}
+      {/* タイトル＋カラー付きコードチップ */}
       <section className="space-y-2">
         <div className="text-cyan-300 font-semibold">
           {titleText} {saving && <span className="text-white/60 text-xs ml-2">保存中…</span>}
@@ -155,11 +156,7 @@ export default function ResultClient() {
             const bg = active ? CODE_COLORS[k] : "rgba(255,255,255,0.08)"
             const color = active ? "#fff" : "rgba(255,255,255,0.7)"
             return (
-              <span
-                key={k}
-                style={{ backgroundColor: bg, color }}
-                className="rounded-full px-2.5 py-1 leading-none"
-              >
+              <span key={k} style={{ backgroundColor: bg, color }} className="rounded-full px-2.5 py-1 leading-none">
                 {k}・{CODE_LABELS[k]}
               </span>
             )
@@ -167,18 +164,15 @@ export default function ResultClient() {
         </div>
       </section>
 
-      {/* 上部：ルネアの吹き出し（detail を段階表示） */}
+      {/* ルネアの連続セリフ（白トーンで統一） */}
       <div className="space-y-4">
-        {loading && <div className="text-white/70">…観測中。きみの“いま”を読み解いているよ。</div>}
+        {loading && <div className="text-white/80">…観測中。きみの“いま”を読み解いているよ。</div>}
 
         {error && (
           <div className="space-y-3">
             <div className="text-sm text-red-300">エラー : {error}</div>
             <div className="flex gap-2">
-              <button
-                className="px-3 py-2 rounded border border-white/20 hover:bg-white/10"
-                onClick={() => { if (typeof window !== "undefined") window.location.reload() }}
-              >
+              <button className="px-3 py-2 rounded border border-white/20 hover:bg-white/10" onClick={() => { if (typeof window !== "undefined") window.location.reload() }}>
                 再試行
               </button>
               <button className="px-3 py-2 rounded border border-white/20 hover:bg-white/10" onClick={toProfile}>
@@ -190,8 +184,8 @@ export default function ResultClient() {
 
         {!loading && !error && (
           <>
-            {bubbles.slice(0, step).map((t, i) => (
-              <LuneaBubble key={i} text={t} speed={32} />
+            {bubbles.slice(0, step).map((b, i) => (
+              <LuneaBubble key={i} text={`${b.label}：${b.text}`} speed={50} />
             ))}
             {step < bubbles.length && (
               <div className="pt-1">
@@ -204,37 +198,16 @@ export default function ResultClient() {
         )}
       </div>
 
-      {/* 下部：結果カード（読み返し用） */}
-      {!loading && !error && detail && (
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[inset_0_0_12px_rgba(255,255,255,.04),0_0_0_1px_rgba(255,255,255,.03)]">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-              <h3 className="text-white/80 text-sm mb-1">総合運勢</h3>
-              <p className="text-white/90 leading-relaxed text-[15px]">{detail.fortune || "—"}</p>
-            </article>
-            <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-              <h3 className="text-white/80 text-sm mb-1">性格傾向</h3>
-              <p className="text-white/90 leading-relaxed text-[15px]">{detail.personality || "—"}</p>
-            </article>
-            <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-              <h3 className="text-white/80 text-sm mb-1">仕事運</h3>
-              <p className="text-white/90 leading-relaxed text-[15px]">{detail.work || "—"}</p>
-            </article>
-            <article className="rounded-xl border border-white/10 bg-black/20 p-4">
-              <h3 className="text-white/80 text-sm mb-1">理想のパートナー像</h3>
-              <p className="text-white/90 leading-relaxed text-[15px]">{detail.partner || "—"}</p>
-            </article>
-          </div>
-
-          <div className="flex gap-3 mt-4">
-            <button onClick={restart} className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10" disabled={saving}>
-              もう一度
-            </button>
-            <GlowButton variant="primary" size="sm" onClick={toMyPage} disabled={saving}>
-              マイページへ
-            </GlowButton>
-          </div>
-        </section>
+      {/* 下部カードは削除し、ページ遷移のみ残す */}
+      {!loading && !error && (
+        <div className="flex gap-3">
+          <button onClick={restart} className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10" disabled={saving}>
+            もう一度
+          </button>
+          <GlowButton variant="primary" size="sm" onClick={toMyPage} disabled={saving}>
+            マイページへ
+          </GlowButton>
+        </div>
       )}
     </div>
   )

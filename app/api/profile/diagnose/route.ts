@@ -85,7 +85,7 @@ export async function POST(req: Request) {
     const openai = getOpenAI()
     if (!openai) throw new Error("openai_env_missing")
 
-    const model = process.env.OPENAI_PROFILE_MODEL || "gpt-4o-mini"
+    const model = process.env.OPENAI_PROFILE_MODEL || "gpt-5-mini"
 
     const system = `あなたは「ルネア」。日本語で簡潔に、あたたかく、断定しすぎないトーンで話します。
 出力は必ず厳密な JSON のみ。本文中にラベルや箇条書きや装飾を入れず、改行や引用符は JSON として正しい形式で。`

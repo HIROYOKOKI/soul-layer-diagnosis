@@ -119,7 +119,7 @@ export default function ResultClient() {
     run()
   }, [])
 
-  // ルネアは短文ではなく detail をセリフ化して順に表示
+  // 吹き出しは detail を順に表示
   const bubbles = useMemo(() => {
     const arr: Array<{label: string; text: string}> = []
     if (detail?.fortune)     arr.push({ label: "総合運勢",           text: detail.fortune.trim() })
@@ -164,7 +164,7 @@ export default function ResultClient() {
         </div>
       </section>
 
-      {/* ルネアの連続セリフ（白トーンで統一） */}
+      {/* ルネアの連続セリフ */}
       <div className="space-y-4">
         {loading && <div className="text-white/80">…観測中。きみの“いま”を読み解いているよ。</div>}
 
@@ -185,26 +185,38 @@ export default function ResultClient() {
         {!loading && !error && (
           <>
             {bubbles.slice(0, step).map((b, i) => (
-              <LuneaBubble key={i} text={`${b.label}：${b.text}`} speed={50} />
+              <LuneaBubble key={i} text={`${b.label}：${b.text}`} speed={48} />
             ))}
-            {step < bubbles.length && (
-              <div className="pt-1">
-                <GlowButton size="sm" variant="primary" onClick={next} disabled={saving}>
-                  次へ
-                </GlowButton>
-              </div>
-            )}
           </>
         )}
       </div>
 
-      {/* 下部カードは削除し、ページ遷移のみ残す */}
+      {/* ボタン群：縦並び */}
       {!loading && !error && (
-        <div className="flex gap-3">
-          <button onClick={restart} className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10" disabled={saving}>
+        <div className="space-y-3">
+          {step < bubbles.length && (
+            <button
+              onClick={next}
+              disabled={saving}
+              className="w-full h-12 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-medium shadow-lg transition"
+            >
+              次へ
+            </button>
+          )}
+          <button
+            onClick={restart}
+            className="w-full px-4 py-3 rounded-xl border border-white/20 hover:bg-white/10"
+            disabled={saving}
+          >
             もう一度
           </button>
-          <GlowButton variant="primary" size="sm" onClick={toMyPage} disabled={saving}>
+          <GlowButton
+            variant="primary"
+            size="sm"
+            onClick={toMyPage}
+            disabled={saving}
+            className="w-full h-12"
+          >
             マイページへ
           </GlowButton>
         </div>

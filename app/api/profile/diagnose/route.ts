@@ -1,13 +1,13 @@
-// app/api/profile/diagnose/route.ts
 import { NextResponse } from "next/server"
 import { getOpenAI } from "../../../../lib/openai"
 
 type Pending = {
   name: string
   birthday: string
-  blood: string
-  gender: string
-  preference: string | null
+  birthTime?: string | null
+  birthPlace?: string | null
+  sex?: "Male" | "Female" | "Other" | null
+  preference?: "Female" | "Male" | "Both" | "None" | "Other" | null
   theme?: string | null // dev / prod など任意
 }
 
@@ -64,7 +64,8 @@ function sanitizeDetail(d?: Partial<DiagnoseDetail>): DiagnoseDetail {
 
 function pickSafeLines(lines: unknown): string[] {
   const xs = Array.isArray(lines) ? (lines as unknown[]) : []
-  return xs.map((s) => (typeof s === "string" ? s.trim() : ""))
+  return xs
+    .map((s) => (typeof s === "string" ? s.trim() : ""))
     .filter((s) => s.length > 0)
     .slice(0, 6) // 3〜5本程度推奨（最大6本まで）
 }
@@ -75,10 +76,8 @@ export async function POST(req: Request) {
     const openai = getOpenAI()
     if (!openai) throw new Error("openai_env_missing")
 
-    // 任意: モデルを環境変数で差し替え可能に
     const model = process.env.OPENAI_PROFILE_MODEL || "gpt-4o-mini"
 
-    // ルネアの口調で、厳密なJSONを返すよう要求
     const system = `あなたは「ルネア」。日本語で簡潔に、あたたかく、断定しすぎないトーンで話します。
 出力は必ず厳密な JSON のみ。本文中にラベルや箇条書きや装飾を入れず、改行や引用符は JSON として正しい形式で。`
 
@@ -96,9 +95,10 @@ export async function POST(req: Request) {
       profile: {
         name: pending?.name,
         birthday: pending?.birthday,
-        blood: pending?.blood,
-        gender: pending?.gender,
-        preference: pending?.preference,
+        birthTime: pending?.birthTime ?? null,
+        birthPlace: pending?.birthPlace ?? null,
+        sex: pending?.sex ?? null,
+        preference: pending?.preference ?? null,
       },
       output_format: {
         type: "object",
@@ -160,7 +160,6 @@ export async function POST(req: Request) {
       return pickSafeLines([...xs, ...add])
     })()
 
-    // dev テーマなら軽くログを分離（必要あれば拡張）
     const resBody = {
       ok: true,
       result: {

@@ -185,7 +185,7 @@ export default function ResultClient() {
         {!loading && !error && (
           <>
             {bubbles.slice(0, step).map((b, i) => (
-              <LuneaBubble key={i} text={`${b.label}：${b.text}`} speed={64} />
+              <LuneaBubble key={i} text={`${b.label}：${b.text}`} speed={80} />
             ))}
           </>
         )}

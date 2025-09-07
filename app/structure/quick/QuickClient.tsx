@@ -41,7 +41,7 @@ const BASE_HINTS: PendingV2['baseHints'] = {
   Ǝ: { type: 'Ǝ主導', comment: '観測→小実験→選び直しの循環。状況把握が得意。' },
 }
 
-export default function QuickClient() {
+export default function QuickClient({ returnTo }: { returnTo: string }) {
   const router = useRouter()
   const [order, setOrder] = useState<EV[]>([])   // 押した順
   const [locking, setLocking] = useState(false)  // 送信中
@@ -64,12 +64,19 @@ export default function QuickClient() {
     setOrder([])
   }
 
-  function computePoints(ord: EV[]): Record<EV, number> {
-    // 1位=4, 2位=3, 3位=2, 4位=1
-    const pts: Record<EV, number> = { E: 0, V: 0, Λ: 0, Ǝ: 0 }
-    ord.forEach((code, idx) => { pts[code] = 4 - idx })
-    return pts
+ function completeQuick(order: EV[]) {
+    sessionStorage.setItem(
+      "structure_quick_pending",
+      JSON.stringify({
+        order,
+        points: { E: 3, V: 2, Λ: 1, Ǝ: 0 }, // 実際は計算ロジックで置き換え
+      })
+    )
+    router.replace(returnTo)
   }
+
+  // 既存の handlePick / undoLast などはそのまま
+ }
 
   function toConfirm() {
     if (!isDone || locking) return

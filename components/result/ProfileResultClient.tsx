@@ -58,23 +58,42 @@ const CODE_COLORS = { E: "#FF4500", V: "#1E3A8A", "Λ": "#84CC16", "Ǝ": "#B833F
 
 export default function ProfileResultClient() {
   const router = useRouter()
+
+  // ガード & 表示用ステート
+  const [quickBase, setQuickBase] = useState<ReturnType<typeof getQuickBase> | null>(null)
+  const [guardChecked, setGuardChecked] = useState(false)
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [detail, setDetail] = useState<DiagnoseDetail | null>(null)
   const [step, setStep] = useState(0)
-  const [quickBase, setQuickBase] = useState<ReturnType<typeof getQuickBase> | null>(null)
 
+  // ---------- Guard #1: Quick 未実施なら即リダイレクト ----------
   useEffect(() => {
-    async function run() {
+    const qb = getQuickBase()
+    if (!qb?.base_order || qb.base_order.length !== 4) {
+      const returnTo = encodeURIComponent("/profile/result")
+      router.replace(`/structure/quick?return=${returnTo}`)
+      return
+    }
+    setQuickBase(qb)
+    setGuardChecked(true)
+  }, [router])
+
+  // ---------- Guard #2: Guard通過後にのみ API 実行 ----------
+  useEffect(() => {
+    if (!guardChecked) return
+
+    ;(async () => {
       try {
         setError(null)
         setLoading(true)
 
-        const raw = typeof window !== "undefined" ? sessionStorage.getItem("profile_pending") : null
+        const raw = sessionStorage.getItem("profile_pending")
         if (!raw) throw new Error("no_profile_pending")
-        const pending = JSON.parse(raw) as Pending
 
+        const pending = JSON.parse(raw) as Pending
         const resp = await fetch("/api/profile/diagnose", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -87,11 +106,8 @@ export default function ProfileResultClient() {
         const d = json.result.detail ?? null
         setDetail(d)
 
-        const qb = getQuickBase()
-        setQuickBase(qb)
-
         setSaving(true)
-        const saveRes = await fetch("/api/profile/save", {
+        await fetch("/api/profile/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -99,25 +115,20 @@ export default function ProfileResultClient() {
             fortune: d?.fortune ?? null,
             personality: d?.personality ?? null,
             partner: d?.partner ?? null,
-            ...(qb ?? {}),
+            ...(quickBase ?? {}),
           }),
-        })
-        if (!saveRes.ok && saveRes.status !== 409) {
-          const j = await saveRes.json().catch(() => ({}))
-          console.warn("profile/save failed:", j?.error ?? saveRes.statusText)
-        } else {
-          try { sessionStorage.removeItem("structure_quick_pending") } catch {}
-        }
+        }).catch(() => {})
       } catch (e: any) {
         setError(e?.message || "failed")
       } finally {
         setSaving(false)
         setLoading(false)
       }
-    }
-    run()
-  }, [])
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guardChecked])
 
+  // ルネアは detail をセリフ化して順に表示（短文は使わない）
   const bubbles = useMemo(() => {
     const arr: Array<{label: string; text: string}> = []
     if (detail?.fortune)     arr.push({ label: "総合運勢",           text: detail.fortune.trim() })
@@ -127,9 +138,7 @@ export default function ProfileResultClient() {
     return arr
   }, [detail])
 
-  useEffect(() => {
-    setStep(initialStep(bubbles.length))
-  }, [bubbles.length])
+  useEffect(() => { setStep(initialStep(bubbles.length)) }, [bubbles.length])
 
   const next = () => setStep((s) => Math.min(bubbles.length, s + 1))
   const restart = () => setStep(initialStep(bubbles.length))
@@ -138,10 +147,14 @@ export default function ProfileResultClient() {
   const topCode = quickBase?.base_order?.[0]
   const titleText = topCode ? `傾向：${topCode}（${CODE_LABELS[topCode]}）が強め` : "診断結果"
 
+  // Guardの途中（リダイレクト準備中）は何も描画しない
+  if (!guardChecked) return null
+
   return (
     <div className="mx-auto max-w-3xl p-6 space-y-8">
       <h1 className="sr-only">プロフィール診断結果</h1>
 
+      {/* タイトル＋カラー付きコードチップ */}
       <section className="space-y-2">
         <div className="text-cyan-300 font-semibold">
           {titleText} {saving && <span className="text-white/60 text-xs ml-2">保存中…</span>}
@@ -160,19 +173,21 @@ export default function ProfileResultClient() {
         </div>
       </section>
 
+      {/* ルネアの連続セリフ（白トーンで統一） */}
       <div className="space-y-4">
+        {loading && <div className="text-white/80">…観測中。きみの“いま”を読み解いているよ。</div>}
         {error && <div className="text-sm text-red-300">エラー : {error}</div>}
-
-        {!error && (
+        {!loading && !error && (
           <>
             {bubbles.slice(0, step).map((b, i) => (
-              <LuneaBubble key={i} text={`${b.label}：${b.text}`} speed={48} />
+              <LuneaBubble key={i} text={`${b.label}：${b.text}`} speed={62} />
             ))}
           </>
         )}
       </div>
 
-      {!error && (
+      {/* ボタン群：縦並び。次へ＝EVΛƎパープル、もう一度＝軽グロー、マイページへ＝既存Glow */}
+      {!loading && !error && (
         <div className="space-y-3">
           {step < bubbles.length && (
             <button

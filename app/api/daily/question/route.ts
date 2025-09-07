@@ -49,7 +49,7 @@ export async function GET() {
     const res = await client.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'system', content: prompt }],
-      temperature: 0.8,
+    
     })
 
     const text = res.choices?.[0]?.message?.content?.trim()

@@ -18,6 +18,7 @@ type Pending = {
 export default function ConfirmClient() {
   const router = useRouter()
   const [data, setData] = useState<Pending | null>(null)
+  const [backPressed, setBackPressed] = useState(false)
 
   useEffect(() => {
     try {
@@ -26,10 +27,15 @@ export default function ConfirmClient() {
     } catch {}
   }, [])
 
-  function goBack() {
-    router.push("/profile")
+  function goBackWithFX() {
+    if (backPressed) return
+    setBackPressed(true)
+    setTimeout(() => {
+      router.push("/profile")
+    }, 160) // ← 演出が見える最短の待機（120–180ms推奨）
   }
-  async function goNext() {
+
+  function goNext() {
     router.push("/profile/result")
   }
 
@@ -37,13 +43,13 @@ export default function ConfirmClient() {
     return (
       <div className="max-w-xl mx-auto p-6 text-white/70">
         入力内容が見つかりません。
-        <button className="underline ml-2" onClick={goBack}>戻る</button>
+        <button className="underline ml-2" onClick={() => router.push("/profile")}>戻る</button>
       </div>
     )
   }
 
   const show = (v?: string | null) => (v && v.trim() !== "" ? v : "未入力")
-  const showSex = (v: Pending["sex"]) => (v && v !== "" ? v : "未入力")
+  const showSex  = (v: Pending["sex"]) => (v && v !== "" ? v : "未入力")
   const showPref = (v: Pending["preference"]) => (v && v !== "" ? v : "選択しない")
 
   return (
@@ -59,15 +65,30 @@ export default function ConfirmClient() {
         <div><span className="opacity-70">恋愛対象（任意）：</span>{showPref(data.preference)}</div>
       </div>
 
-      {/* 縦並びのボタン */}
+      {/* 縦並びボタン（戻る→診断） */}
       <div className="space-y-3">
         <button
-          onClick={goBack}
-          className="group flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 px-4 py-3 text-white transition-colors hover:bg-white/10"
+          onClick={goBackWithFX}
+          disabled={backPressed}
+          className={[
+            "group relative w-full rounded-xl px-4 py-3",
+            "border border-white/20 text-white transition",
+            "active:scale-[0.99]",
+            backPressed
+              ? "bg-white/12 shadow-[0_0_16px_rgba(0,255,255,0.25)]"
+              : "hover:bg-white/10 hover:shadow-[0_0_12px_rgba(0,255,255,0.18)]",
+            "flex items-center justify-center gap-2"
+          ].join(" ")}
         >
-          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+          <ArrowLeft
+            className={[
+              "h-4 w-4 transition-transform",
+              backPressed ? "-translate-x-1" : "group-active:-translate-x-1"
+            ].join(" ")}
+          />
           <span>戻る</span>
         </button>
+
         <GlowButton
           onClick={goNext}
           variant="primary"

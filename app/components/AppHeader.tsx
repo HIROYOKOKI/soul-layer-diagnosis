@@ -1,11 +1,9 @@
-"use client"
-
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 
 export default function AppHeader() {
   const pathname = usePathname() || ""
-  // const isMyPage = /^\/mypage(?:\/|$)/.test(pathname)
+  // const isMyPage = /^\/mypage(?:\/|$)/.test(pathname) // ← 使うなら残す
 
   return (
     <header className="relative z-50 flex items-center justify-between px-5 py-3">
@@ -16,16 +14,13 @@ export default function AppHeader() {
           width={32}
           height={32}
           priority
-          className="
-            rounded-full
-            border border-violet-500/40
-            shadow-[0_0_6px_2px_rgba(184,51,245,0.5)]
-          "
+          className="rounded-full border border-gray-700"
         />
         <span className="tracking-[0.28em] text-xs md:text-sm text-white/90">
           SOUL LAYER DIAGNOSIS
         </span>
       </div>
+      {/* 右側は空（設定は /mypage 本体で表示） */}
       <div className="w-6 h-6" />
     </header>
   )

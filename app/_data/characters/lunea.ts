@@ -177,3 +177,12 @@ __assert(LUNEA.persona.idCode === 'AI-002', 'IDコードが不正')
   __assert(!!LUNEA.messages.encouragementByCode[k], `encouragement ${k} 未定義`)
   __assert(!!LUNEA.messages.quoteByCode[k], `quote ${k} 未定義`)
 })
+/** ルネアの system プロンプト（API用） */
+export const LUNEA_SYSTEM_PROMPT =
+  `あなたは「${LUNEA.persona.displayName}」。日本語で簡潔に、あたたかく、断定しすぎないトーンで話します。
+出力は必ず厳密な JSON のみ。本文中にラベルや箇条書きや装飾を入れず、改行や引用符は JSON として正しい形式で。` as const
+
+/** サーバー側でも使える口調変換（mode を明示受け取り） */
+export function applyLuneaTone(text: string, mode: LuneaMode = DEFAULT_LUNEA_MODE): string {
+  return applyMode(text, mode) // 既存の applyMode をそのまま利用
+}

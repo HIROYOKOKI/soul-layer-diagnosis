@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { ArrowLeft } from "lucide-react"
 import GlowButton from "@/components/GlowButton"
 
 type Pending = {
@@ -62,9 +63,10 @@ export default function ConfirmClient() {
       <div className="space-y-3">
         <button
           onClick={goBack}
-          className="w-full rounded-xl border border-white/20 px-4 py-3 text-white hover:bg-white/10"
+          className="group flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 px-4 py-3 text-white transition-colors hover:bg-white/10"
         >
-          戻る
+          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+          <span>戻る</span>
         </button>
         <GlowButton
           onClick={goNext}

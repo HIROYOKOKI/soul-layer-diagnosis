@@ -1,7 +1,7 @@
 // app/api/profile/diagnose/route.ts
 import { NextResponse } from "next/server"
 import { getOpenAI } from "../../../../lib/openai"
-import { buildProfilePrompt, type ProfilePending } from "../../../../lib/prompts/profilePrompt"
+import { buildProfilePrompt, type ProfilePending } from "../../../../lib/prompts/ProfilePrompt"
 
 type Pending = ProfilePending
 

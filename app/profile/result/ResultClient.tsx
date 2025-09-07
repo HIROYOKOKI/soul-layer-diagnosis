@@ -134,10 +134,8 @@ export default function ResultClient() {
 
         if (!saveRes.ok && saveRes.status !== 409) {
           const j = await saveRes.json().catch(() => ({}))
-          // 409 = 既に保存済み（once guard）。それ以外は警告だけ出す
           console.warn("profile/save failed:", j?.error ?? saveRes.statusText)
         } else {
-          // 一時データは任意でクリア
           try { sessionStorage.removeItem("structure_quick_pending") } catch {}
         }
       } catch (e: any) {
@@ -194,7 +192,7 @@ export default function ResultClient() {
         {!loading && !error && (
           <>
             {lines.slice(0, step).map((t, i) => (
-              <LuneaBubble key={i} text={t} speed={16} />
+              <LuneaBubble key={i} text={t} speed={32} />
             ))}
 
             {step < lines.length && (

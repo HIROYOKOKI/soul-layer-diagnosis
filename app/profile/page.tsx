@@ -1,4 +1,6 @@
-// auto-generated stub to clear merge markers
+// app/profile/page.tsx
+import ProfileFormClient from "./ProfileFormClient"
+
 export default function Page() {
-  return null
+  return <ProfileFormClient />
 }

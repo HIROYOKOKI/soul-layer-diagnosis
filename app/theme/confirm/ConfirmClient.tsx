@@ -1,10 +1,12 @@
 // app/theme/confirm/ConfirmClient.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type ThemeKey = "work" | "love" | "future" | "self";
+const THEMES: ThemeKey[] = ["work", "love", "future", "self"];
+
 const LABEL: Record<ThemeKey, string> = {
   work: "仕事",
   love: "恋愛・結婚",
@@ -18,78 +20,84 @@ const DESC: Record<ThemeKey, string> = {
   self: "自分の傾向を言語化し、日常の選択に活かしたい人へ",
 };
 
-export default function ConfirmClient() {
+function Inner() {
   const router = useRouter();
-  const [selected, setSelected] = useState<ThemeKey | null>(null);
+  const qs = useSearchParams();
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const v = sessionStorage.getItem("evae_theme_selected");
-    if (v && (["work", "love", "future", "self"] as string[]).includes(v)) {
-      setSelected(v as ThemeKey);
-    } else {
-      // 選択がなければ戻す
-      router.replace("/theme");
-    }
-  }, [router]);
+  // /theme/confirm?to=love&redirect=/mypage を想定
+  const fromQuery = (qs.get("to") || "").trim() as ThemeKey | "";
+  // クエリが無い場合は直前の選択をフォールバック
+  const prev = (typeof window !== "undefined"
+    ? (sessionStorage.getItem("evae_theme_selected") as ThemeKey | null)
+    : null) || null;
 
-  const summary = useMemo(() => {
-    if (!selected) return null;
-    return { key: selected, label: LABEL[selected], desc: DESC[selected] };
-  }, [selected]);
+  const selected: ThemeKey = THEMES.includes(fromQuery)
+    ? fromQuery
+    : (prev ?? "self");
 
-  const saveAndGo = async () => {
-    if (!summary) return;
+  const redirect = qs.get("redirect") || "/mypage";
+
+  const handleConfirmSave = useCallback(() => {
     try {
-      const res = await fetch("/api/theme/set", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ theme: summary.key }),
-      });
-      if (!res.ok && res.status !== 404) {
-        console.warn("Failed to persist theme:", res.status);
-      }
+      // ✅ ここで保存（「確認した」タイミング）
+      sessionStorage.setItem("evae_theme_selected", selected);
+      sessionStorage.setItem("evae_theme_applied_at", String(Date.now()));
+      // ※ UI配色テーマなど別キー（ev-theme）を使っているなら、ここでは触らない
+      // document.documentElement.setAttribute("data-theme", selected) // ←不要なら外す
     } catch {
-      // 失敗してもUX優先で続行
-    } finally {
-      router.push("/mypage");
+      // no-op
     }
-  };
-
-  if (!summary) return null;
+    // 保存後、マイページへ
+    router.push(redirect);
+    router.refresh();
+  }, [selected, redirect, router]);
 
   return (
-    <div className="min-h-[100svh] bg-black text-white">
-      <main className="px-5 pt-4 pb-28">
-        <h1 className="text-xl font-semibold tracking-wide">選択の確認</h1>
-        <p className="text-white/60 text-sm mt-1">この内容で保存してよければ「保存する」を押してください。</p>
+    <main className="mx-auto max-w-md px-5 py-10 text-white">
+      <h1 className="text-xl font-semibold mb-4">テーマを変更しますか？</h1>
+      <p className="text-white/70 mb-6">
+        テーマを変更すると、保存済みの一部履歴がリセットされる場合があります。
+      </p>
 
-        <section className="mt-6">
-          <div className="rounded-2xl border border-white/15 bg-white/5 p-4">
-            <div className="text-sm text-white/60">あなたの選択</div>
-            <div className="mt-1 text-lg font-medium">{summary.label}</div>
-            <div className="mt-2 text-sm text-white/60">{summary.desc}</div>
-          </div>
+      {/* 確認用プレビュー（任意） */}
+      <section className="rounded-2xl bg-white/5 border border-white/10 p-4 mb-6">
+        <div className="text-sm text-white/60">選択中のテーマ</div>
+        <div className="mt-1 text-lg font-medium">{LABEL[selected]}</div>
+        <p className="text-sm text-white/60 mt-1">{DESC[selected]}</p>
+      </section>
 
-          <button
-            type="button"
-            onClick={() => router.push("/theme")}
-            className="mt-4 text-sm underline text-white/70 hover:text-white"
-          >
-            変更する（テーマ選択に戻る）
-          </button>
-        </section>
-      </main>
-
-      {/* 下部：保存 */}
-      <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 border-t border-white/10">
+      <div className="flex gap-3">
         <button
-          onClick={saveAndGo}
-          className="w-full h-12 rounded-xl font-medium bg-white text-black active:opacity-90"
+          type="button"
+          onClick={() => router.push("/theme")}
+          className="rounded-md px-4 py-2 bg-white/10 border border-white/15 hover:bg-white/15"
         >
-          保存する（MYPAGEへ）
+          いいえ（戻る）
+        </button>
+
+        {/* ✅ ラベルを「確認した（保存してマイページへ）」に変更 */}
+        <button
+          type="button"
+          onClick={handleConfirmSave}
+          className="rounded-md px-4 py-2 bg-white text-black border border-white/10 active:opacity-90"
+        >
+          確認した（保存してマイページへ）
         </button>
       </div>
-    </div>
+
+      <div className="mt-6 text-xs text-white/50">
+        適用テーマ：<span className="font-mono">{selected}</span> ／ 遷移先：{" "}
+        <span className="font-mono">{redirect}</span>
+      </div>
+    </main>
+  );
+}
+
+export default function ConfirmClient() {
+  // useSearchParams の要件を満たすため Suspense でラップ
+  return (
+    <Suspense fallback={<div className="p-8 text-white/70">読み込み中…</div>}>
+      <Inner />
+    </Suspense>
   );
 }

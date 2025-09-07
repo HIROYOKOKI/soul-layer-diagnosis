@@ -1,56 +1,48 @@
-// app/api/profile/save/route.ts
+// app/api/profile/save/route.ts （差分）
 import { NextResponse } from "next/server"
-import { getSupabaseAdmin } from "../../../../lib/supabase-admin"
-
-type MaybeTextObj = string | { text?: string } | null | undefined
-type MaybeLine = string | { type?: string; label?: string; text?: string }
-
-function toText(v: MaybeTextObj): string {
-  if (v == null) return ""
-  if (typeof v === "string") {
-    try {
-      const j = JSON.parse(v)
-      return (j && typeof j === "object" && "text" in j) ? String((j as any).text ?? "") : v
-    } catch { return v }
-  }
-  return String(v.text ?? "")
-}
-
-function extractFromLines(lines: unknown) {
-  const arr = Array.isArray(lines) ? (lines as MaybeLine[]).map(x => toText(x as any)) : []
-  const fortune     = arr[1] ?? arr[0] ?? ""
-  const personality = arr[2] ?? ""
-  const partner     = arr[3] ?? ""
-  return { fortune, personality, partner }
-}
+import { getSupabaseAdmin } from "@/lib/supabase-admin"
 
 export async function POST(req: Request) {
-  const sb = getSupabaseAdmin()
-  if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 })
+  try {
+    const sb = getSupabaseAdmin()
+    if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 })
 
-  let body: any
-  try { body = await req.json() } catch { return NextResponse.json({ ok:false, error:"invalid_json" }, { status:400 }) }
+    const body = await req.json()
+    const { user_id = null } = body
 
-  const payload = Array.isArray(body?.luneaLines)
-    ? extractFromLines(body.luneaLines)
-    : {
-        fortune:     toText(body?.fortune),
-        personality: toText(body?.personality),
-        partner:     toText(body?.partner),
+    // ★ 一度きりガード（user_id 必須推奨）
+    if (user_id) {
+      const { data: exists, error: qerr } = await sb
+        .from("profile_results")
+        .select("id")
+        .eq("user_id", user_id)
+        .limit(1)
+        .maybeSingle()
+      if (qerr) return NextResponse.json({ ok:false, error:qerr.message }, { status:500 })
+      if (exists) {
+        return NextResponse.json({ ok:false, error:"already_exists", code:"PROFILE_RESULT_EXISTS" }, { status:409 })
       }
+    }
 
-  if (!payload.fortune && !payload.personality && !payload.partner) {
-    return NextResponse.json({ ok:false, error:"empty_payload" }, { status:400 })
+    const row = {
+      user_id: user_id,
+      fortune: body.fortune ?? null,
+      personality: body.personality ?? null,
+      partner: body.partner ?? null,
+      base_model: body.base_model ?? null,
+      base_order: body.base_order ?? null,
+      base_points: body.base_points ?? null,
+    }
+
+    const { data, error } = await sb
+      .from("profile_results")
+      .insert([row])
+      .select("id, created_at, base_model")
+      .maybeSingle()
+
+    if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 })
+    return NextResponse.json({ ok:true, id:data?.id, created_at:data?.created_at, base_model:data?.base_model })
+  } catch (e:any) {
+    return NextResponse.json({ ok:false, error:String(e?.message ?? e) }, { status:500 })
   }
-
-  const { data, error } = await sb
-    .from("profile_results")
-    .insert([payload])
-    .select("created_at")
-    .maybeSingle()
-
-  if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 })
-  return NextResponse.json({ ok:true, saved:true, created_at: data?.created_at ?? null }, {
-    headers: { "Cache-Control": "no-store" }
-  })
 }

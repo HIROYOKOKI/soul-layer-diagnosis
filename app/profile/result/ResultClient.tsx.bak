@@ -1,85 +1,336 @@
-<<<<<<< HEAD
 // app/profile/result/ResultClient.tsx
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import LuneaResult from "./LuneaResult"
+import LuneaBubble from "@/components/LuneaBubble" // 既に導入済みのタイプライター吹き出し
+
+// 旧フォーマット互換（lunea_profile_result 用）
+type LegacyLine = { type: string; label: string; text: string }
+
+// 診断詳細（4ブロック）
+type DiagnoseDetail = {
+  fortune?: string
+  personality?: string
+  work?: string
+  partner?: string
+}
+
+type Pending = {
+  name: string
+  birthday: string
+  blood: string
+  gender: string
+  preference: string | null
+}
+
+type DiagnoseOk = {
+  ok: true
+  result: {
+    name: string
+    summary?: string
+    luneaLines: string[]
+    detail?: DiagnoseDetail
+  }
+}
+type DiagnoseNg = { ok: false; error: string }
+type DiagnoseResp = DiagnoseOk | DiagnoseNg
+
+// ---------- helpers ----------
+function chooseCardTexts(lines: string[]) {
+  const xs = (lines || [])
+    .map((s) => (typeof s === "string" ? s.trim() : ""))
+    .filter((s) => s.length > 0)
+
+  let mainLine = ""
+  if (xs.length >= 3) mainLine = xs[2]
+  else if (xs.length === 2) mainLine = xs[1]
+  else if (xs.length === 1) mainLine = xs[0]
+
+  const quote = xs.length > 0 ? xs[xs.length - 1] : ""
+  return { mainLine, quote }
+}
+function initialStep(len: number) {
+  if (!Number.isFinite(len) || len <= 0) return 0
+  return Math.min(2, Math.max(0, Math.floor(len)))
+}
+const FALLBACK_MAIN =
+  "行動の火種が灯っているね。小さく始めるほど、軌道は早く整うよ。"
 
 export default function ResultClient() {
   const router = useRouter()
-  const [lines, setLines] = useState<string[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // ルネア吹き出し用の行
+  const [lines, setLines] = useState<string[]>([])
+  const [step, setStep] = useState(0)
+
+  // 4カード用の詳細
+  const [detail, setDetail] = useState<DiagnoseDetail | null>(null)
+
+  // 保存UI
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [saveErr, setSaveErr] = useState<string | null>(null)
 
   useEffect(() => {
-    const raw = sessionStorage.getItem("profile_result_luneaLines")
-    try {
-      const arr = raw ? (JSON.parse(raw) as unknown) : null
-      setLines(Array.isArray(arr) ? (arr as string[]) : null)
-    } catch {
-      setLines(null)
+    async function run() {
+      try {
+        setError(null)
+        setLoading(true)
+
+        // 1) 互換1: profile_result_luneaLines（string[]）
+        const rawA =
+          typeof window !== "undefined"
+            ? sessionStorage.getItem("profile_result_luneaLines")
+            : null
+        if (rawA) {
+          try {
+            const arr = JSON.parse(rawA) as unknown
+            const xs = Array.isArray(arr) ? (arr as string[]) : []
+            if (xs.length) {
+              setLines(xs.filter(Boolean))
+              setDetail(null) // detailは無し（下部はフォールバック表示）
+              setStep(initialStep(xs.length))
+              return
+            }
+          } catch {
+            // noop → 次の手段へ
+          }
+        }
+
+        // 2) 互換2: lunea_profile_result（{text}[]）
+        const rawB =
+          typeof window !== "undefined"
+            ? sessionStorage.getItem("lunea_profile_result")
+            : null
+        if (rawB) {
+          try {
+            const arr = JSON.parse(rawB) as LegacyLine[]
+            const xs = Array.isArray(arr) ? arr.map((l) => l?.text ?? "").filter(Boolean) : []
+            if (xs.length) {
+              setLines(xs)
+              setDetail(null)
+              setStep(initialStep(xs.length))
+              return
+            }
+          } catch {
+            // noop → 次の手段へ
+          }
+        }
+
+        // 3) 正式APIフロー: profile_pending → /api/profile/diagnose
+        const rawP =
+          typeof window !== "undefined"
+            ? sessionStorage.getItem("profile_pending")
+            : null
+        if (!rawP) throw new Error("no_profile_pending")
+
+        const pending = JSON.parse(rawP) as Pending
+        const resp = await fetch("/api/profile/diagnose", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pending),
+          cache: "no-store",
+        })
+        const json = (await resp.json()) as DiagnoseResp
+        if (!("ok" in json) || !json.ok) {
+          throw new Error((json as any)?.error || "diagnose_failed")
+        }
+
+        const ls = (json.result.luneaLines ?? []).filter(Boolean)
+        setLines(ls)
+        setDetail(json.result.detail ?? null)
+        setStep(initialStep(ls.length))
+      } catch (e: any) {
+        setError(e?.message || "failed")
+      } finally {
+        setLoading(false)
+      }
     }
+    run()
   }, [])
 
-  if (!lines) {
-    return (
-      <div className="p-6">
-        <h1 className="text-xl font-semibold tracking-wide">診断結果</h1>
-        <p className="mt-3 text-sm text-gray-500">直前の診断結果が見つかりませんでした。</p>
-        <div className="mt-5 flex gap-3">
-          <button onClick={() => router.push("/profile")} className="px-5 py-2 rounded-2xl bg-black text-white">
-            プロフィールへ戻る
-          </button>
-        </div>
-      </div>
-    )
+  const next = () => setStep((s) => Math.min(lines.length, s + 1))
+  const restart = () => setStep(initialStep(lines.length))
+  const toProfile = () => router.push("/profile")
+  const toMyPage = () => router.push("/mypage")
+
+  const saveProfile = async () => {
+    if (!detail) return
+    try {
+      setSaving(true)
+      setSaveErr(null)
+      const resp = await fetch("/api/profile/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fortune: detail.fortune ?? "",
+          personality: detail.personality ?? "",
+          work: detail.work ?? "",
+          partner: detail.partner ?? "",
+        }),
+      })
+      const json = await resp.json()
+      if (!json?.ok) throw new Error(json?.error || "save_failed")
+      setSaved(true)
+    } catch (e: any) {
+      setSaveErr(e?.message || "save_failed")
+    } finally {
+      setSaving(false)
+    }
   }
 
+  const { mainLine, quote } = chooseCardTexts(lines)
+
+  // ---------- 画面 ----------
   return (
-    <div className="p-6 space-y-6">
+    <div className="mx-auto max-w-3xl p-6 space-y-8">
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-wide">診断結果</h1>
-          <p className="text-sm text-gray-500 mt-1">ルネアによるパーソナルガイダンス</p>
+          <h1 className="text-xl font-semibold tracking-wide">プロフィール診断結果</h1>
+          <p className="text-sm text-white/60 mt-1">ルネアによるパーソナルガイダンス</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => router.push("/mypage")} className="px-4 py-2 rounded-2xl border border-gray-300 text-gray-700 hover:bg-gray-100">
-            MyPageへ
+          <button
+            onClick={toMyPage}
+            className="px-4 py-2 rounded-2xl border border-white/20 text-white hover:bg-white/10"
+          >
+            マイページへ
           </button>
-          <button onClick={() => router.push("/profile")} className="px-4 py-2 rounded-2xl bg-black text-white">
+          <button
+            onClick={toProfile}
+            className="px-4 py-2 rounded-2xl bg-black text-white border border-white/10"
+          >
             最初からやり直す
           </button>
         </div>
       </header>
 
-      <LuneaResult lines={lines} />
-=======
-'use client'
-import { useEffect, useState } from 'react'
-type Line = { type:string; label:string; text:string }
-export default function ResultClient() {
-  const [lines, setLines] = useState<Line[] | null>(null)
-  const [step, setStep] = useState(0)
-  useEffect(() => {
-    const raw = sessionStorage.getItem('lunea_profile_result')
-    if (raw) setLines(JSON.parse(raw) as Line[])
-  }, [])
-  if (!lines) return <p className="opacity-70 text-sm p-6">結果が見つかりません。もう一度診断してください。</p>
-  const visible = lines.slice(0, step + 1)
-  return (
-    <div className="max-w-2xl mx-auto p-6 grid gap-3">
-      <h1 className="text-lg font-bold">プロフィール診断結果</h1>
-      {visible.map((l,i)=>(
-        <div key={i} className="rounded-2xl p-3 border border-white/10 bg-white/5">
-          <div className="text-[11px] uppercase tracking-wide opacity-60">{l.label}</div>
-          <div className="mt-1 leading-relaxed">{l.text || '—'}</div>
-        </div>
-      ))}
-      {step < lines.length-1 ? (
-        <button onClick={()=>setStep(s=>s+1)} className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10">次へ</button>
-      ) : (
-        <a href="/mypage" className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10 w-max">マイページへ</a>
+      {/* 上部：ルネアの吹き出し（段階表示） */}
+      <div className="space-y-4">
+        {loading && (
+          <div className="text-white/70">
+            …観測中。きみの“いま”を読み解いているよ。
+          </div>
+        )}
+        {error && (
+          <div className="space-y-3">
+            <div className="text-sm text-red-300">エラー : {error}</div>
+            <div className="flex gap-2">
+              <button
+                className="px-3 py-2 rounded border border-white/20 hover:bg-white/10"
+                onClick={() => {
+                  if (typeof window !== "undefined") window.location.reload()
+                }}
+              >
+                再試行
+              </button>
+              <button
+                className="px-3 py-2 rounded border border-white/20 hover:bg-white/10"
+                onClick={toProfile}
+              >
+                入力へ戻る
+              </button>
+            </div>
+          </div>
+        )}
+        {!loading && !error && (
+          <>
+            {lines.slice(0, step).map((t, i) => (
+              <LuneaBubble key={i} text={t} speed={16} />
+            ))}
+            {step < lines.length && lines.length > 0 && (
+              <div className="pt-1">
+                <button
+                  onClick={next}
+                  className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10"
+                >
+                  次へ
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* 下部：結果カード */}
+      {!loading && !error && (
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[inset_0_0_12px_rgba(255,255,255,.04),0_0_0_1px_rgba(255,255,255,.03)]">
+          <div className="text-cyan-300 font-semibold mb-2">プロフィール診断（まとめ）</div>
+
+          {detail ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <article className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <h3 className="text-white/80 text-sm mb-1">総合運勢</h3>
+                <p className="text-white/90 leading-relaxed text-[15px]">
+                  {detail.fortune || "—"}
+                </p>
+              </article>
+              <article className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <h3 className="text-white/80 text-sm mb-1">性格傾向</h3>
+                <p className="text-white/90 leading-relaxed text-[15px]">
+                  {detail.personality || "—"}
+                </p>
+              </article>
+              <article className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <h3 className="text-white/80 text-sm mb-1">仕事運</h3>
+                <p className="text-white/90 leading-relaxed text-[15px]">
+                  {detail.work || "—"}
+                </p>
+              </article>
+              <article className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <h3 className="text-white/80 text-sm mb-1">理想のパートナー像</h3>
+                <p className="text-white/90 leading-relaxed text-[15px]">
+                  {detail.partner || "—"}
+                </p>
+              </article>
+            </div>
+          ) : (
+            <>
+              <p className="text-white/90 leading-relaxed mb-2">
+                {mainLine || FALLBACK_MAIN}
+              </p>
+              {quote && (
+                <p className="text-white/60 italic text-sm">「{quote}」</p>
+              )}
+            </>
+          )}
+
+          <div className="flex gap-3 mt-4">
+            <button
+              onClick={restart}
+              className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10"
+            >
+              もう一度
+            </button>
+            {detail && (
+              <button
+                onClick={saveProfile}
+                disabled={saving || saved}
+                className={`px-4 py-2 rounded-xl border ${
+                  saved
+                    ? "border-emerald-400/40 text-emerald-300/90"
+                    : "border-white/20 hover:bg-white/10"
+                }`}
+              >
+                {saved ? "保存済み" : saving ? "保存中…" : "結果を保存"}
+              </button>
+            )}
+            <button
+              className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10"
+              onClick={toMyPage}
+            >
+              マイページへ
+            </button>
+          </div>
+
+          {saveErr && (
+            <p className="text-red-300 text-xs mt-2">保存エラー: {saveErr}</p>
+          )}
+        </section>
       )}
->>>>>>> e65b975 (Result UI仕上げ: Luneaタイプライター／保存→MyPage反映／mypage API)
     </div>
   )
 }

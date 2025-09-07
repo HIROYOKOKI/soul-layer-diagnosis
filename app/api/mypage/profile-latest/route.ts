@@ -1,12 +1,13 @@
+// app/api/mypage/profile-latest/route.ts
 import { NextResponse } from "next/server"
-import { getSupabaseAdmin } from "../../../../lib/supabase-admin"
+import { getSupabaseAdmin } from "@/lib/supabase-admin"
 
 export async function GET() {
   const sb = getSupabaseAdmin()
   if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 })
   const { data, error } = await sb
     .from("profile_results")
-    .select("fortune, personality, partner, created_at")
+    .select("fortune, personality, partner, base_model, base_order, base_points, created_at")
     .order("created_at", { ascending:false })
     .limit(1).maybeSingle()
   if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 })

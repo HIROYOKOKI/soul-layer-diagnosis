@@ -47,14 +47,6 @@ body  { background: var(--color-bg); color: var(--color-fg); }
     --accent-eps-rgb: 192,132,252;
   }
 
-  /* 別テーマ例 */
-  :root[data-mode="pink"] {
-    --accent: #ff4fdf;
-    --accent-shadow: 0 0 10px #ff4fdf, 0 0 20px #ff4fdf;
-    --accent-shadow-strong: 0 0 20px #ff4fdf, 0 0 40px #ff4fdf;
-    --accent-rgb: 255,79,223;
-  }
-
   html {
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
@@ -66,10 +58,12 @@ body  { background: var(--color-bg); color: var(--color-fg); }
     color: var(--fg);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* ✅ ページ全体の横スクロール禁止 */
+    overflow-x: hidden;
   }
 
   /* ✅ レイアウト安定ガード（はみ出し抑止） */
-  html, body { overflow-x: hidden; }
+  html { overflow-x: hidden; }
   *, *::before, *::after { box-sizing: border-box; min-width: 0; }
 
   a {
@@ -116,7 +110,7 @@ body  { background: var(--color-bg); color: var(--color-fg); }
     content: none !important;
     display: none !important;
   }
-  /* 念のため、縦1px罫線を透明化（誤適用対策） */
+  /* 縦1px罫線の誤適用対策 */
   .border-l, .border-l-[1px] { border-left-color: transparent !important; }
 }
 
@@ -161,7 +155,7 @@ body  { background: var(--color-bg); color: var(--color-fg); }
     width: 100%;
     max-width: 100%;
     overflow: hidden;
-    border-radius: 1rem; /* = var(--radius-card) */
+    border-radius: var(--radius-card);
     border: 1px solid rgba(255,255,255,0.10);
     background: rgba(255,255,255,0.03);
     box-shadow: 0 0 40px rgba(59,130,246,.08);
@@ -169,12 +163,7 @@ body  { background: var(--color-bg); color: var(--color-fg); }
   }
 
   /* ✅ グラフ用ラッパ（幅100%固定） */
-  .chart-wrap {
-    width: 100%;
-    min-width: 0;
-    overflow: hidden;
-    border-radius: .75rem;
-  }
+  .chart-wrap { width: 100%; min-width: 0; overflow: hidden; border-radius: .75rem; }
 }
 
 /* =========================
@@ -185,7 +174,6 @@ body  { background: var(--color-bg); color: var(--color-fg); }
   70%  { transform: translate(-50%, -50%) scale(5.2); opacity: .25; }
   100% { transform: translate(-50%, -50%) scale(6.2); opacity: 0;   }
 }
-
 @keyframes ripple {
   0%   { transform: translate(-50%, -50%) scale(0);   opacity: 0.7; }
   80%  { transform: translate(-50%, -50%) scale(4);   opacity: 0.15; }
@@ -194,11 +182,7 @@ body  { background: var(--color-bg); color: var(--color-fg); }
 
 /* 動きを最小化設定のユーザーには穏やかに */
 @media (prefers-reduced-motion: reduce) {
-  .btn-pressable, .ripple, .ripple-gradient {
-    transition: none !important;
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-  }
+  .btn-pressable, .ripple { transition: none !important; animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
 }
 
 /* ---- Fallback: 変数を :root に直置き（@theme失敗対策） ---- */
@@ -218,44 +202,17 @@ body  { background: var(--color-bg); color: var(--color-fg); }
   --radius-pill: 999px;
   --shadow-card: 0 10px 30px rgba(0,0,0,.35);
 }
-/* ===== kill center guide (any leftover 'before' or gradient) ===== */
+
+/* ===== 中央ライン殺し（保険） ===== */
 main::before,
 .center-guide::before,
-[data-center-guide]::before {
-  content: none !important;
-  display: none !important;
-}
+[data-center-guide]::before { content: none !important; display: none !important; }
+.bg-center-line, .has-center-line { background-image: none !important; }
+.border-l, .border-l-[1px] { border-left-color: transparent !important; }
 
-/* 背景グラデの“中央1px”系も全て無効化 */
-.bg-center-line,
-.has-center-line {
-  background-image: none !important;
-}
-
-/* 念のため縦ボーダーを透明化（1px残り対策） */
-.border-l,
-.border-l-[1px] {
-  border-left-color: transparent !important;
-}
-html, body { background:#000; color:#fff; }
-/* ===== Settingsアイコン制御（確実版） ===== */
-/* いったん全てのlucide-settingsを非表示 */
-svg.lucide.lucide-settings { display: none !important; }
-
-/* FREEバッジが2個以上描画されたら、2個目以降は非表示 */
-.free-badge ~ .free-badge { display: none !important; }
-
-/* ギア線を常に細く（アイコン実装に依らず効かせる） */
-button[aria-label="Settings"] svg { stroke-width: 1.0 !important; }
-/* 塗りつぶしで太く見える場合の保険（ギアに限る） */
+/* ===== Settingsアイコン & FREEバッジ制御（重複排除） ===== */
+/* ※ ライブラリ差異があっても効く無難な指定だけ残す */
+button[aria-label="Settings"] svg { stroke-width: 1 !important; }
 button[aria-label="Settings"] svg [fill]:not([fill="none"]) { fill: none !important; }
-/* FREEバッジが複数描画された場合、2個目以降を隠す（保険） */
+/* FREEバッジが複数描画された場合、2個目以降を非表示 */
 .free-badge ~ .free-badge { display: none !important; }
-
-/* ギア線は常に極細に（ライブラリ差異があっても効く） */
-button[aria-label="Settings"] svg { stroke-width: 1.0 !important; }
-/* 塗りつぶしで太く見えるケースを無効化（ギア限定） */
-button[aria-label="Settings"] svg [fill]:not([fill="none"]) { fill: none !important; }
-
-
-

@@ -1,5 +1,6 @@
+// app/api/mypage/daily-latest/route.ts
 import { NextResponse } from "next/server"
-import { getSupabaseAdmin } from "../../../../lib/supabase-admin"
+import { getSupabaseAdmin } from "@/lib/supabase-admin"
 
 export async function GET() {
   const sb = getSupabaseAdmin()

@@ -1,6 +1,5 @@
 // app/profile/result/ResultClient.tsx
 "use client"
-
 import React, { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import LuneaBubble from "@/components/LuneaBubble"
@@ -12,32 +11,18 @@ import GlowButton from "@/components/GlowButton"
 type EV = "E" | "V" | "Λ" | "Ǝ"
 type BaseModel = "EΛVƎ" | "EVΛƎ"
 
-type Pending = {
-  name: string
-  birthday: string
-  blood: string
-  gender: string
-  preference: string | null
-}
-
 type DiagnoseDetail = {
   fortune?: string
   personality?: string
   work?: string
   partner?: string
 }
-
-type DiagnoseOk = {
-  ok: true
-  result: {
-    name: string
-    summary?: string
-    luneaLines: string[]
-    detail?: DiagnoseDetail
-  }
+type DiagnoseResult = {
+  name?: string
+  summary?: string
+  luneaLines?: string[]
+  detail?: DiagnoseDetail
 }
-type DiagnoseNg = { ok: false; error: string }
-type DiagnoseResp = DiagnoseOk | DiagnoseNg
 
 /* ========================
    Helpers
@@ -46,7 +31,6 @@ function initialStep(len: number) {
   if (!Number.isFinite(len) || len <= 0) return 0
   return Math.min(1, Math.max(0, Math.floor(len)))
 }
-
 const CODE_LABELS: Record<EV, string> = {
   E: "衝動・情熱",
   V: "可能性・夢",
@@ -121,62 +105,55 @@ export default function ProfileResultClient() {
   const [step, setStep] = useState(0)
   const [quickBase, setQuickBaseState] = useState<ReturnType<typeof getQuickBase> | null>(null)
 
+  // 表示専用：Confirm が保存した結果を読むだけ
   useEffect(() => {
-    async function run() {
-      try {
-        setError(null)
-        setLoading(true)
-
-        // Confirmで保存した入力値を取得
-        const raw = typeof window !== "undefined" ? sessionStorage.getItem("profile_pending") : null
-        if (!raw) throw new Error("no_profile_pending")
-        const pending = JSON.parse(raw) as Pending
-
-        // 診断実行
-        const resp = await fetch("/api/profile/diagnose", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(pending),
-          cache: "no-store",
-        })
-        const json = (await resp.json()) as DiagnoseResp
-        if (!("ok" in json) || !json.ok) throw new Error((json as any)?.error || "diagnose_failed")
-
-        const d = json.result.detail ?? null
-        setDetail(d)
-
-        // Quickの基礎層（任意）
-        const qb = getQuickBase()
-        setQuickBaseState(qb)
-
-        // 保存（任意APIがない環境でも404/405は無視する）
-        setSaving(true)
-        const saveRes = await fetch("/api/profile/save", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            user_id: null,
-            fortune: d?.fortune ?? null,
-            personality: d?.personality ?? null,
-            partner: d?.partner ?? null,
-            ...(qb ?? {}),
-          }),
-        }).catch(() => null)
-
-        if (saveRes && !saveRes.ok && saveRes.status !== 409) {
-          const j = await saveRes.json().catch(() => ({}))
-          console.warn("profile/save failed:", j?.error ?? saveRes.statusText)
-        } else {
-          try { sessionStorage.removeItem("structure_quick_pending") } catch {}
-        }
-      } catch (e: any) {
-        setError(e?.message || "failed")
-      } finally {
-        setSaving(false)
+    try {
+      const raw = typeof window !== "undefined" ? sessionStorage.getItem("profile_diagnose_pending") : null
+      if (!raw) {
+        setError("結果データが見つかりません（もう一度診断してください）")
         setLoading(false)
+        return
       }
+      const result = JSON.parse(raw) as DiagnoseResult
+      const d = result?.detail ?? null
+      setDetail(d)
+
+      // Quickの基礎層（任意）
+      setQuickBaseState(getQuickBase())
+
+      // （任意）保存APIが存在する環境では試す。404/405等は無視。
+      ;(async () => {
+        try {
+          setSaving(true)
+          const saveRes = await fetch("/api/profile/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: null,
+              fortune: d?.fortune ?? null,
+              personality: d?.personality ?? null,
+              partner: d?.partner ?? null,
+              ...(getQuickBase() ?? {}),
+            }),
+          }).catch(() => null)
+
+          if (saveRes && !saveRes.ok && saveRes.status !== 409) {
+            // ログだけ出して UI は壊さない
+            const j = await saveRes.json().catch(() => ({} as any))
+            console.warn("profile/save failed:", j?.error ?? saveRes.statusText)
+          } else {
+            // Quickを消費（任意）
+            try { sessionStorage.removeItem("structure_quick_pending") } catch {}
+          }
+        } finally {
+          setSaving(false)
+        }
+      })()
+    } catch (e) {
+      setError("結果データの読み込みに失敗しました")
+    } finally {
+      setLoading(false)
     }
-    run()
   }, [])
 
   // ルネアの吹き出し
@@ -238,10 +215,7 @@ export default function ProfileResultClient() {
               >
                 再試行
               </button>
-              <button
-                className="px-3 py-2 rounded border border-white/20 hover:bg-white/10"
-                onClick={toProfile}
-              >
+              <button className="px-3 py-2 rounded border border-white/20 hover:bg-white/10" onClick={toProfile}>
                 入力へ戻る
               </button>
             </div>

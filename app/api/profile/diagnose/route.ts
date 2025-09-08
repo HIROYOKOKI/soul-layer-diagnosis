@@ -1,40 +1,60 @@
 // app/api/profile/diagnose/route.ts
-import { NextResponse } from "next/server"
-import { getOpenAI } from "../../../../lib/openai"
-import { buildProfilePrompt, type ProfilePending } from "../../../../lib/prompts/profilePrompt"
+/* =============================================================
+   Profile Diagnose API (fast-return + background save)
+   - 先に結果を返す（体感UP）
+   - 保存は並行実行（失敗してもUIをブロックしない）
+   - 生成量・モデルを絞って高速化
+   ============================================================= */
 
-type Pending = ProfilePending
+export const dynamic = "force-dynamic";          // プリレンダー禁止（常に動的）
+export const revalidate = 0;
+// Node.js ランタイム推奨（Edgeはレスポンス後のバックグラウンド処理が厳しいため）
+export const runtime = "nodejs";
+// 東京近傍優先（Vercel）
+export const preferredRegion = ["hnd1", "sin1"];
+
+import { NextResponse } from "next/server";
+import { getOpenAI } from "../../../../lib/openai";
+import { buildProfilePrompt, type ProfilePending } from "../../../../lib/prompts/profilePrompt";
+
+/* ========================
+   Types
+======================== */
+type Pending = ProfilePending;
 
 type DiagnoseDetail = {
-  fortune: string
-  personality: string
-  work: string
-  partner: string
-}
+  fortune: string;
+  personality: string;
+  work: string;
+  partner: string;
+};
 
 type AiJson = {
-  detail: DiagnoseDetail
-  luneaLines: string[]
-}
+  detail: Partial<DiagnoseDetail>;
+  luneaLines?: string[];
+};
 
+/* ========================
+   Helpers
+======================== */
 /** 許容バッファつきの長さ調整（±10〜20字許容） */
 function softClampText(
   src: string,
   { min, max, tol = 20, fallback }: { min: number; max: number; tol?: number; fallback: string }
 ) {
-  const text = (src || "").trim()
-  if (!text) return fallback
+  const text = (src || "").trim();
+  if (!text) return fallback;
 
-  if (text.length > max + tol) return text.slice(0, max)
+  if (text.length > max + tol) return text.slice(0, max);
 
   if (text.length < min - tol) {
-    const need = min - text.length
-    const add = (fallback || "").slice(0, need + 10)
-    const merged = (text + " " + add).replace(/\s+/g, " ").trim()
-    return merged.length > max ? merged.slice(0, max) : merged
+    const need = min - text.length;
+    const add = (fallback || "").slice(0, need + 10);
+    const merged = (text + " " + add).replace(/\s+/g, " ").trim();
+    return merged.length > max ? merged.slice(0, max) : merged;
   }
 
-  return text
+  return text;
 }
 
 const FALLBACKS = {
@@ -42,109 +62,150 @@ const FALLBACKS = {
     "今は小さな熱源が灯っている時期。迷いがあっても、最初の一歩を踏み出せば流れは整う。焦らず、でも止まらず、今日の小さな行動を重ねていこう。",
   personality:
     "直感の火力が高く、方向が定まると一気に集中できるタイプ。芯を決めると継続力が生まれ、周囲を巻き込む推進力に変わる。",
-  work:
-    "小さく試す→すぐ学ぶの反復が吉。短いスプリントで検証を回すと成果が伸びる。",
+  work: "小さく試す→すぐ学ぶの反復が吉。短いスプリントで検証を回すと成果が伸びる。",
   partner:
     "熱量を尊重しつつ、リズムを整えてくれる相手と好相性。歩幅を合わせてくれる関係が長続きする。",
-}
+};
 
-/** 項目ごとの最小/最大文字数レンジを pending から決定 */
 function getRanges(pending: Pending) {
-  const hasAstro = Boolean(pending?.birthTime && pending?.birthPlace)
+  const hasAstro = Boolean(pending?.birthTime && pending?.birthPlace);
   return {
-    fortune: { min: hasAstro ? 200 : 150, max: hasAstro ? 250 : 200 },
-    personality: { min: hasAstro ? 200 : 150, max: hasAstro ? 250 : 200 },
-    work: { min: hasAstro ? 100 : 80, max: hasAstro ? 120 : 100 },
-    partner: { min: hasAstro ? 100 : 80, max: hasAstro ? 120 : 100 },
-  }
+    fortune: { min: hasAstro ? 200 : 150, max: hasAstro ? 230 : 190 },
+    personality: { min: hasAstro ? 200 : 150, max: hasAstro ? 230 : 190 },
+    work: { min: hasAstro ? 90 : 70, max: hasAstro ? 110 : 90 },
+    partner: { min: hasAstro ? 90 : 70, max: hasAstro ? 110 : 90 },
+  };
 }
 
 function sanitizeDetail(
   d: Partial<DiagnoseDetail> | undefined,
   ranges: ReturnType<typeof getRanges>
 ): DiagnoseDetail {
-  const fortune = softClampText(d?.fortune || "", { ...ranges.fortune, fallback: FALLBACKS.fortune })
-  const personality = softClampText(d?.personality || "", { ...ranges.personality, fallback: FALLBACKS.personality })
-  const work = softClampText(d?.work || "", { ...ranges.work, fallback: FALLBACKS.work })
-  const partner = softClampText(d?.partner || "", { ...ranges.partner, fallback: FALLBACKS.partner })
-  return { fortune, personality, work, partner }
+  const fortune = softClampText(d?.fortune || "", { ...ranges.fortune, fallback: FALLBACKS.fortune });
+  const personality = softClampText(d?.personality || "", { ...ranges.personality, fallback: FALLBACKS.personality });
+  const work = softClampText(d?.work || "", { ...ranges.work, fallback: FALLBACKS.work });
+  const partner = softClampText(d?.partner || "", { ...ranges.partner, fallback: FALLBACKS.partner });
+  return { fortune, personality, work, partner };
 }
 
 function pickSafeLines(lines: unknown): string[] {
-  const xs = Array.isArray(lines) ? (lines as unknown[]) : []
+  const xs = Array.isArray(lines) ? (lines as unknown[]) : [];
   return xs
     .map((s) => (typeof s === "string" ? s.trim() : ""))
     .filter((s) => s.length > 0)
-    .slice(0, 6) // 3〜5本程度推奨（最大6本まで）
+    .slice(0, 5);
 }
 
+function safeJSON<T = any>(s?: string | null): T | null {
+  try {
+    return s ? (JSON.parse(s) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+/* ========================
+   Route
+======================== */
 export async function POST(req: Request) {
   try {
-    const pending = (await req.json()) as Pending
+    const pending = (await req.json().catch(() => ({}))) as Pending;
 
-    const openai = getOpenAI()
-    if (!openai) throw new Error("openai_env_missing")
+    const openai = getOpenAI();
+    if (!openai) throw new Error("openai_env_missing");
 
-    const model = process.env.OPENAI_PROFILE_MODEL || "gpt-5-mini"
+    // 速さ最優先の既定値（環境変数で上書き可）
+    const model = process.env.OPENAI_PROFILE_MODEL || "gpt-4o-mini";
 
-    const system = `あなたは「ルネア」。日本語で簡潔に、あたたかく、断定しすぎないトーンで話します。
-出力は必ず厳密な JSON のみ。本文中にラベルや箇条書きや装飾を入れず、改行や引用符は JSON として正しい形式で。`
+    // 出力量を明確に制限（速い）
+    const MAX_TOKENS = Number(process.env.OPENAI_PROFILE_MAXTOKENS || 550);
 
-    // ← プロンプトを外部関数で生成（ハイブリッド条件も内包）
-    const user = buildProfilePrompt(pending)
+    const system =
+      'あなたは「ルネア」。日本語で簡潔に、あたたかく、断定しすぎないトーンで話します。出力は必ず厳密なJSONのみ。';
+    // 外部プロンプトビルダーをそのまま利用（短文志向で）
+    const user = buildProfilePrompt(pending);
 
+    // ===== 生成を実行 =====
     const resp = await openai.chat.completions.create({
       model,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
+        // JSON.stringify で確実に短く
         { role: "user", content: JSON.stringify(user) },
       ],
- 
-    })
+      max_tokens: MAX_TOKENS,
+      temperature: 0.6,
+    });
 
-    const raw = resp.choices?.[0]?.message?.content || "{}"
-    let parsed: AiJson | null = null
-    try {
-      parsed = JSON.parse(raw) as AiJson
-    } catch {
-      parsed = null
-    }
+    const raw = resp.choices?.[0]?.message?.content || "{}";
+    const parsed = safeJSON<AiJson>(raw) || { detail: {}, luneaLines: [] };
 
-    // 入力に応じたレンジでサニタイズ（切り詰め/補完）
-    const ranges = getRanges(pending)
-    const detail = sanitizeDetail(parsed?.detail, ranges)
+    // 整形（切り詰め/補完）
+    const ranges = getRanges(pending);
+    const detail = sanitizeDetail(parsed.detail, ranges);
 
     const luneaLines = (() => {
-      const xs = pickSafeLines(parsed?.luneaLines)
-      if (xs.length >= 3) return xs
-      // フォールバック（足りない時はdetailから拝借）
-      const add: string[] = []
-      if (detail.fortune) add.push(detail.fortune.slice(0, 60))
-      if (detail.personality) add.push(detail.personality.slice(0, 60))
+      const xs = pickSafeLines(parsed.luneaLines);
+      if (xs.length >= 3) return xs;
+      const add: string[] = [];
+      if (detail.fortune) add.push(detail.fortune.slice(0, 60));
+      if (detail.personality) add.push(detail.personality.slice(0, 60));
       if (add.length === 0) {
-        add.push("…観測中。きみの“いま”を読み解いているよ。")
-        add.push("今日の一歩は小さくていい。熱が冷める前に、1つだけ動かそう。")
+        add.push("…観測中。きみの“いま”を読み解いているよ。");
+        add.push("今日の一歩は小さくていい。熱が冷める前に、1つだけ動かそう。");
       }
-      return pickSafeLines([...xs, ...add])
-    })()
+      return pickSafeLines([...xs, ...add]);
+    })();
 
+    // ===== 先に返す（体感改善）=====
     const resBody = {
-      ok: true,
+      ok: true as const,
       result: {
         name: pending?.name || "",
         luneaLines,
         detail,
-        theme: pending?.theme || null,
+        theme: (pending as any)?.theme || null,
       },
-    }
+    };
 
-    return NextResponse.json(resBody)
+    // Cacheを明示的に無効化（中継CDNでの再利用を避ける）
+    const res = NextResponse.json(resBody, {
+      headers: {
+        "Cache-Control": "no-store, max-age=0",
+      },
+    });
+
+    // ===== 保存は並行で実行（失敗してもUIをブロックしない）=====
+    (async () => {
+      try {
+        const { getSupabaseAdmin } = await import("../../../../lib/supabase-admin");
+        const sb = getSupabaseAdmin();
+        if (!sb) return;
+
+        await sb.from("profile_results").insert({
+          theme: (pending as any)?.theme ?? "dev",
+          name: pending?.name ?? null,
+          birthday: (pending as any)?.birthday ?? null,
+          blood: (pending as any)?.blood ?? null,
+          gender: (pending as any)?.gender ?? null,
+          preference: (pending as any)?.preference ?? null,
+          fortune: detail.fortune,
+          personality: detail.personality,
+          work: detail.work,
+          partner: detail.partner,
+        });
+      } catch (_e) {
+        // ログだけ（本体の応答は既に返している）
+        console.warn("[profile/diagnose] save failed");
+      }
+    })();
+
+    return res;
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e?.message || "failed" },
-      { status: 500 },
-    )
+      { status: 500 }
+    );
   }
 }
-console.log("Model in use:", process.env.OPENAI_PROFILE_MODEL)

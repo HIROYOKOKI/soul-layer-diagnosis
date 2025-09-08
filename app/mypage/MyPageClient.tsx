@@ -214,30 +214,30 @@ export default function MyPageClient() {
 
   return (
     <div className="min-h-screen bg-black text-white px-5 py-6 max-w-md mx-auto">
-      {/* 1) クイック診断の型（色仕様：EΛVƎ=紫 / EVΛƎ=橙） */}
-      <div className="text-center mb-3">
-        {typeLabel ? (
-          <span
-            className="inline-block rounded-lg px-3 py-1 text-sm border"
-            style={{
-              borderColor: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
-              backgroundColor: normalizedModel === "EΛVƎ" ? "#B833F522" : "#FF450022",
-              color: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
-            }}
-          >
-            {typeLabel}（{normalizedModel}）
-          </span>
-        ) : (
-          <span className="inline-block rounded-lg px-3 py-1 text-xs border border-white/15 text-white/60 bg-white/5">
-            クイック診断はまだありません
-          </span>
-        )}
-      </div>
-
-      {/* 1.5) タイプ吹き出し + 詳しく見る */}
-      <div className="mb-4">
-        <OrientationTip baseModel={normalizedModel} />
-      </div>
+      {/* 1) クイック診断の型（バッジ＝ボタン） */}
++  <div className="flex justify-center mb-4">
++    {typeLabel ? (
++      <button
++        onClick={() =>
++          router.push(`/guide/future-vs-realistic?model=${encodeURIComponent(normalizedModel!)}`)
++        }
++        className="inline-block rounded-xl px-4 py-2 text-sm border transition
++                   hover:brightness-110 active:scale-[0.99]"
++        style={{
++          borderColor: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
++          backgroundColor: normalizedModel === "EΛVƎ" ? "#B833F51A" : "#FF45001A",
++          color: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
++        }}
++        aria-label={`${typeLabel}（${normalizedModel}）の解説へ`}
++      >
++        {typeLabel}（{normalizedModel}）
++      </button>
++    ) : (
++      <span className="inline-block rounded-xl px-3 py-2 text-xs border border-white/15 text-white/60 bg-white/5">
++        クイック診断はまだありません
++      </span>
++    )}
++  </div>
 
       {/* 2) プロフィール行 */}
       <div className="flex items-start justify-between mb-2">

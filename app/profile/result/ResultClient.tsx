@@ -6,6 +6,12 @@ import { useRouter } from "next/navigation"
 import LuneaBubble from "@/components/LuneaBubble"
 import GlowButton from "@/components/GlowButton"
 
+/* ========================
+   Types
+======================== */
+type EV = "E" | "V" | "Λ" | "Ǝ"
+type BaseModel = "EΛVƎ" | "EVΛƎ"
+
 type Pending = {
   name: string
   birthday: string
@@ -26,47 +32,94 @@ type DiagnoseOk = {
   result: {
     name: string
     summary?: string
-    luneaLines: string[] // 受け取るが使わない
+    luneaLines: string[]
     detail?: DiagnoseDetail
   }
 }
 type DiagnoseNg = { ok: false; error: string }
 type DiagnoseResp = DiagnoseOk | DiagnoseNg
 
+/* ========================
+   Helpers
+======================== */
 function initialStep(len: number) {
   if (!Number.isFinite(len) || len <= 0) return 0
   return Math.min(1, Math.max(0, Math.floor(len)))
 }
 
-// タイトル＆チップ用：クイック基礎層（sessionStorage）
-function getQuickBase() {
-  try {
-    const raw = typeof window !== "undefined" ? sessionStorage.getItem("structure_quick_pending") : null
-    if (!raw) return null
-    const p = JSON.parse(raw) as {
-      order: Array<"E" | "V" | "Λ" | "Ǝ">
-      points?: Record<"E" | "V" | "Λ" | "Ǝ", number>
-    }
-    if (!p?.order || p.order.length !== 4) return null
-    const top = p.order[0]
-    const base_model = top === "E" || top === "Λ" ? "EΛVƎ" : "EVΛƎ"
-    return { base_model, base_order: p.order, base_points: p.points ?? { E:0, V:0, Λ:0, Ǝ:0 } }
-  } catch { return null }
+const CODE_LABELS: Record<EV, string> = {
+  E: "衝動・情熱",
+  V: "可能性・夢",
+  Λ: "選択・葛藤",
+  Ǝ: "観測・静寂",
+}
+const CODE_COLORS: Record<EV, string> = {
+  E: "#FF4500",
+  V: "#1E3A8A",
+  Λ: "#84CC16",
+  Ǝ: "#B833F5",
 }
 
-const CODE_LABELS = { E: "衝動・情熱", V: "可能性・夢", "Λ": "選択・葛藤", "Ǝ": "観測・静寂" } as const
-const CODE_COLORS = { E: "#FF4500", V: "#1E3A8A", "Λ": "#84CC16", "Ǝ": "#B833F5" } as const
+function toEV(x: unknown): EV | null {
+  const s = String(x ?? "").trim()
+  if (s === "E") return "E"
+  if (s === "V") return "V"
+  if (s === "Λ" || s.toUpperCase() === "L") return "Λ"
+  if (s === "Ǝ" || s.toUpperCase() === "EEXISTS") return "Ǝ"
+  return null
+}
+function num(n: unknown, fallback = 0): number {
+  const v = typeof n === "number" ? n : Number(n)
+  return Number.isFinite(v) ? v : fallback
+}
 
-// app/profile/result/ResultClient.tsx
-export { default } from "@/components/result/ProfileResultClient"
+/** Quick結果（sessionStorage.structure_quick_pending）を読み取り→正規化 */
+function getQuickBase(): {
+  base_model: BaseModel
+  base_order: EV[]
+  base_points: Record<EV, number>
+} | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = sessionStorage.getItem("structure_quick_pending")
+    if (!raw) return null
 
+    const p = JSON.parse(raw) as { order?: unknown[]; points?: Record<string, unknown> }
+    const ordRaw = Array.isArray(p.order) ? p.order : []
+    const ord: EV[] = (ordRaw.map(toEV).filter(Boolean) as EV[]) || []
+
+    const uniq = Array.from(new Set(ord))
+    const full: EV[] = ["E", "V", "Λ", "Ǝ"]
+    const complete = uniq.length === 4 && full.every(k => uniq.includes(k))
+    if (!complete) return null
+
+    const src = p.points ?? {}
+    const pts: Record<EV, number> = {
+      E: num(src["E"]),
+      V: num(src["V"]),
+      Λ: num(src["Λ"] ?? src["L"]),
+      Ǝ: num(src["Ǝ"] ?? src["Eexists"]),
+    }
+
+    const top = uniq[0]
+    const base_model: BaseModel = top === "E" || top === "Λ" ? "EΛVƎ" : "EVΛƎ"
+    return { base_model, base_order: uniq, base_points: pts }
+  } catch {
+    return null
+  }
+}
+
+/* ========================
+   Component
+======================== */
+export default function ProfileResultClient() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [detail, setDetail] = useState<DiagnoseDetail | null>(null)
   const [step, setStep] = useState(0)
-  const [quickBase, setQuickBase] = useState<ReturnType<typeof getQuickBase> | null>(null)
+  const [quickBase, setQuickBaseState] = useState<ReturnType<typeof getQuickBase> | null>(null)
 
   useEffect(() => {
     async function run() {
@@ -74,10 +127,12 @@ export { default } from "@/components/result/ProfileResultClient"
         setError(null)
         setLoading(true)
 
+        // Confirmで保存した入力値を取得
         const raw = typeof window !== "undefined" ? sessionStorage.getItem("profile_pending") : null
         if (!raw) throw new Error("no_profile_pending")
         const pending = JSON.parse(raw) as Pending
 
+        // 診断実行
         const resp = await fetch("/api/profile/diagnose", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -90,9 +145,11 @@ export { default } from "@/components/result/ProfileResultClient"
         const d = json.result.detail ?? null
         setDetail(d)
 
+        // Quickの基礎層（任意）
         const qb = getQuickBase()
-        setQuickBase(qb)
+        setQuickBaseState(qb)
 
+        // 保存（任意APIがない環境でも404/405は無視する）
         setSaving(true)
         const saveRes = await fetch("/api/profile/save", {
           method: "POST",
@@ -104,8 +161,9 @@ export { default } from "@/components/result/ProfileResultClient"
             partner: d?.partner ?? null,
             ...(qb ?? {}),
           }),
-        })
-        if (!saveRes.ok && saveRes.status !== 409) {
+        }).catch(() => null)
+
+        if (saveRes && !saveRes.ok && saveRes.status !== 409) {
           const j = await saveRes.json().catch(() => ({}))
           console.warn("profile/save failed:", j?.error ?? saveRes.statusText)
         } else {
@@ -121,9 +179,9 @@ export { default } from "@/components/result/ProfileResultClient"
     run()
   }, [])
 
-  // 吹き出しは detail を順に表示
+  // ルネアの吹き出し
   const bubbles = useMemo(() => {
-    const arr: Array<{label: string; text: string}> = []
+    const arr: Array<{ label: string; text: string }> = []
     if (detail?.fortune)     arr.push({ label: "総合運勢",           text: detail.fortune.trim() })
     if (detail?.personality) arr.push({ label: "性格傾向",           text: detail.personality.trim() })
     if (detail?.work)        arr.push({ label: "仕事運",             text: detail.work.trim() })
@@ -135,7 +193,7 @@ export { default } from "@/components/result/ProfileResultClient"
     setStep(initialStep(bubbles.length))
   }, [bubbles.length])
 
-  const next = () => setStep((s) => Math.min(bubbles.length, s + 1))
+  const next = () => setStep(s => Math.min(bubbles.length, s + 1))
   const restart = () => setStep(initialStep(bubbles.length))
   const toProfile = () => router.push("/profile")
   const toMyPage = () => router.push("/mypage")
@@ -174,10 +232,16 @@ export { default } from "@/components/result/ProfileResultClient"
           <div className="space-y-3">
             <div className="text-sm text-red-300">エラー : {error}</div>
             <div className="flex gap-2">
-              <button className="px-3 py-2 rounded border border-white/20 hover:bg-white/10" onClick={() => { if (typeof window !== "undefined") window.location.reload() }}>
+              <button
+                className="px-3 py-2 rounded border border-white/20 hover:bg-white/10"
+                onClick={() => { if (typeof window !== "undefined") window.location.reload() }}
+              >
                 再試行
               </button>
-              <button className="px-3 py-2 rounded border border-white/20 hover:bg-white/10" onClick={toProfile}>
+              <button
+                className="px-3 py-2 rounded border border-white/20 hover:bg-white/10"
+                onClick={toProfile}
+              >
                 入力へ戻る
               </button>
             </div>

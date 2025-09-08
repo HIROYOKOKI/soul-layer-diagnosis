@@ -115,7 +115,7 @@ export async function POST(req: Request) {
     if (!openai) throw new Error("openai_env_missing");
 
     // 速さ最優先の既定値（環境変数で上書き可）
-    const model = process.env.OPENAI_PROFILE_MODEL || "gpt-4o-mini";
+    const model = process.env.OPENAI_PROFILE_MODEL || "gpt-5-mini";
 
     // 出力量を明確に制限（速い）
     const MAX_TOKENS = Number(process.env.OPENAI_PROFILE_MAXTOKENS || 550);
@@ -126,17 +126,16 @@ export async function POST(req: Request) {
     const user = buildProfilePrompt(pending);
 
     // ===== 生成を実行 =====
-    const resp = await openai.chat.completions.create({
-      model,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        // JSON.stringify で確実に短く
-        { role: "user", content: JSON.stringify(user) },
-      ],
-      max_tokens: MAX_TOKENS,
-      temperature: 0.6,
-    });
+   const resp = await openai.chat.completions.create({
+       model,
+       response_format: { type: "json_object" },
+       messages: [
+         { role: "system", content: system },
+         { role: "user", content: JSON.stringify(user) },
+       ],
+      max_completion_tokens: MAX_TOKENS, // ← ここを変更
+       temperature: 0.6,
+     })
 
     const raw = resp.choices?.[0]?.message?.content || "{}";
     const parsed = safeJSON<AiJson>(raw) || { detail: {}, luneaLines: [] };

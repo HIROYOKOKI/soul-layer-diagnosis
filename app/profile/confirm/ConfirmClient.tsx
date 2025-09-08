@@ -13,7 +13,6 @@ type Pending = {
   birthPlace: string | null
   sex: "Male" | "Female" | "Other" | "" | null
   preference: "Female" | "Male" | "Both" | "None" | "Other" | "" | null
-  // もし血液型などがある場合はここに追加してOK
 }
 
 export default function ConfirmClient() {
@@ -23,31 +22,44 @@ export default function ConfirmClient() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // ★ 止血ガード：このページ内の /structure/quick への遷移をすべて無効化
+  useEffect(() => {
+    function killQuickLink(e: MouseEvent) {
+      const target = e.target as HTMLElement | null
+      const a = target?.closest?.("a") as HTMLAnchorElement | null
+      const href = a?.getAttribute?.("href") || ""
+      if (a && /\/structure\/quick/.test(href)) {
+        e.preventDefault()
+        e.stopPropagation()
+        a.removeAttribute("href") // 二度と発火しないように
+      }
+    }
+    document.addEventListener("click", killQuickLink, true) // capture段で握りつぶす
+    return () => document.removeEventListener("click", killQuickLink, true)
+  }, [])
+
+  // 入力確認データの取得
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("profile_pending")
       if (raw) setData(JSON.parse(raw))
-    } catch {
-      /* noop */
-    }
+    } catch {/* noop */}
   }, [])
 
   function goBackWithFX() {
     if (backPressed) return
     setBackPressed(true)
-    setTimeout(() => {
-      router.push("/profile")
-    }, 160) // 演出が見える最短待機
+    setTimeout(() => { router.push("/profile") }, 160)
   }
 
-  // ✅ Quick は使わない。ここで診断APIを叩いて /profile/result へ。
-  async function goNext() {
+  // ✅ Quickは使わない：API → 結果を sessionStorage → /profile/result へ
+  async function goNext(e?: React.MouseEvent<HTMLButtonElement>) {
+    e?.preventDefault()
+    e?.stopPropagation() // ★ 根治：親要素の Link/onClick 連鎖を遮断
     if (!data || loading) return
     setLoading(true)
     setError(null)
-
     try {
-      // API 受け側の想定キーに合わせて最低限マッピング
       const payload = {
         name: data.name,
         birthday: data.birthday,
@@ -55,8 +67,7 @@ export default function ConfirmClient() {
         preference: data.preference ?? "",
         birthTime: data.birthTime ?? "",
         birthPlace: data.birthPlace ?? "",
-        // 本番DB汚染防止のため dev テーマで分離（必要なければ削除OK）
-        theme: "dev",
+        theme: "dev", // 本番DB保護（不要なら削除）
       }
 
       const res = await fetch("/api/profile/diagnose", {
@@ -64,22 +75,13 @@ export default function ConfirmClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       })
-
       const json = await res.json()
-      if (!res.ok || !json?.ok) {
-        throw new Error(json?.error || "diagnose_failed")
-      }
+      if (!res.ok || !json?.ok) throw new Error(json?.error || "diagnose_failed")
 
-      // 結果を結果ページで読むために保存
-      sessionStorage.setItem(
-        "profile_diagnose_pending",
-        JSON.stringify(json.result)
-      )
-
-      // 必ず結果ページへ（Quick は結果ページ下部の導線のみで使用）
+      sessionStorage.setItem("profile_diagnose_pending", JSON.stringify(json.result))
       router.push("/profile/result")
-    } catch (e: any) {
-      setError(e?.message ?? "unknown_error")
+    } catch (err: any) {
+      setError(err?.message ?? "unknown_error")
     } finally {
       setLoading(false)
     }
@@ -101,7 +103,8 @@ export default function ConfirmClient() {
   const showPref = (v: Pending["preference"]) => (v && v !== "" ? v : "選択しない")
 
   return (
-    <div className="max-w-xl mx-auto p-6 space-y-6">
+    // 念のため：このコンテナ内のクリックは外側に伝播させない
+    <div className="max-w-xl mx-auto p-6 space-y-6" onClick={(e)=>e.stopPropagation()}>
       <h1 className="text-xl font-bold">確認</h1>
 
       <div className="rounded-2xl bg-white/[0.03] p-4 text-sm grid gap-2">

@@ -13,18 +13,23 @@ type Pending = {
   birthPlace: string | null
   sex: "Male" | "Female" | "Other" | "" | null
   preference: "Female" | "Male" | "Both" | "None" | "Other" | "" | null
+  // もし血液型などがある場合はここに追加してOK
 }
 
 export default function ConfirmClient() {
   const router = useRouter()
   const [data, setData] = useState<Pending | null>(null)
   const [backPressed, setBackPressed] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("profile_pending")
       if (raw) setData(JSON.parse(raw))
-    } catch {}
+    } catch {
+      /* noop */
+    }
   }, [])
 
   function goBackWithFX() {
@@ -32,32 +37,61 @@ export default function ConfirmClient() {
     setBackPressed(true)
     setTimeout(() => {
       router.push("/profile")
-    }, 160) // ← 演出が見える最短の待機（120–180ms推奨）
+    }, 160) // 演出が見える最短待機
   }
 
-function goNext() {
-  try {
-    const raw = sessionStorage.getItem("structure_quick_pending")
-    const quick = raw ? JSON.parse(raw) : null
-    if (!quick?.order || quick.order.length !== 4) {
-      // Quick未実施 → Quickへ。完了後に /profile/result へ戻す
-      const returnTo = encodeURIComponent("/profile/result")
-      router.push(`/structure/quick?return=${returnTo}`)
-      return
+  // ✅ Quick は使わない。ここで診断APIを叩いて /profile/result へ。
+  async function goNext() {
+    if (!data || loading) return
+    setLoading(true)
+    setError(null)
+
+    try {
+      // API 受け側の想定キーに合わせて最低限マッピング
+      const payload = {
+        name: data.name,
+        birthday: data.birthday,
+        gender: data.sex ?? "",
+        preference: data.preference ?? "",
+        birthTime: data.birthTime ?? "",
+        birthPlace: data.birthPlace ?? "",
+        // 本番DB汚染防止のため dev テーマで分離（必要なければ削除OK）
+        theme: "dev",
+      }
+
+      const res = await fetch("/api/profile/diagnose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      const json = await res.json()
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "diagnose_failed")
+      }
+
+      // 結果を結果ページで読むために保存
+      sessionStorage.setItem(
+        "profile_diagnose_pending",
+        JSON.stringify(json.result)
+      )
+
+      // 必ず結果ページへ（Quick は結果ページ下部の導線のみで使用）
+      router.push("/profile/result")
+    } catch (e: any) {
+      setError(e?.message ?? "unknown_error")
+    } finally {
+      setLoading(false)
     }
-  } catch {
-    const returnTo = encodeURIComponent("/profile/result")
-    router.push(`/structure/quick?return=${returnTo}`)
-    return
   }
-  router.push("/profile/result")
-}
 
   if (!data) {
     return (
       <div className="max-w-xl mx-auto p-6 text-white/70">
         入力内容が見つかりません。
-        <button className="underline ml-2" onClick={() => router.push("/profile")}>戻る</button>
+        <button className="underline ml-2" onClick={() => router.push("/profile")}>
+          戻る
+        </button>
       </div>
     )
   }
@@ -83,7 +117,7 @@ function goNext() {
       <div className="space-y-3">
         <button
           onClick={goBackWithFX}
-          disabled={backPressed}
+          disabled={backPressed || loading}
           className={[
             "group relative w-full rounded-xl px-4 py-3",
             "border border-white/20 text-white transition",
@@ -105,12 +139,19 @@ function goNext() {
 
         <GlowButton
           onClick={goNext}
+          disabled={loading}
           variant="primary"
           size="sm"
           className="w-full h-12"
         >
-          この内容で診断
+          {loading ? "診断中…" : "この内容で診断"}
         </GlowButton>
+
+        {error && (
+          <p className="text-rose-400 text-sm text-center">
+            エラーが発生しました：{error}（もう一度お試しください）
+          </p>
+        )}
       </div>
     </div>
   )

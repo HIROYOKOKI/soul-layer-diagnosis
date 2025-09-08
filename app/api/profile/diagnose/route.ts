@@ -125,17 +125,18 @@ export async function POST(req: Request) {
     // 外部プロンプトビルダーをそのまま利用（短文志向で）
     const user = buildProfilePrompt(pending);
 
-    // ===== 生成を実行 =====
-   const resp = await openai.chat.completions.create({
-       model,
-       response_format: { type: "json_object" },
-       messages: [
-         { role: "system", content: system },
-         { role: "user", content: JSON.stringify(user) },
-       ],
-      max_completion_tokens: MAX_TOKENS, // ← ここを変更
-       temperature: 0.6,
-     })
+    // 一部モデルは max_tokens ではなく max_completion_tokens、
+   // かつ temperature=1 固定（任意値不可）のため、温度は指定しない
+    const resp = await openai.chat.completions.create({
+      model,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: JSON.stringify(user) },
+      ],
+      max_completion_tokens: MAX_TOKENS,
+      // temperature は未指定（モデル既定=1）
+    });
 
     const raw = resp.choices?.[0]?.message?.content || "{}";
     const parsed = safeJSON<AiJson>(raw) || { detail: {}, luneaLines: [] };

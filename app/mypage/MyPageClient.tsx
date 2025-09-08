@@ -215,29 +215,33 @@ export default function MyPageClient() {
   return (
     <div className="min-h-screen bg-black text-white px-5 py-6 max-w-md mx-auto">
       {/* 1) クイック診断の型（バッジ＝ボタン） */}
-+  <div className="flex justify-center mb-4">
-+    {typeLabel ? (
-+      <button
-+        onClick={() =>
-+          router.push(`/guide/future-vs-realistic?model=${encodeURIComponent(normalizedModel!)}`)
-+        }
-+        className="inline-block rounded-xl px-4 py-2 text-sm border transition
-+                   hover:brightness-110 active:scale-[0.99]"
-+        style={{
-+          borderColor: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
-+          backgroundColor: normalizedModel === "EΛVƎ" ? "#B833F51A" : "#FF45001A",
-+          color: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
-+        }}
-+        aria-label={`${typeLabel}（${normalizedModel}）の解説へ`}
-+      >
-+        {typeLabel}（{normalizedModel}）
-+      </button>
-+    ) : (
-+      <span className="inline-block rounded-xl px-3 py-2 text-xs border border-white/15 text-white/60 bg-white/5">
-+        クイック診断はまだありません
-+      </span>
-+    )}
-+  </div>
+ {/* 1) クイック診断の型（バッジ＝ボタン） */}
+<div className="flex justify-center mb-4">
+  {typeLabel ? (
+    <button
+      onClick={() => {
+        if (!normalizedModel) return
+        router.push(
+          `/guide/future-vs-realistic?model=${encodeURIComponent(normalizedModel)}`
+        )
+      }}
+      className="inline-block rounded-xl px-4 py-2 text-sm border transition hover:brightness-110 active:scale-[0.99]"
+      style={{
+        borderColor: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
+        backgroundColor: normalizedModel === "EΛVƎ" ? "#B833F51A" : "#FF45001A",
+        color: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
+      }}
+      aria-label={`${typeLabel}（${normalizedModel}）の解説へ`}
+    >
+      {typeLabel}（{normalizedModel}）
+    </button>
+  ) : (
+    <span className="inline-block rounded-xl px-3 py-2 text-xs border border-white/15 text-white/60 bg-white/5">
+      クイック診断はまだありません
+    </span>
+  )}
+</div>
+
 
       {/* 2) プロフィール行 */}
       <div className="flex items-start justify-between mb-2">

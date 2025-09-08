@@ -1,3 +1,4 @@
+// app/structure/quick/result/ResultClient.tsx
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -98,14 +99,8 @@ export default function ResultClient() {
             </div>
           </div>
 
-          {/* 導線 */}
-          <div className="mt-6 grid gap-3">
-            <button
-              className="w-full rounded-lg bg-pink-600 py-2 font-bold hover:bg-pink-500"
-              onClick={() => router.push('/profile/result')}
-            >
-              プロフィール診断の結果と一緒に見る
-            </button>
+          {/* 導線：マイページのみ */}
+          <div className="mt-6">
             <button
               className="w-full rounded-lg border border-white/20 py-2 text-white/90 hover:bg-white/10"
               onClick={() => router.push('/mypage')}

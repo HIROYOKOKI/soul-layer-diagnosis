@@ -1,19 +1,14 @@
-"use client"
-import { useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+// app/structure/quick/page.tsx
+import { Suspense } from "react"
+import QuickClient from "./QuickClient"
 
-export default function QuickPageGuard({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const sp = useSearchParams()
+export const dynamic = "force-dynamic"   // ← プリレンダーしない
+export const revalidate = 0              // ← 再検証なし
 
-  useEffect(() => {
-    const raw = sessionStorage.getItem("structure_quick_pending")
-    const hasPending = !!raw
-    const returnTo = sp.get("return") || "/mypage"
-    if (!hasPending) {
-      router.replace(returnTo) // ← 直接来た/前提欠如はエラー出さず戻す
-    }
-  }, [router, sp])
-
-  return <>{children}</>
+export default function QuickPage() {
+  return (
+    <Suspense fallback={null}>
+      <QuickClient />
+    </Suspense>
+  )
 }

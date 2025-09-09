@@ -44,13 +44,10 @@ const safeText = (v: unknown) =>
     : v == null
     ? ""
     : (() => {
-        try {
-          return JSON.stringify(v);
-        } catch {
-          return String(v);
-        }
+        try { return JSON.stringify(v) } catch { return String(v) }
       })();
 
+/** API⇄UIのコード表記を正規化 */
 function normalizeCode(x?: string | null): EV | null {
   const s = (x || "").trim();
   if (s === "∃" || s === "ヨ") return "Ǝ";
@@ -59,6 +56,7 @@ function normalizeCode(x?: string | null): EV | null {
   return null;
 }
 
+/** ローカル保存に使う dev/prod テーマ識別 */
 function getThemeForLog() {
   const t =
     (typeof localStorage !== "undefined"
@@ -67,21 +65,57 @@ function getThemeForLog() {
   return t;
 }
 
-// 朝=0:00-11:59 / 昼=12:00-17:59 / 夜=18:00-23:59
+/** JSTの現在日時（UTC+9） */
+function jstNow() {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000);
+}
+
+/** JST基準のスロット（朝A/昼B/夜C） */
 function currentSlot(): "A" | "B" | "C" {
-  const now = new Date();
-  const h = now.getHours();
+  const h = jstNow().getUTCHours();
   if (h < 12) return "A";
   if (h < 18) return "B";
   return "C";
 }
 
-function todayId(slot: "A" | "B" | "C") {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `daily-${y}-${m}-${day}-${slot}`;
+/** YYYY-MM-DD（JST） */
+function jstYmd() {
+  const d = jstNow();
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** question_id をJSTで統一 */
+function buildQuestionId(slot: "A" | "B" | "C") {
+  return `daily-${jstYmd()}-${slot}`;
+}
+
+/** /api/daily/save 用 */
+async function saveDaily({
+  questionId, subset, finalChoice, firstChoice, changes, theme = "dev",
+}:{
+  questionId: string
+  subset?: ("E"|"V"|"Λ"|"Ǝ")[]
+  finalChoice: "E"|"V"|"Λ"|"Ǝ"
+  firstChoice?: "E"|"V"|"Λ"|"Ǝ"|null
+  changes: number
+  theme?: "dev"|"prod"
+}) {
+  const res = await fetch("/api/daily/save", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({
+      question_id: questionId,
+      subset,
+      final_choice: finalChoice,
+      first_choice: firstChoice ?? null,
+      changes,
+      theme
+    })
+  });
+  return res.json() as Promise<SaveResp>;
 }
 
 /* 選び直しトラッカー（β：first/final/changesのみ） */
@@ -112,8 +146,8 @@ function useChoiceTrack<Code extends string>() {
    ───────────────────────────── */
 export default function DailyQuestionPage() {
   const theme = useMemo(getThemeForLog, []);
-  const slot = useMemo(currentSlot, []); // マウント時点のslotを固定（再描画で変わらない）
-  const questionId = useMemo(() => todayId(slot), [slot]);
+  const slot = useMemo(currentSlot, []); // マウント時点のslotを固定
+  const questionId = useMemo(() => buildQuestionId(slot), [slot]);
 
   // 表示状態
   const [loading, setLoading] = useState(false);
@@ -152,49 +186,45 @@ export default function DailyQuestionPage() {
       const question = safeText(data.question) || "きょうの直感で選んでください。";
       setQ(question);
 
-      // subset（あれば）をEVに正規化
+      // subset（あれば）をEVに正規化（ローカル変数 sub を以後の処理で優先使用）
       const sub = Array.isArray(data.subset)
-        ? data.subset
+        ? (data.subset
             .map((s) => normalizeCode(String(s)))
-            .filter(Boolean) as EV[]
+            .filter(Boolean) as EV[])
         : null;
       setSubset(sub && sub.length > 0 ? sub : null);
 
       // choices を {code,label}[] に正規化（2/3/4択どれでも）
       let raw = Array.isArray(data.choices) ? data.choices : [];
-      if (raw.length === 0) {
-        // フォールバック（4択）
-        raw = [
-          { code: "E", label: "勢いよく進める" },
-          { code: "V", label: "まずは発想を広げる" },
-          { code: "Λ", label: "手順と基準を決める" },
-          { code: "Ǝ", label: "小さく試して観察する" },
-        ];
-      }
-      const normalized: Array<{ code: EV; label: string }> = raw
-        .map((r) => {
-          if (typeof r === "string") {
-            // 文字列のみ → ラベル扱い、コードは推測不可なので後で整合を取る
-            return { code: "E" as EV, label: safeText(r) };
-          }
-          const code = normalizeCode(
-            "code" in r ? (r.code as string | undefined) : undefined
-          );
-          const label = safeText("label" in r ? r.label : "");
-          return code ? { code, label } : null;
-        })
-        .filter(Boolean) as Array<{ code: EV; label: string }>;
+      // 文字列のみのとき、subset の順または既定順でコードを割り当てる
+      const FALLBACK_ORDER: EV[] = ["E", "V", "Λ", "Ǝ"];
 
-      // subsetが来ていれば、それに含まれない選択肢は除外
+      const normalized: Array<{ code: EV; label: string }> = raw.map((r, idx) => {
+        if (typeof r === "string") {
+          const assigned =
+            (sub && sub[idx]) ? sub[idx] :
+            FALLBACK_ORDER[idx] ?? "E";
+          return { code: assigned, label: safeText(r) };
+        }
+        const code = normalizeCode("code" in r ? (r.code as string | undefined) : undefined);
+        const label = safeText("label" in r ? r.label : "");
+        if (code) return { code, label };
+        // codeが無い場合は subset/既定順で穴埋め
+        const assigned =
+          (sub && sub[idx]) ? sub[idx] :
+          FALLBACK_ORDER[idx] ?? "E";
+        return { code: assigned, label };
+      });
+
+      // subが来ていれば、それに含まれない選択肢は除外（※stateのsubsetではなく「今の sub」を使う）
       const filtered =
-        (subset && subset.length > 0)
-          ? normalized.filter((o) => subset.includes(o.code))
+        (sub && sub.length > 0)
+          ? normalized.filter((o) => sub.includes(o.code))
           : normalized;
 
-      // 2/3/4択に正規化（最大4）
+      // 2/3/4択に正規化（最大4、最低2）
       const opts = filtered.slice(0, 4);
       if (opts.length < 2) {
-        // 安全フォールバック：最低2択にする
         setOptions([
           { code: "E", label: "勢いで突破する" },
           { code: "Ǝ", label: "一度立ち止まって観察する" },
@@ -259,22 +289,23 @@ export default function DailyQuestionPage() {
         theme, // dev分離
 
         // β行動ログ＋スコア計算用
-        question_id: questionId,          // daily-YYYY-MM-DD-A/B/C
-        subset: subset ?? options.map((o) => o.code), // 今回の出題対象（2/3/4択）
-        final_choice: finalChoice,         // 最終選択（顕在）
-        first_choice: firstChoice,         // 初回選択（選び直しの痕跡）
-        changes,                           // 選び直し回数（βでは参考）
+        question_id: questionId,                               // daily-YYYY-MM-DD-A/B/C（JST）
+        subset: subset ?? options.map((o) => o.code),          // 今回の出題対象（2/3/4択）
+        final_choice: finalChoice,                             // 最終選択（顕在）
+        first_choice: firstChoice,                             // 初回選択（選び直しの痕跡）
+        changes,                                               // 選び直し回数（βでは参考）
       };
 
-      const res = await fetch("/api/daily/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        cache: "no-store",
+      const data = await saveDaily({
+        questionId,
+        subset: payload.subset,
+        finalChoice,
+        firstChoice: firstChoice ?? null,
+        changes,
+        theme,
       });
-      const data: SaveResp = await res.json();
-      if (!data.ok) throw new Error(data.error || "failed_save");
 
+      if (!data.ok) throw new Error(data.error || "failed_save");
       window.location.href = "/mypage";
     } catch (e: any) {
       setError(e?.message ?? "save_error");
@@ -332,7 +363,7 @@ export default function DailyQuestionPage() {
               const active = finalChoice === o.code;
               return (
                 <button
-                  key={i}
+                  key={`${o.code}-${i}`}
                   type="button"
                   disabled={loading || !!result}
                   onClick={() => choose(o.code)}

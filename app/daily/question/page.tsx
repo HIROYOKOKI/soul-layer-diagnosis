@@ -1,9 +1,43 @@
-// app/daily/question/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-/* どんな値でも文字列にして安全に描画 */
+/* ─────────────────────────────
+   型
+   ───────────────────────────── */
+type EV = "E" | "V" | "Λ" | "Ǝ";
+
+type QChoice =
+  | string
+  | { code: EV | "A" | "∃" | "ヨ"; label: string }  // 新API想定
+  | { code?: string; label?: string };              // 互換
+
+type QResp = {
+  ok: boolean;
+  question?: unknown;
+  // 2/3/4択どれでもOK（文字列 or {code,label} 混在も許容）
+  choices?: QChoice[];
+  // 今回出題対象のコード集合（例: ["E","Λ"]）※無くても動く
+  subset?: string[];
+  seed?: string | number;
+  error?: string;
+};
+
+type DReq = { choice: string; theme?: string };
+type DResp = {
+  ok: boolean;
+  code?: string;
+  comment?: unknown;
+  quote?: unknown;
+  navigator?: string | null;
+  error?: string;
+};
+
+type SaveResp = { ok: boolean; item?: any; error?: string };
+
+/* ─────────────────────────────
+   ユーティリティ
+   ───────────────────────────── */
 const safeText = (v: unknown) =>
   typeof v === "string" || typeof v === "number"
     ? String(v)
@@ -17,36 +51,6 @@ const safeText = (v: unknown) =>
         }
       })();
 
-/* =========================
-   型
-   ========================= */
-type EV = "E" | "V" | "Λ" | "Ǝ";
-type QResp = {
-  ok: boolean;
-  question?: unknown;       // ← APIが配列/オブジェクトを返しても落ちないよう unknown
-  choices?: unknown[];      // 4択
-  seed?: string | number;
-  error?: string;
-};
-type DReq = {
-  choice: string;
-  theme?: string; // dev 分離用
-};
-type DResp = {
-  ok: boolean;
-  code?: string;
-  comment?: unknown;
-  quote?: unknown;
-  navigator?: string | null;
-  error?: string;
-};
-
-type SaveResp = { ok: boolean; stored?: boolean; error?: string };
-
-/* =========================
-   ユーティリティ
-   ========================= */
-// 記号の正規化（"∃" や "A" を許容）
 function normalizeCode(x?: string | null): EV | null {
   const s = (x || "").trim();
   if (s === "∃" || s === "ヨ") return "Ǝ";
@@ -56,7 +60,6 @@ function normalizeCode(x?: string | null): EV | null {
 }
 
 function getThemeForLog() {
-  // UIテーマ（配色）と診断テーマ（devログ分離）は別レイヤー
   const t =
     (typeof localStorage !== "undefined"
       ? localStorage.getItem("ev-theme")
@@ -64,14 +67,70 @@ function getThemeForLog() {
   return t;
 }
 
-/* =========================
+// 朝=0:00-11:59 / 昼=12:00-17:59 / 夜=18:00-23:59
+function currentSlot(): "A" | "B" | "C" {
+  const now = new Date();
+  const h = now.getHours();
+  if (h < 12) return "A";
+  if (h < 18) return "B";
+  return "C";
+}
+
+function todayId(slot: "A" | "B" | "C") {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `daily-${y}-${m}-${day}-${slot}`;
+}
+
+/* 選び直しトラッカー（β：first/final/changesのみ） */
+function useChoiceTrack<Code extends string>() {
+  const first = useRef<Code | null>(null);
+  const [finalChoice, setFinal] = useState<Code | null>(null);
+  const changes = useRef(0);
+  function choose(code: Code) {
+    if (!first.current) first.current = code;
+    if (finalChoice && finalChoice !== code) changes.current += 1;
+    setFinal(code);
+  }
+  return {
+    firstChoice: first.current,
+    finalChoice,
+    changes: changes.current,
+    choose,
+    reset() {
+      first.current = null;
+      changes.current = 0;
+      setFinal(null);
+    },
+  };
+}
+
+/* ─────────────────────────────
    ページ本体
-   ========================= */
+   ───────────────────────────── */
 export default function DailyQuestionPage() {
+  const theme = useMemo(getThemeForLog, []);
+  const slot = useMemo(currentSlot, []); // マウント時点のslotを固定（再描画で変わらない）
+  const questionId = useMemo(() => todayId(slot), [slot]);
+
+  // 表示状態
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState<string>("");
-  const [choices, setChoices] = useState<string[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [subset, setSubset] = useState<EV[] | null>(null);
+
+  // 選択肢は {code,label} に正規化して保持
+  const [options, setOptions] = useState<Array<{ code: EV; label: string }>>([]);
+
+  // 選択状態（ラベルではなく code を採用：2/3/4択で安定）
+  const {
+    firstChoice,
+    finalChoice,
+    changes,
+    choose,
+    reset: resetTrack,
+  } = useChoiceTrack<EV>();
 
   const [diagLoading, setDiagLoading] = useState(false);
   const [result, setResult] = useState<{ code: EV; comment: string; quote: string } | null>(null);
@@ -79,34 +138,70 @@ export default function DailyQuestionPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const theme = useMemo(getThemeForLog, []);
-
-  /* ---------- Q1. 質問の取得 ---------- */
+  /* 1) 質問の取得（slotに応じた出題。2/3/4択OK） */
   const fetchQuestion = async () => {
     setLoading(true);
     setError(null);
-    setSelected(null);
     setResult(null);
+    resetTrack();
     try {
-      const res = await fetch("/api/lunea/question", { cache: "no-store" });
+      const res = await fetch(`/api/lunea/question?slot=${slot}`, { cache: "no-store" });
       const data: QResp = await res.json();
       if (!data.ok) throw new Error(data.error || "failed_question");
 
-      // どんな形でも文字列に整形
       const question = safeText(data.question) || "きょうの直感で選んでください。";
-      const csRaw =
-        Array.isArray(data.choices) && data.choices.length >= 4
-          ? data.choices.slice(0, 4)
-          : [
-              "A：勢いよく進める",
-              "B：まずは発想を広げる",
-              "C：手順と基準を決めて進める",
-              "D：小さく試して観察する",
-            ];
-      const cs = csRaw.map(safeText);
-
       setQ(question);
-      setChoices(cs);
+
+      // subset（あれば）をEVに正規化
+      const sub = Array.isArray(data.subset)
+        ? data.subset
+            .map((s) => normalizeCode(String(s)))
+            .filter(Boolean) as EV[]
+        : null;
+      setSubset(sub && sub.length > 0 ? sub : null);
+
+      // choices を {code,label}[] に正規化（2/3/4択どれでも）
+      let raw = Array.isArray(data.choices) ? data.choices : [];
+      if (raw.length === 0) {
+        // フォールバック（4択）
+        raw = [
+          { code: "E", label: "勢いよく進める" },
+          { code: "V", label: "まずは発想を広げる" },
+          { code: "Λ", label: "手順と基準を決める" },
+          { code: "Ǝ", label: "小さく試して観察する" },
+        ];
+      }
+      const normalized: Array<{ code: EV; label: string }> = raw
+        .map((r) => {
+          if (typeof r === "string") {
+            // 文字列のみ → ラベル扱い、コードは推測不可なので後で整合を取る
+            return { code: "E" as EV, label: safeText(r) };
+          }
+          const code = normalizeCode(
+            "code" in r ? (r.code as string | undefined) : undefined
+          );
+          const label = safeText("label" in r ? r.label : "");
+          return code ? { code, label } : null;
+        })
+        .filter(Boolean) as Array<{ code: EV; label: string }>;
+
+      // subsetが来ていれば、それに含まれない選択肢は除外
+      const filtered =
+        (subset && subset.length > 0)
+          ? normalized.filter((o) => subset.includes(o.code))
+          : normalized;
+
+      // 2/3/4択に正規化（最大4）
+      const opts = filtered.slice(0, 4);
+      if (opts.length < 2) {
+        // 安全フォールバック：最低2択にする
+        setOptions([
+          { code: "E", label: "勢いで突破する" },
+          { code: "Ǝ", label: "一度立ち止まって観察する" },
+        ]);
+      } else {
+        setOptions(opts);
+      }
     } catch (e: any) {
       setError(e?.message ?? "question_error");
     } finally {
@@ -119,13 +214,13 @@ export default function DailyQuestionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ---------- Q2. 診断の実行 ---------- */
+  /* 2) 診断の実行（選択は code ベースで送る） */
   const runDiagnose = async () => {
-    if (!selected) return;
+    if (!finalChoice) return;
     setDiagLoading(true);
     setError(null);
     try {
-      const body: DReq = { choice: selected, theme };
+      const body: DReq = { choice: finalChoice, theme };
       const res = await fetch("/api/daily/diagnose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -134,7 +229,7 @@ export default function DailyQuestionPage() {
       const data: DResp = await res.json();
       if (!data.ok) throw new Error(data.error || "failed_diagnose");
 
-      const code = normalizeCode(safeText(data.code)) || "E";
+      const code = normalizeCode(safeText(data.code)) || finalChoice;
       setResult({
         code,
         comment: safeText(data.comment),
@@ -149,20 +244,28 @@ export default function DailyQuestionPage() {
     }
   };
 
-  /* ---------- Q3. 保存 ---------- */
+  /* 3) 保存（β：first≠final のときだけ first に 0.25 を与えるのはサーバ側で） */
   const saveResult = async () => {
-    if (!result) return;
+    if (!result || !finalChoice) return;
     setSaving(true);
     setError(null);
     try {
       const payload = {
+        // 既存フィールド
         code: result.code,
         comment: result.comment,
         quote: result.quote,
-        choice: selected,
         mode: "daily",
-        theme, // ← dev で分離できる
+        theme, // dev分離
+
+        // β行動ログ＋スコア計算用
+        question_id: questionId,          // daily-YYYY-MM-DD-A/B/C
+        subset: subset ?? options.map((o) => o.code), // 今回の出題対象（2/3/4択）
+        final_choice: finalChoice,         // 最終選択（顕在）
+        first_choice: firstChoice,         // 初回選択（選び直しの痕跡）
+        changes,                           // 選び直し回数（βでは参考）
       };
+
       const res = await fetch("/api/daily/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -171,7 +274,7 @@ export default function DailyQuestionPage() {
       });
       const data: SaveResp = await res.json();
       if (!data.ok) throw new Error(data.error || "failed_save");
-      // 保存成功 → マイページへ
+
       window.location.href = "/mypage";
     } catch (e: any) {
       setError(e?.message ?? "save_error");
@@ -179,7 +282,7 @@ export default function DailyQuestionPage() {
     }
   };
 
-  /* ---------- 表示ヘルパ ---------- */
+  /* 表示ヘルパ */
   const codeBadge = (c: EV) => {
     const name =
       c === "E" ? "衝動・情熱" :
@@ -194,14 +297,21 @@ export default function DailyQuestionPage() {
     );
   };
 
-  /* =========================
+  /* ─────────────────────────────
      UI
-     ========================= */
+     ───────────────────────────── */
   return (
     <div className="min-h-[100svh] bg-black text-white">
       <main className="mx-auto max-w-xl px-5 py-8">
-        <h1 className="text-xl font-semibold tracking-wide">デイリー診断</h1>
-        <p className="text-sm text-white/60 mt-1">1日1問。直感で選んでください。</p>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold tracking-wide">デイリー診断</h1>
+          <div className="text-xs text-white/60">
+            Slot: {slot === "A" ? "朝" : slot === "B" ? "昼" : "夜"} / {questionId}
+          </div>
+        </div>
+        <p className="text-sm text-white/60 mt-1">
+          1日最大3回。いまの直感で選んでください。
+        </p>
 
         {/* エラー */}
         {error && (
@@ -218,15 +328,14 @@ export default function DailyQuestionPage() {
           </p>
 
           <div className="mt-4 grid grid-cols-1 gap-3">
-            {choices.map((c, i) => {
-              const label = safeText(c);                 // ← ラベルを確実に文字列化
-              const active = selected === label;         // ← 比較もラベルで統一
+            {options.map((o, i) => {
+              const active = finalChoice === o.code;
               return (
                 <button
                   key={i}
                   type="button"
                   disabled={loading || !!result}
-                  onClick={() => setSelected(label)}     // ← 文字列を保持
+                  onClick={() => choose(o.code)}
                   className={[
                     "w-full text-left rounded-xl px-4 py-3 border transition",
                     active
@@ -234,7 +343,8 @@ export default function DailyQuestionPage() {
                       : "border-white/10 bg-white/5 hover:bg-white/8",
                   ].join(" ")}
                 >
-                  {label}
+                  <span className="mr-2 opacity-70 font-mono">{o.code}</span>
+                  {safeText(o.label)}
                 </button>
               );
             })}
@@ -254,10 +364,10 @@ export default function DailyQuestionPage() {
               <button
                 type="button"
                 onClick={runDiagnose}
-                disabled={!selected || loading || diagLoading}
+                disabled={!finalChoice || loading || diagLoading}
                 className={[
                   "h-10 px-4 rounded-lg border border-white/10",
-                  !selected || loading || diagLoading
+                  !finalChoice || loading || diagLoading
                     ? "bg-white/10 text-white/50"
                     : "bg-white text-black active:opacity-90",
                 ].join(" ")}

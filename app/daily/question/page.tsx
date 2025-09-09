@@ -57,13 +57,13 @@ function normalizeCode(x?: string | null): EV | null {
 }
 
 /** ローカル保存に使う dev/prod テーマ識別 */
-function getThemeForLog() {
-  const t =
-    (typeof localStorage !== "undefined"
-      ? localStorage.getItem("ev-theme")
-      : null) || "dev";
-  return t;
-}
+function getEnvForLog() {
+   try {
+     if (typeof localStorage === "undefined") return "dev"
+     const v = (localStorage.getItem("ev-env") || "dev").toLowerCase()
+     return v === "prod" ? "prod" : "dev"
+   } catch { return "dev" }
+ }
 
 /** JSTの現在日時（UTC+9） */
 function jstNow() {
@@ -94,15 +94,15 @@ function buildQuestionId(slot: "A" | "B" | "C") {
 
 /** /api/daily/save 用 */
 async function saveDaily({
-  questionId, subset, finalChoice, firstChoice, changes, theme = "dev",
-}:{
-  questionId: string
-  subset?: ("E"|"V"|"Λ"|"Ǝ")[]
-  finalChoice: "E"|"V"|"Λ"|"Ǝ"
-  firstChoice?: "E"|"V"|"Λ"|"Ǝ"|null
-  changes: number
-  theme?: "dev"|"prod"
-}) {
+  questionId, subset, finalChoice, firstChoice, changes, env="dev"
+ }:{
+   questionId: string
+   subset?: ("E"|"V"|"Λ"|"Ǝ")[]
+   finalChoice: "E"|"V"|"Λ"|"Ǝ"
+   firstChoice?: "E"|"V"|"Λ"|"Ǝ"|null
+   changes: number
+   env?: "dev"|"prod"
+ }) {
   const res = await fetch("/api/daily/save", {
     method:"POST",
     headers:{ "Content-Type":"application/json" },
@@ -112,7 +112,7 @@ async function saveDaily({
       final_choice: finalChoice,
       first_choice: firstChoice ?? null,
       changes,
-      theme
+       env       // ★ ここで env を送る（theme は送らない）
     })
   });
   return res.json() as Promise<SaveResp>;
@@ -145,7 +145,7 @@ function useChoiceTrack<Code extends string>() {
    ページ本体
    ───────────────────────────── */
 export default function DailyQuestionPage() {
-  const theme = useMemo(getThemeForLog, []);
+ const env = useMemo(getEnvForLog, [])
   const slot = useMemo(currentSlot, []); // マウント時点のslotを固定
   const questionId = useMemo(() => buildQuestionId(slot), [slot]);
 
@@ -250,7 +250,7 @@ export default function DailyQuestionPage() {
     setDiagLoading(true);
     setError(null);
     try {
-      const body: DReq = { choice: finalChoice, theme };
+      const body: DReq = { choice: finalChoice, theme: env };
       const res = await fetch("/api/daily/diagnose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -297,13 +297,13 @@ export default function DailyQuestionPage() {
       };
 
       const data = await saveDaily({
-        questionId,
-        subset: payload.subset,
-        finalChoice,
-        firstChoice: firstChoice ?? null,
-        changes,
-        theme,
-      });
+  questionId,
+   subset: payload.subset,
+   finalChoice,
+   firstChoice: firstChoice ?? null,
+   changes,
+   env,   // ★
+ });
 
       if (!data.ok) throw new Error(data.error || "failed_save");
       window.location.href = "/mypage";

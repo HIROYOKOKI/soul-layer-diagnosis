@@ -20,20 +20,33 @@ type DailyLatest = {
 
 export default function MyPageClient({
   initialDailyLatest = null,
+  initialEnv = "dev",
 }: {
   initialDailyLatest?: DailyLatest | null
+  initialEnv?: "dev" | "prod"
 }) {
   const [daily, setDaily] = useState<DailyLatest | null>(initialDailyLatest)
   const [loading, setLoading] = useState(!initialDailyLatest)
   const [error, setError] = useState<string | null>(null)
+  const [env, setEnv] = useState<"dev"|"prod">(initialEnv)
+// ブラウザの選好を反映（ev-env があればそれを優先）
+  useEffect(() => {
+    try {
+      const v = (localStorage.getItem("ev-env") || initialEnv).toLowerCase()
+      const e = v === "prod" ? "prod" : "dev"
+      setEnv(e)
+      if (e !== initialEnv) refetch(e) // 違う環境なら即再取得
+    } catch { /* noop */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // 再取得（手動更新用にも使える）
-  async function refetch() {
+ async function refetch(targetEnv = env) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/mypage/daily-latest", { cache: "no-store" })
-      const json = await res.json()
+     const res = await fetch(`/api/mypage/daily-latest?env=${targetEnv}`, { cache: "no-store" })
+       const json = await res.json()
       setDaily(json?.item ?? null)
     } catch (e: any) {
       setError(e?.message ?? "fetch_failed")
@@ -43,7 +56,7 @@ export default function MyPageClient({
   }
 
   useEffect(() => {
-    if (!initialDailyLatest) refetch()
+  if (!initialDailyLatest) refetch(env)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -84,12 +97,16 @@ export default function MyPageClient({
         <header className="flex items-center justify-between">
           <h1 className="text-xl font-semibold tracking-wide">My Page</h1>
           <button
-            className="text-xs rounded-lg border border-white/15 bg-white/10 px-3 py-1 hover:bg-white/15"
-            onClick={refetch}
-            disabled={loading}
-          >
-            {loading ? "更新中…" : "更新"}
-          </button>
+  className="text-xs rounded-lg border border-white/15 bg-white/10 px-3 py-1 hover:bg-white/15"
+  onClick={()=>{
+    const next = env === "dev" ? "prod" : "dev"
+    setEnv(next)
+    localStorage.setItem("ev-env", next)
+    refetch(next)
+  }}
+>
+  env: {env}（切替）
+</button>
         </header>
 
         {/* エラー */}

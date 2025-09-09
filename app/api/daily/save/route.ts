@@ -82,37 +82,31 @@ export async function POST(req: Request) {
 
   // 3) βスコア計算 & 生ログ
   const scores = computeScoresBeta(final_choice, first_choice)
-  const raw_interactions = {
-    first_choice,
-    final_choice,
-    changes: typeof changes === "number" ? changes : 0,
-    subset: subset ?? null,
-  }
+const raw_interactions = {
+  first_choice,
+  final_choice,
+  changes: typeof changes === "number" ? changes : 0,
+  subset: subset ?? null,
+  env: theme ?? "prod",        // ← 環境タグはここに格納
+}
 
-  // 4) Supabase（service role; top-level new禁止 → ラッパー使用）
-  const sb = getSupabaseAdmin()
-  if (!sb) {
-    return NextResponse.json({ ok: false, error: "supabase_env_missing" }, { status: 500 })
-  }
+const sb = getSupabaseAdmin()
+if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 })
 
-  // 5) 保存
-  const { data, error } = await sb
-    .from("daily_results")
-    .insert({
-      question_id,
-      code: repCode,
-      comment,
-      quote,
-      theme,
-      scores,            // ← jsonb
-      raw_interactions,  // ← jsonb
-    })
-    .select("*")
-    .maybeSingle()
+// 5) 保存（theme列は書かない！）
+const { data, error } = await sb
+  .from("daily_results")
+  .insert({
+    question_id,
+    code: repCode,
+    comment,
+    quote,
+    scores,            // jsonb
+    raw_interactions,  // jsonb（env含む）
+  })
+  .select("*")
+  .maybeSingle()
 
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ ok: true, item: data }, { status: 200 })
+if (error) return NextResponse.json({ ok:false, error: error.message }, { status:500 })
+return NextResponse.json({ ok:true, item: data })
 }

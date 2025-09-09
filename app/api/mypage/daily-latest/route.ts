@@ -6,15 +6,23 @@ export async function GET(req: Request) {
   if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 })
 
   const url = new URL(req.url)
-  const env = (url.searchParams.get("env") || "prod").toLowerCase() // dev/prod
+  const env = (url.searchParams.get("env") || "prod").toLowerCase() as "dev"|"prod"
+  const debug = url.searchParams.get("debug") === "1"
 
-  const { data, error } = await sb
+  // raw_interactions(JSONB) 内の { env: "dev" } で絞る
+  const base = sb
     .from("daily_results")
-    .select("code, comment, quote, scores, raw_interactions, created_at, env, theme")
-    .eq("env", env) // ★ 環境で絞る
+    .select("code, comment, quote, scores, raw_interactions, created_at")
+    .contains("raw_interactions", { env })    // ← JSON contains でフィルタ
     .order("created_at", { ascending:false })
-    .limit(1).maybeSingle()
 
+  if (debug) {
+    const { data, error } = await base.limit(3)
+    if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 })
+    return NextResponse.json({ ok:true, rows:data ?? [] })
+  }
+
+  const { data, error } = await base.limit(1).maybeSingle()
   if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 })
   return NextResponse.json({ ok:true, item: data ?? null })
 }

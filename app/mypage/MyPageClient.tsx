@@ -201,7 +201,7 @@ export default function MyPageClient({
                   )}
                   {!!daily.quote && (
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <div className="text-sm text-white/60">きょうの言葉</div>
+                  <div className="text-sm text-white/60">きょうのアファメーション</div>
                       <blockquote className="mt-1">“{String(daily.quote)}”</blockquote>
                     </div>
                   )}

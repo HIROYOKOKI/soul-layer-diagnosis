@@ -13,8 +13,9 @@ export async function GET(req: Request) {
   const base = sb
     .from("daily_results")
     .select("code, comment, quote, scores, raw_interactions, created_at")
-    .eq("raw_interactions->>env", env)     // ← ここを eq に
-    .order("created_at", { ascending:false })
+    .eq("raw_interactions->>env", env)
+.order("created_at", { ascending: false })
+.limit(1)
 
   if (debug) {
     const { data, error } = await base.limit(3)

@@ -9,11 +9,11 @@ export async function GET(req: Request) {
   const env = (url.searchParams.get("env") || "prod").toLowerCase() as "dev"|"prod"
   const debug = url.searchParams.get("debug") === "1"
 
-  // raw_interactions(JSONB) 内の { env: "dev" } で絞る
+  // ★ 索引に最適化：eq + ORDER BY created_at DESC
   const base = sb
     .from("daily_results")
     .select("code, comment, quote, scores, raw_interactions, created_at")
-    .contains("raw_interactions", { env })    // ← JSON contains でフィルタ
+    .eq("raw_interactions->>env", env)     // ← ここを eq に
     .order("created_at", { ascending:false })
 
   if (debug) {

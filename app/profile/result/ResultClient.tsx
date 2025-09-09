@@ -159,10 +159,10 @@ export default function ProfileResultClient() {
   // ルネアの吹き出し
   const bubbles = useMemo(() => {
     const arr: Array<{ label: string; text: string }> = []
-    if (detail?.fortune)     arr.push({ label: "総合運勢",           text: detail.fortune.trim() })
-    if (detail?.personality) arr.push({ label: "性格傾向",           text: detail.personality.trim() })
-    if (detail?.work)        arr.push({ label: "仕事運",             text: detail.work.trim() })
-    if (detail?.partner)     arr.push({ label: "理想のパートナー像", text: detail.partner.trim() })
+    if (detail?.fortune)     arr.push({ label: "総合運勢(ホロスコープ）",           text: detail.fortune.trim() })
+    if (detail?.personality) arr.push({ label: "性格傾向(数秘術）",           text: detail.personality.trim() })
+    if (detail?.work)        arr.push({ label: "仕事運(数秘術）",             text: detail.work.trim() })
+    if (detail?.partner)     arr.push({ label: "理想のパートナー像(ホロスコープ）", text: detail.partner.trim() })
     return arr
   }, [detail])
 

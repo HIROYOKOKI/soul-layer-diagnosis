@@ -2,11 +2,11 @@
 import { NextResponse } from "next/server"
 import { getSupabaseAdmin } from "../../../../lib/supabase-admin"
 
-// ── ランタイム設定（Vercel/Next） ─────────────────
+// ── ランタイム設定 ──────────────────────────────
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-// ── 型 ────────────────────────────────────────────
+// ── 型 ──────────────────────────────────────────
 type EV = "E" | "V" | "Λ" | "Ǝ"
 const EVS: EV[] = ["E", "V", "Λ", "Ǝ"]
 
@@ -27,11 +27,11 @@ type SaveRequest = {
   quote?: string | null
   /** 保存上の代表コード（省略時 final_choice を採用） */
   code?: EV
-  /** dev / prod の流し分け */
+  /** dev / prod の流し分け（※DBのtheme列とは無関係） */
   theme?: "dev" | "prod"
 }
 
-/** βスコア計算：final=1.0、first≠final の場合のみ first=0.25 を加点 */
+/** βスコア：final=1.0、first≠final の場合のみ first=0.25 */
 function computeScoresBeta(finalChoice: EV, firstChoice?: EV | null) {
   const s: Record<EV, number> = { E: 0, V: 0, "Λ": 0, "Ǝ": 0 }
   s[finalChoice] = 1.0
@@ -45,14 +45,19 @@ function isEV(v: unknown): v is EV {
 function isEVArray(v: unknown): v is EV[] {
   return Array.isArray(v) && v.every(isEV)
 }
+function normalizeEnv(v: unknown): "dev" | "prod" {
+  const s = String(v ?? "").toLowerCase()
+  return s === "dev" ? "dev" : "prod"
+}
 
-// ── ハンドラ ─────────────────────────────────────
+// ── ハンドラ ────────────────────────────────────
 export async function POST(req: Request) {
   // 1) JSON 受け取り
   const bodyUnknown = await req.json().catch(() => null)
   if (!bodyUnknown) {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 })
   }
+
   const {
     question_id,
     final_choice,
@@ -62,7 +67,7 @@ export async function POST(req: Request) {
     comment = null,
     quote = null,
     code,
-    theme = "prod",
+    theme = "prod", // ← 環境タグ（dev/prod）として使う
   } = bodyUnknown as Partial<SaveRequest>
 
   // 2) バリデーション
@@ -78,35 +83,45 @@ export async function POST(req: Request) {
   if (subset != null && !isEVArray(subset)) {
     return NextResponse.json({ ok: false, error: "bad_request:subset" }, { status: 400 })
   }
+
   const repCode: EV = isEV(code) ? code : final_choice
+  const env = normalizeEnv(theme)
 
   // 3) βスコア計算 & 生ログ
   const scores = computeScoresBeta(final_choice, first_choice)
-const raw_interactions = {
-  first_choice,
-  final_choice,
-  changes: typeof changes === "number" ? changes : 0,
-  subset: subset ?? null,
-  env: theme ?? "prod",        // ← 環境タグはここに格納
-}
+  const raw_interactions = {
+    first_choice,
+    final_choice,
+    changes: typeof changes === "number" ? changes : 0,
+    subset: subset ?? null,
+    env, // ★ 環境タグはここに格納（DBのtheme列は触らない）
+  }
 
-const sb = getSupabaseAdmin()
-if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 })
+  // 4) Supabase
+  const sb = getSupabaseAdmin()
+  if (!sb) {
+    return NextResponse.json(
+      { ok: false, error: "supabase_env_missing" },
+      { status: 500 }
+    )
+  }
 
-// 5) 保存（theme列は書かない！）
-const { data, error } = await sb
-  .from("daily_results")
-  .insert({
-    question_id,
-    code: repCode,
-    comment,
-    quote,
-    scores,            // jsonb
-    raw_interactions,  // jsonb（env含む）
-  })
-  .select("*")
-  .maybeSingle()
+  // 5) 保存（theme列は書かない！）
+  const { data, error } = await sb
+    .from("daily_results")
+    .insert({
+      question_id,
+      code: repCode,
+      comment,
+      quote,
+      scores,            // jsonb
+      raw_interactions,  // jsonb（env含む）
+    })
+    .select("*")
+    .maybeSingle()
 
-if (error) return NextResponse.json({ ok:false, error: error.message }, { status:500 })
-return NextResponse.json({ ok:true, item: data })
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  }
+  return NextResponse.json({ ok: true, item: data })
 }

@@ -28,7 +28,8 @@ type DResp = {
   ok: boolean;
   code?: string;
   comment?: unknown;
-  quote?: unknown;
+  quote?: unknown;        // 互換（APIはaffirmationも返す）
+affirmation?: unknown;  // 新
   navigator?: string | null;
   error?: string;
 };
@@ -167,7 +168,7 @@ export default function DailyQuestionPage() {
   } = useChoiceTrack<EV>();
 
   const [diagLoading, setDiagLoading] = useState(false);
-  const [result, setResult] = useState<{ code: EV; comment: string; quote: string } | null>(null);
+  const [result, setResult] = useState<{ code: EV; comment: string; affirmation?: string; quote?: string } | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -260,11 +261,12 @@ export default function DailyQuestionPage() {
       if (!data.ok) throw new Error(data.error || "failed_diagnose");
 
       const code = normalizeCode(safeText(data.code)) || finalChoice;
-      setResult({
-        code,
-        comment: safeText(data.comment),
-        quote: safeText(data.quote),
-      });
+      ssetResult({
+     code,
+     comment: safeText(data.comment),
+     affirmation: safeText((data as any).affirmation),
+     quote: safeText(data.quote), // 互換
+   });
 
       (navigator as any)?.vibrate?.(8);
     } catch (e: any) {
@@ -284,7 +286,7 @@ export default function DailyQuestionPage() {
         // 既存フィールド
         code: result.code,
         comment: result.comment,
-        quote: result.quote,
+        quote: result.affirmation || result.quote || "",
         mode: "daily",
         theme, // dev分離
 
@@ -434,11 +436,11 @@ export default function DailyQuestionPage() {
               <p className="mt-3 leading-relaxed">{safeText(result.comment)}</p>
             </div>
 
-            {!!result.quote && (
+           {!!(result.affirmation || result.quote) && (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <div className="text-sm text-white/60">きょうの言葉</div>
+              <div className="text-sm text-white/60">きょうのアファメーション</div>
                 <blockquote className="mt-2 text-base leading-relaxed">
-                  “{safeText(result.quote)}”
+                  {safeText(result.affirmation || result.quote)}
                 </blockquote>
               </div>
             )}

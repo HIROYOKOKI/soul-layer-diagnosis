@@ -1,4 +1,4 @@
-// app/mypage/page.tsx (Server Component)
+// app/mypage/page.tsx
 import MyPageClient from "./MyPageClient"
 
 type EV = "E" | "V" | "Λ" | "Ǝ"
@@ -16,13 +16,17 @@ type DailyLatest = {
   created_at?: string | null
 }
 
-async function fetchDailyLatest(): Promise<DailyLatest | null> {
+const SERVER_ENV: "dev" | "prod" =
+  process.env.VERCEL_ENV === "production" ? "prod" : "dev"
+
+async function fetchDailyLatest(env: "dev" | "prod"): Promise<DailyLatest | null> {
+  const base = process.env.NEXT_PUBLIC_BASE_URL ?? ""
+  const url = base
+    ? `${base}/api/mypage/daily-latest?env=${env}`
+    : `/api/mypage/daily-latest?env=${env}`
+
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/mypage/daily-latest`, {
-      cache: "no-store",
-      // 相対パスでもOKだが、Vercel環境では絶対URLのほうが安定
-      // 相対にしたい場合は: await fetch("/api/mypage/daily-latest", { cache: "no-store" })
-    })
+    const res = await fetch(url, { cache: "no-store" })
     if (!res.ok) return null
     const json = await res.json()
     return json?.item ?? null
@@ -32,6 +36,6 @@ async function fetchDailyLatest(): Promise<DailyLatest | null> {
 }
 
 export default async function Page() {
-  const dailyLatest = await fetchDailyLatest()
-  return <MyPageClient initialDailyLatest={dailyLatest} />
+  const dailyLatest = await fetchDailyLatest(SERVER_ENV)
+  return <MyPageClient initialDailyLatest={dailyLatest} initialEnv={SERVER_ENV} />
 }

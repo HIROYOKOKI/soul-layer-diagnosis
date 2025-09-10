@@ -1,34 +1,28 @@
-import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@supabase/supabase-js";
-
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY;
+// app/api/me/route.ts
+import { NextResponse } from "next/server"
+import { getSupabaseAdmin } from "@/lib/supabase-admin"
 
 export async function GET() {
-  const sb = supabaseAdmin // or getSupabaseServer(req) など、既存実装に合わせる
-  // ここでユーザーのアクセストークンに基づきRLSが効く
-  const { data, error } = await sb.from("profiles").select("*").maybeSingle()
-  if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 })
-  return NextResponse.json({ ok:true, data })
-}
+  const sb = getSupabaseAdmin()
+  if (!sb) return NextResponse.json({ ok: false, error: "supabase_env_missing" }, { status: 500 })
 
-  const supabase = createClient(url, key);
+  // ここでは“とりあえず動かす”前提で先頭1件を返す
+  const { data, error } = await sb
+    .from("profiles")
+    .select("*")
+    .limit(1)
+    .maybeSingle()
 
-  try {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, name, plan")
-      .limit(1)
-      .maybeSingle<{ id: string | number; name: string | null; plan: string | null }>();
-
-    if (error) throw error;
-
-    return NextResponse.json({
-      plan: String(data?.plan ?? "FREE").toUpperCase(),
-      name: data?.name ?? "Hiro",
-      id: String(data?.id ?? "0001"),
-    });
-  } catch (_err) {
-    return NextResponse.json({ plan: "FREE", name: "Hiro", id: "0001" });
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
+
+  // 互換レスポンス（任意の表示があれば合わせてください）
+  return NextResponse.json({
+    ok: true,
+    data,
+    plan: String(data?.plan ?? "FREE").toUpperCase(),
+    name: data?.name ?? "Hiro",
+    id: String(data?.id ?? "0001"),
+  })
 }

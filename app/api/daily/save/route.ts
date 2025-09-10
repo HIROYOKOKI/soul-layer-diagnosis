@@ -1,6 +1,6 @@
 // app/api/daily/save/route.ts
 import { NextResponse } from "next/server"
-import { getSupabaseAdmin } from "../../../../lib/supabase-admin"
+import { getSupabaseAdmin } from "@/lib/supabase-admin"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -34,11 +34,10 @@ const isEV = (v: unknown): v is EV => EVS.includes(v as EV)
 const isEVArray = (v: unknown): v is EV[] => Array.isArray(v) && v.every(isEV)
 const normEnv = (v: unknown): "dev" | "prod" => (String(v ?? "").toLowerCase() === "dev" ? "dev" : "prod")
 
-export async function POST(req: Request) {
-  // 1) 受信
-  const body = (await req.json().catch(() => null)) as SaveRequest | null
-  if (!body) return NextResponse.json({ ok:false, error:"invalid_json" }, { status:400 })
-
+export async function GET() {
+  const sb = getSupabaseAdmin()
+  if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 })
+ 
   const {
     question_id,
     final_choice,

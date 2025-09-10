@@ -41,7 +41,7 @@ export default function LoginFormPage() {
 
   const sendReset = async () => {
     try {
-      const supabase = await getBrowserSupabase()
+      const supabase = getBrowserSupabase()
       const { error } = await supabase.auth.resetPasswordForEmail(email || '', {
         redirectTo: `${location.origin}/login/form`,
       })

@@ -1,12 +1,12 @@
 // app/api/structure/quick/save/route.ts
 // ※ このファイルに "export default ..." は置かないでください
 
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseAdmin } from "@/lib/supabase-admin"
 
-export const runtime = 'nodejs' // Edgeでenvが読めない事故を避ける
-export const dynamic = 'force-dynamic' // キャッシュ回避
+export const runtime = "nodejs"          // Edgeでenvが読めない事故を避ける
+export const dynamic = "force-dynamic"   // キャッシュ回避
 
-type EVChar = 'E' | 'V' | 'Λ' | 'Ǝ'
+type EVChar = "E" | "V" | "Λ" | "Ǝ"
 
 type Body = {
   code: EVChar
@@ -19,50 +19,41 @@ type Body = {
 function json(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
     status: init?.status ?? 200,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
+    headers: { "content-type": "application/json; charset=utf-8" },
   })
 }
 
 export async function POST(req: Request): Promise<Response> {
-  // ---- env 取得（URL は Public をフォールバック） ----
-  const url =
-    process.env.SUPABASE_URL ??
-    process.env.NEXT_PUBLIC_SUPABASE_URL ??
-    ''
-
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
-
-  if (!url || !serviceKey) {
+  // --- Admin クライアント（env は supabase-admin.ts 側で検証） ---
+  const sb = getSupabaseAdmin()
+  if (!sb) {
     return json(
-      {
-        ok: false,
-        error: `ENV_MISSING: url=${url ? 'set' : 'missing'}, role=${serviceKey ? 'set' : 'missing'}`,
-      },
+      { ok: false, error: "supabase_env_missing (SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY)" },
       { status: 500 }
     )
   }
 
-  const supabase = createClient(url, serviceKey)
-
+  // --- 受信JSON ---
   let body: Body
   try {
     body = (await req.json()) as Body
   } catch {
-    return json({ ok: false, error: 'INVALID_JSON' }, { status: 400 })
+    return json({ ok: false, error: "INVALID_JSON" }, { status: 400 })
   }
 
   if (!body?.code || !body?.type_label) {
-    return json({ ok: false, error: 'INVALID_PAYLOAD' }, { status: 400 })
+    return json({ ok: false, error: "INVALID_PAYLOAD" }, { status: 400 })
   }
 
   // ---- クイック診断の係数 ----
   const weight = 0.5
 
+  // scores が無ければ code に該当する1点を加算
   const addOne = !body.scores
-  const rawE = (body.scores?.E ?? 0) + (addOne && body.code === 'E' ? 1 : 0)
-  const rawV = (body.scores?.V ?? 0) + (addOne && body.code === 'V' ? 1 : 0)
-  const rawL = (body.scores?.['Λ'] ?? 0) + (addOne && body.code === 'Λ' ? 1 : 0)
-  const rawR = (body.scores?.['Ǝ'] ?? 0) + (addOne && body.code === 'Ǝ' ? 1 : 0)
+  const rawE = (body.scores?.E ?? 0) + (addOne && body.code === "E" ? 1 : 0)
+  const rawV = (body.scores?.V ?? 0) + (addOne && body.code === "V" ? 1 : 0)
+  const rawL = (body.scores?.["Λ"] ?? 0) + (addOne && body.code === "Λ" ? 1 : 0)
+  const rawR = (body.scores?.["Ǝ"] ?? 0) + (addOne && body.code === "Ǝ" ? 1 : 0)
 
   const row = {
     user_id: body.user_id ?? null,
@@ -74,8 +65,8 @@ export async function POST(req: Request): Promise<Response> {
     e_rev_score: rawR * weight,
   }
 
-  const { data, error } = await supabase
-    .from('structure_results')
+  const { data, error } = await sb
+    .from("structure_results")
     .insert([row])
     .select()
     .single()

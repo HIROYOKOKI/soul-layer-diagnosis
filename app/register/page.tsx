@@ -1,5 +1,6 @@
 import RegisterFormClient from "./RegisterFormClient"
 
+export const dynamic = 'force-dynamic'
 export default function Page() {
   return (
     <div className="mx-auto max-w-md px-6 py-10">

@@ -1,14 +1,28 @@
 // lib/supabaseServer.ts
-import { createClient } from '@supabase/supabase-js';
+import { cookies } from "next/headers"
+import { createServerClient, type CookieOptions } from "@supabase/ssr"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!; // ← サーバ専用
+export function getSupabaseServer(): SupabaseClient {
+  const cookieStore = cookies()
+  const supabaseUrl = process.env.SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !anonKey) {
+    throw new Error("supabase_server_env_missing")
+  }
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('Supabase env is missing. Check NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY');
+  // Next.jsのサーバ側で、Authクッキーを読み書きできるクライアント
+  return createServerClient(supabaseUrl, anonKey, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value
+      },
+      set(name: string, value: string, options: CookieOptions) {
+        try { cookieStore.set(name, value, options) } catch { /* read-only in edge cases */ }
+      },
+      remove(name: string, options: CookieOptions) {
+        try { cookieStore.set(name, "", { ...options, expires: new Date(0) }) } catch {}
+      },
+    },
+  })
 }
-
-/** サーバ側でのみ使うクライアント（Service Role Key） */
-export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});

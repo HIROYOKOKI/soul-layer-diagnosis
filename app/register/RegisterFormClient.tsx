@@ -1,12 +1,21 @@
 "use client"
 
 import { useState } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// ★ ここがポイント：SSRでは実行されないよう遅延生成＋windowガード
+let __sb__: SupabaseClient | null = null
+function getBrowserSupabase(): SupabaseClient {
+  if (typeof window === "undefined") {
+    throw new Error("supabase_client_on_server") // SSRで誤実行を防止
+  }
+  if (!__sb__) {
+    const url  = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    __sb__ = createClient(url, anon)
+  }
+  return __sb__
+}
 
 type IssueResp = {
   ok: boolean
@@ -27,7 +36,7 @@ export default function RegisterFormClient() {
     setError(null)
     setIssued(null)
     try {
-      const supabase = getSupabaseBrowser() // ← lib/supabase-browser.ts に合わせて
+      const supabase = getBrowserSupabase() // ★ ここで取得（初回のみ生成）
       const { data: sign, error: e1 } = await supabase.auth.signUp({ email, password })
       if (e1) throw e1
       const userId = sign.user?.id
@@ -40,8 +49,6 @@ export default function RegisterFormClient() {
       })
       const j = (await res.json()) as IssueResp
       if (!j.ok || !j.item) throw new Error(j.error || "issue_failed")
-
-      // 表示だけ β- を付ける（保存は ASCII: BEAK0001）
       setIssued({ code: `β-${j.item.code}`, tier: j.item.tier })
     } catch (err: any) {
       setError(err?.message || "unknown_error")

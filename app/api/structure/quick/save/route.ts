@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "@/lib/supabase-admin"
 import { getSupabaseServer } from "@/lib/supabaseServer"
+const ALLOW_ANON = process.env.ALLOW_ANON_WRITE === "true"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"

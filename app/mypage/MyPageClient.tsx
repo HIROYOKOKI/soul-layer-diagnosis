@@ -1,215 +1,378 @@
 // app/mypage/MyPageClient.tsx
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import Image from "next/image"
+import {
+  RadarChart,
+  TimeSeriesChart,
+  type EVAEVector,
+  type SeriesPoint,
+} from "@/components/charts/Charts"
+
+/* =============================================================
+   MyPage 完全版（レイアウト復元）
+   - 元のレイアウト：見出しヘッダー + envバッジ（ローカル切替）
+   - 外枠カード：rounded-3xl / border / bg-white/5
+   - 既存のデータ連携・チャート・APIは現状コードを踏襲
+   ============================================================= */
 
 type EV = "E" | "V" | "Λ" | "Ǝ"
+
+type ProfileLatest = {
+  fortune?: string | null
+  personality?: string | null
+  partner?: string | null
+  created_at?: string
+  base_model?: "EΛVƎ" | "EVΛƎ" | null
+  base_order?: EV[] | null
+}
 type DailyLatest = {
-  code?: EV | null
+  code?: string | null
   comment?: string | null
   quote?: string | null
-  scores?: Partial<Record<EV, number>> | null
-  raw_interactions?: {
-    first_choice?: EV | null
-    final_choice?: EV | null
-    changes?: number
-    subset?: EV[] | null
-  } | null
-  created_at?: string | null
+  created_at?: string
 }
 
-export default function MyPageClient({
-  initialDailyLatest = null,
-  initialEnv = "dev",
-}: {
-  initialDailyLatest?: DailyLatest | null
-  initialEnv?: "dev" | "prod"
-}) {
-  const [daily, setDaily] = useState<DailyLatest | null>(initialDailyLatest)
-  const [loading, setLoading] = useState(!initialDailyLatest)
-  const [error, setError] = useState<string | null>(null)
-  const [env, setEnv] = useState<"dev" | "prod">(initialEnv)
+// alias
+type EVAEVectorLocal = EVAEVector
+type SeriesPointLocal = SeriesPoint
 
-  useEffect(() => {
-    try {
-      const v = (localStorage.getItem("ev-env") || initialEnv).toLowerCase()
-      const e = v === "prod" ? "prod" : "dev"
-      setEnv(e)
-      if (e !== initialEnv) refetch(e)
-    } catch { /* noop */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+/* ============== Utils ============== */
+const FALLBACK_USER = { name: "Hiro", idNo: "0001", avatar: "/icon-512.png" }
+const CURRENT_THEME = "self"
 
-  async function refetch(targetEnv = env) {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/mypage/daily-latest?env=${targetEnv}`, { cache: "no-store" })
-      const json = await res.json()
-      setDaily(json?.item ?? null)
-    } catch (e: any) {
-      setError(e?.message ?? "fetch_failed")
-    } finally {
-      setLoading(false)
+const clamp01 = (v: unknown) => {
+  const n = typeof v === "number" ? v : Number(v)
+  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0
+}
+
+function normalizeModel(s?: string | null): "EΛVƎ" | "EVΛƎ" | null {
+  if (!s) return null
+  const t = String(s).replace(/\s+/g, "")
+  if (t.includes("EΛVƎ")) return "EΛVƎ"
+  if (t.includes("EVΛƎ")) return "EVΛƎ"
+  return null
+}
+
+function toTypeLabel(model?: string | null) {
+  const m = normalizeModel(model)
+  if (m === "EΛVƎ") return "現実思考型"
+  if (m === "EVΛƎ") return "未来志向型"
+  return null
+}
+
+function fmt(dt?: string) {
+  try {
+    const d = dt ? new Date(dt) : new Date()
+    return new Intl.DateTimeFormat("ja-JP", {
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit",
+    }).format(d)
+  } catch { return "" }
+}
+
+// Ǝ は Eexists、Λ と L はどちらでも可に揃える
+function normalizeToday(v: any): EVAEVectorLocal {
+  const L = typeof v?.L === "number" ? v.L : (typeof v?.["Λ"] === "number" ? v["Λ"] : 0)
+  return { E: clamp01(v?.E), V: clamp01(v?.V), L: clamp01(L), Eexists: clamp01(v?.Eexists ?? v?.["Ǝ"]) }
+}
+function normalizeSeries(list: any[]): SeriesPointLocal[] {
+  return (list ?? []).map((d) => {
+    const L = typeof d?.L === "number" ? d.L : (typeof d?.["Λ"] === "number" ? d["Λ"] : 0)
+    return {
+      date: String(d?.date ?? "").slice(0, 10),
+      E: clamp01(d?.E), V: clamp01(d?.V), L: clamp01(L), Eexists: clamp01(d?.Eexists ?? d?.["Ǝ"]),
     }
-  }
+  })
+}
 
-  useEffect(() => {
-    if (!initialDailyLatest) refetch(env)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+/* ============== Subcomponent：タイプ吹き出し ============== */
+function OrientationTip({ baseModel }: { baseModel: "EΛVƎ" | "EVΛƎ" | null | undefined }) {
+  const router = useRouter()
+  const isFuture = baseModel === "EVΛƎ"
+  const isReal   = baseModel === "EΛVƎ"
+  const label = isFuture ? "未来志向型 (EVΛƎ)" : isReal ? "現実思考型 (EΛVƎ)" : "タイプ未設定"
+  const message = isFuture
+    ? "まだ形になっていない未来を強く意識し、夢や選択肢を広げようとする傾向があります。"
+    : isReal
+      ? "確定した現在を重視し、現実的な判断と秩序だった進め方を好む傾向があります。"
+      : "まずはクイック診断を完了すると、あなたのタイプが表示されます。"
 
-  const createdAtJst = useMemo(() => {
-    const iso = daily?.created_at
-    if (!iso) return ""
-    const d = new Date(iso)
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, "0")
-    const day = String(d.getDate()).padStart(2, "0")
-    const hh = String(d.getHours()).padStart(2, "0")
-    const mm = String(d.getMinutes()).padStart(2, "0")
-    return `${y}/${m}/${day} ${hh}:${mm}`
-  }, [daily?.created_at])
-
-  const scores = daily?.scores ?? {}
-  const order: EV[] = ["E", "V", "Λ", "Ǝ"]
-  const maxScore = Math.max(1, ...order.map((k) => Number(scores[k] ?? 0)))
-
-  const badge = (c: EV) => {
-    const name =
-      c === "E" ? "衝動・情熱" :
-      c === "V" ? "可能性・夢" :
-      c === "Λ" ? "選択・設計" :
-      "観測・静寂"
-    return (
-      <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1">
-        <span className="font-mono">{c}</span>
-        <span className="text-xs text-white/70">{name}</span>
-      </div>
-    )
-  }
+  const accentStyle = isFuture
+    ? { color: "#B833F5" } // Ǝ紫
+    : isReal
+      ? { color: "#FF4500" } // E系のアクセント寄せ
+      : { color: "rgba(255,255,255,0.6)" }
 
   return (
-    <div className="min-h-[100svh] bg-black text-white">
-      {/* 固定ヘッダー */}
+    <div className="rounded-xl bg-white/5 p-4 space-y-3">
+      <div className="flex items-start gap-2">
+        <span className="text-xl leading-none">🧭</span>
+        <p className="text-white/90 leading-relaxed">
+          あなたは <strong style={accentStyle}>「{label}」</strong><br />
+          <span className="text-white/80">{message}</span>
+        </p>
+      </div>
+      <button
+        onClick={() => router.push("/guide/future-vs-realistic")}
+        className="text-sm text-cyan-400 hover:underline"
+      >
+        もっと詳しく知る →
+      </button>
+    </div>
+  )
+}
+
+/* ============== Component ============== */
+export default function MyPageClient() {
+  const router = useRouter()
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [profile, setProfile] = useState<ProfileLatest | null>(null)
+  const [daily, setDaily] = useState<DailyLatest | null>(null)
+
+  // charts states
+  const [range, setRange] = useState<7 | 30 | 90>(30)
+  const [today, setToday] = useState<EVAEVectorLocal | null>(null)
+  const [series, setSeries] = useState<SeriesPointLocal[] | null>(null)
+  const [chartsErr, setChartsErr] = useState<string | null>(null)
+
+  // === envバッジ（UIのみ・APIは現状維持） ===
+  const [env, setEnv] = useState<"dev" | "prod">(
+    (typeof window !== "undefined" && (localStorage.getItem("ev-env") as any)) || "prod"
+  )
+  useEffect(() => {
+    try {
+      const cached = (localStorage.getItem("ev-env") || "prod") as "dev" | "prod"
+      setEnv(cached === "dev" ? "dev" : "prod")
+    } catch { /* noop */ }
+  }, [])
+
+  // プロフィール/デイリー
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        setError(null); setLoading(true)
+        const [p, d] = await Promise.all([
+          fetch("/api/mypage/profile-latest", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/mypage/daily-latest",  { cache: "no-store" }).then((r) => r.json()),
+        ])
+        if (!alive) return
+        if (!p?.ok) throw new Error(p?.error || "profile_latest_failed")
+        if (!d?.ok) throw new Error(d?.error || "daily_latest_failed")
+        setProfile(p.item ?? null)
+        setDaily(d.item ?? null)
+      } catch (e: any) {
+        if (alive) setError(e?.message || "failed")
+      } finally {
+        if (alive) setLoading(false)
+      }
+    })()
+    return () => { alive = false }
+  }, [])
+
+  // チャートデータ
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        setChartsErr(null)
+        const [tRes, sRes] = await Promise.all([
+          fetch("/api/today", { cache: "no-store" }),
+          fetch(`/api/series?days=${range}`, { cache: "no-store" }),
+        ])
+        if (!tRes.ok) throw new Error("/api/today failed")
+        if (!sRes.ok) throw new Error("/api/series failed")
+
+        const tJson = await tRes.json()
+        const sJson = await sRes.json()
+        if (!alive) return
+
+        setToday(tJson?.scores ? normalizeToday(tJson.scores) : normalizeToday(tJson))
+        setSeries(normalizeSeries(sJson))
+      } catch (e: any) {
+        if (!alive) return
+        setChartsErr(e?.message ?? "charts fetch error")
+        // fallback（常に描ける安全値）
+        const d = new Date()
+        const mock = Array.from({ length: range }, (_, i) => {
+          const dt = new Date(d); dt.setDate(dt.getDate() - (range - 1 - i))
+          return { date: dt.toISOString().slice(0,10), E: 0.6, V: 0.6, L: 0.6, Eexists: 0.6 }
+        })
+        setToday({ E: 0.6, V: 0.6, L: 0.6, Eexists: 0.6 })
+        setSeries(mock)
+      }
+    })()
+    return () => { alive = false }
+  }, [range])
+
+  const normalizedModel = normalizeModel(profile?.base_model)
+  const typeLabel = toTypeLabel(profile?.base_model)
+  const nowStr = fmt()
+
+  const goDaily = () => router.push("/daily/question")
+  const goSettings = () => router.push("/settings")
+
+  if (loading) return <div className="p-6 text-white/70">読み込み中…</div>
+  if (error)   return <div className="p-6 text-red-400">エラー: {error}</div>
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      {/* === 固定ヘッダー：見出し＋envバッジ（UIのみ） === */}
       <header className="sticky top-0 z-20 bg-black/70 backdrop-blur supports-[backdrop-filter]:bg-black/50">
-        <div className="mx-auto max-w-xl px-5 pt-5 pb-3 flex items-center justify-between">
+        <div className="mx-auto max-w-md px-5 pt-5 pb-3 flex items-center justify-between">
           <h1 className="text-[28px] font-extrabold tracking-tight">My Page</h1>
           <button
-            className="text-xs rounded-full border border-white/20 bg-white/10 px-3 py-1.5 hover:bg-white/15"
-            onClick={() => {
-              const next = env === "dev" ? "prod" : "dev"
+            onClick={()=>{
+              const next = env === "prod" ? "dev" : "prod"
               setEnv(next)
-              localStorage.setItem("ev-env", next)
-              refetch(next)
+              try { localStorage.setItem("ev-env", next) } catch {}
             }}
-            aria-label="環境を切り替え"
-            title="環境切替"
+            className="text-xs rounded-full border border-white/20 bg-white/10 px-3 py-1.5 hover:bg-white/15"
+            title="環境表示の切替（APIには影響しません）"
           >
             env: {env}（切替）
           </button>
         </div>
       </header>
 
-      {/* 本体 */}
-      <main className="mx-auto max-w-xl px-5 py-5">
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-5">
-          {/* エラー */}
-          {error && (
-            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm">
-              読み込みに失敗しました（{String(error)}）
-            </div>
-          )}
-
-          {/* デイリー最新カード */}
-          <section className="rounded-2xl border border-white/12 bg-black/20 p-4 sm:p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white/80">デイリー診断（最新）</h2>
-              <div className="text-xs text-white/50">{createdAtJst}</div>
-            </div>
-
-            {/* 空／ローディング */}
-            {!daily && !loading && (
-              <p className="mt-3 text-sm text-white/60">まだ記録がありません。</p>
+      {/* === 本文（外枠カードでラップ） === */}
+      <main className="mx-auto max-w-md px-5 py-5">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-4 space-y-4">
+          {/* 1) クイック診断の型（バッジ＝ボタン） */}
+          <div className="flex justify-center">
+            {typeLabel ? (
+              <button
+                onClick={() => {
+                  if (!normalizedModel) return
+                  router.push(`/guide/future-vs-realistic?model=${encodeURIComponent(normalizedModel)}`)
+                }}
+                className="inline-block rounded-xl px-4 py-2 text-sm border transition hover:brightness-110 active:scale-[0.99]"
+                style={{
+                  borderColor: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
+                  backgroundColor: normalizedModel === "EΛVƎ" ? "#B833F51A" : "#FF45001A",
+                  color: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
+                }}
+                aria-label={`${typeLabel}（${normalizedModel}）の解説へ`}
+              >
+                {typeLabel}（{normalizedModel}）
+              </button>
+            ) : (
+              <span className="inline-block rounded-xl px-3 py-2 text-xs border border-white/15 text-white/60 bg-white/5">
+                クイック診断はまだありません
+              </span>
             )}
-            {loading && (
-              <p className="mt-3 text-sm text-white/60">読み込み中…</p>
-            )}
+          </div>
 
-            {/* 本文 */}
-            {daily && (
-              <>
-                {/* コード */}
-                <div className="mt-3 flex items-center gap-3">
-                  <div className="text-sm text-white/60">今日のコード</div>
-                  {daily.code ? badge(daily.code) : <span className="text-sm text-white/60">—</span>}
+          {/* 2) プロフィール行 */}
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <Image src={FALLBACK_USER.avatar} alt="Profile Icon" width={48} height={48}
+                    className="h-12 w-12 rounded-full border border-white/20 bg-black/20" />
+              <div className="flex flex-col justify-center">
+                <div className="text-base font-semibold leading-tight">{FALLBACK_USER.name}</div>
+                <div className="text-xs text-white/60 leading-tight">ID: {FALLBACK_USER.idNo}</div>
+              </div>
+            </div>
+            <button
+              onClick={goSettings}
+              className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs hover:bg-white/10"
+              title="設定"
+            >
+              <span>⚙️</span>設定
+            </button>
+          </div>
+
+          {/* 3) テーマ＆日時 */}
+          <div className="text-[11px] text-white/50">
+            テーマ: {CURRENT_THEME}<span className="opacity-40 mx-1">•</span>{nowStr}
+          </div>
+
+          {/* 4) 直近メッセージ */}
+          <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-sm font-bold">直近のメッセージ</h2>
+              <span className="text-[11px] text-white/50">{fmt(daily?.created_at || profile?.created_at || "")}</span>
+            </div>
+            <p className="text-sm text-white/90">
+              {daily?.comment || profile?.fortune || "まだメッセージはありません。"}
+            </p>
+          </section>
+
+          {/* 5) 構造チャート（横スライド：初期Radar） */}
+          <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-sm font-bold">構造バランス</h2>
+              <div className="text-[11px] text-white/60">Radar / Line（横スワイプ）</div>
+            </div>
+
+            <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {/* Slide 1: Radar */}
+              <div className="min-w-full snap-center flex justify-center">
+                <div className="w-full max-w-xs">
+                  {today ? <RadarChart values={today} size={260} /> : <div className="text-xs text-white/50">No Data</div>}
+                </div>
+              </div>
+
+              {/* Slide 2: Line */}
+              <div className="min-w-full snap-center">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="text-sm text-white/80">Line（{range}日推移）</div>
+                  <div className="flex items-center gap-2 text-xs">
+                    {[7, 30, 90].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setRange(n as 7 | 30 | 90)}
+                        className={`px-3 py-1 rounded border ${range === n ? "bg-white/15 border-white/30" : "bg-white/5 border-white/10 hover:bg-white/10"}`}
+                      >
+                        {n}日
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* 行動ログ */}
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <div className="text-white/60 text-xs">初回選択</div>
-                    <div className="mt-1 font-mono text-base">{daily.raw_interactions?.first_choice ?? "—"}</div>
-                  </div>
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <div className="text-white/60 text-xs">最終選択</div>
-                    <div className="mt-1 font-mono text-base">{daily.raw_interactions?.final_choice ?? "—"}</div>
-                  </div>
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <div className="text-white/60 text-xs">選び直し回数</div>
-                    <div className="mt-1 font-mono text-base">{daily.raw_interactions?.changes ?? 0}</div>
-                  </div>
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <div className="text-white/60 text-xs">出題セット</div>
-                    <div className="mt-1 font-mono text-base">
-                      {(daily.raw_interactions?.subset && daily.raw_interactions.subset.length > 0)
-                        ? daily.raw_interactions.subset.join(" / ")
-                        : "—"}
+                {/* 横スクロールで広く見せるラッパー */}
+                <div className="rounded-xl bg-black/25 border border-white/10">
+                  <div className="overflow-x-auto py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,transparent_0,black_16px,black_calc(100%-16px),transparent_100%)] overscroll-x-contain">
+                    <div className="inline-block pr-4">
+                      {series ? (
+                        <TimeSeriesChart data={series} />
+                      ) : (
+                        <div className="h-56 grid place-items-center text-white/60 text-sm">読み込み中…</div>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* βスコア */}
-                <div className="mt-5">
-                  <div className="mb-2 text-sm text-white/60">βスコア</div>
-                  <div className="space-y-2">
-                    {(["E", "V", "Λ", "Ǝ"] as EV[]).map((k) => {
-                      const v = Number(scores[k] ?? 0)
-                      const w = Math.round((v / maxScore) * 100)
-                      return (
-                        <div key={k}>
-                          <div className="flex items-center justify-between text-xs text-white/60">
-                            <span className="font-mono">{k}</span>
-                            <span>{v.toFixed(2)}</span>
-                          </div>
-                          <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white/10">
-                            <div className="h-full bg-white" style={{ width: `${w}%` }} />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                {/* コメント & アファメーション */}
-                {(daily.comment || daily.quote) && (
-                  <div className="mt-5 grid gap-3">
-                    {!!daily.comment && (
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 leading-relaxed">
-                        {String(daily.comment)}
-                      </div>
-                    )}
-                    {!!daily.quote && (
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <div className="text-sm text-white/60">きょうのアファメーション</div>
-                        <blockquote className="mt-1">“{String(daily.quote)}”</blockquote>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
+                {chartsErr && <div className="mt-2 text-[11px] text-red-300/80">[{chartsErr}] フォールバック表示中</div>}
+              </div>
+            </div>
           </section>
+
+          {/* 6) 次の一歩 */}
+          <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
+            <h2 className="text-sm font-bold mb-3">次の一歩を選んでください</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={goDaily} className="rounded-xl border border-white/20 bg-white/10 px-3 py-3 hover:bg-white/15">
+                デイリー診断
+                <div className="text-[11px] text-white/60 mt-1">1問 / 今日のゆらぎ</div>
+              </button>
+              <button className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-white/50 cursor-not-allowed" title="近日公開">
+                診断タイプを選ぶ
+                <div className="text-[11px] text-white/40 mt-1">Weekly / Monthly（予定）</div>
+              </button>
+            </div>
+          </section>
+
+          {/* 7) タイプ吹き出し（任意表示） */}
+          <div className="pt-1">
+            <OrientationTip baseModel={profile?.base_model ?? null} />
+          </div>
         </div>
       </main>
     </div>

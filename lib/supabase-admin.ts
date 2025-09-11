@@ -1,15 +1,12 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+// lib/supabase-admin.ts
+import { createClient } from "@supabase/supabase-js"
 
-let admin: SupabaseClient | null = null
-
-export function getSupabaseAdmin(): SupabaseClient | null {
-  const url = process.env.SUPABASE_URL // サーバー用の Project URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY // サーバー用 service_role key
-
+let _admin: ReturnType<typeof createClient> | null = null
+export function getSupabaseAdmin() {
+  if (_admin) return _admin
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) return null
-
-  if (!admin) {
-    admin = createClient(url, key, { auth: { persistSession: false } })
-  }
-  return admin
+  _admin = createClient(url, key, { auth: { persistSession: false } })
+  return _admin
 }

@@ -1,3 +1,4 @@
+// app/login/layout.tsx
 export default function LoginLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
@@ -5,5 +6,5 @@ export default function LoginLayout({ children }: { children: React.ReactNode })
         <main className="min-h-[100dvh]">{children}</main>
       </body>
     </html>
-  );
+  )
 }

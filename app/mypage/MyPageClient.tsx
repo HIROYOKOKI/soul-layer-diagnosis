@@ -12,10 +12,10 @@ import {
 } from "@/components/charts/Charts"
 
 /* =============================================================
-   MyPage 完全版（レイアウト復元）
-   - 元のレイアウト：見出しヘッダー + envバッジ（ローカル切替）
-   - 外枠カード：rounded-3xl / border / bg-white/5
-   - 既存のデータ連携・チャート・APIは現状コードを踏襲
+   MyPage（元レイアウト復元版）
+   - 画面最上部：ブランドヘッダー（ロゴ＋SOUL LAYER DIAGNOSIS）
+   - メインカード先頭：H1「MY PAGE」＋サブコピー＋右側envピル
+   - 以降の情報構成・API連携は現行のまま
    ============================================================= */
 
 type EV = "E" | "V" | "Λ" | "Ǝ"
@@ -35,11 +35,9 @@ type DailyLatest = {
   created_at?: string
 }
 
-// alias
 type EVAEVectorLocal = EVAEVector
 type SeriesPointLocal = SeriesPoint
 
-/* ============== Utils ============== */
 const FALLBACK_USER = { name: "Hiro", idNo: "0001", avatar: "/icon-512.png" }
 const CURRENT_THEME = "self"
 
@@ -55,14 +53,12 @@ function normalizeModel(s?: string | null): "EΛVƎ" | "EVΛƎ" | null {
   if (t.includes("EVΛƎ")) return "EVΛƎ"
   return null
 }
-
 function toTypeLabel(model?: string | null) {
   const m = normalizeModel(model)
   if (m === "EΛVƎ") return "現実思考型"
   if (m === "EVΛƎ") return "未来志向型"
   return null
 }
-
 function fmt(dt?: string) {
   try {
     const d = dt ? new Date(dt) : new Date()
@@ -72,8 +68,6 @@ function fmt(dt?: string) {
     }).format(d)
   } catch { return "" }
 }
-
-// Ǝ は Eexists、Λ と L はどちらでも可に揃える
 function normalizeToday(v: any): EVAEVectorLocal {
   const L = typeof v?.L === "number" ? v.L : (typeof v?.["Λ"] === "number" ? v["Λ"] : 0)
   return { E: clamp01(v?.E), V: clamp01(v?.V), L: clamp01(L), Eexists: clamp01(v?.Eexists ?? v?.["Ǝ"]) }
@@ -88,7 +82,19 @@ function normalizeSeries(list: any[]): SeriesPointLocal[] {
   })
 }
 
-/* ============== Subcomponent：タイプ吹き出し ============== */
+/* ============== ブランドヘッダー（最上部固定） ============== */
+function AppHeader() {
+  return (
+    <div className="mx-auto max-w-md px-5 pt-4 pb-2 flex items-center gap-3">
+      <Image src="/icon-512.png" alt="app icon" width={28} height={28} className="rounded-full" />
+      <div className="text-[13px] tracking-wide text-white/70">
+        SOUL LAYER DIAGNOSIS
+      </div>
+    </div>
+  )
+}
+
+/* ============== タイプ吹き出し（任意） ============== */
 function OrientationTip({ baseModel }: { baseModel: "EΛVƎ" | "EVΛƎ" | null | undefined }) {
   const router = useRouter()
   const isFuture = baseModel === "EVΛƎ"
@@ -100,11 +106,7 @@ function OrientationTip({ baseModel }: { baseModel: "EΛVƎ" | "EVΛƎ" | null |
       ? "確定した現在を重視し、現実的な判断と秩序だった進め方を好む傾向があります。"
       : "まずはクイック診断を完了すると、あなたのタイプが表示されます。"
 
-  const accentStyle = isFuture
-    ? { color: "#B833F5" } // Ǝ紫
-    : isReal
-      ? { color: "#FF4500" } // E系のアクセント寄せ
-      : { color: "rgba(255,255,255,0.6)" }
+  const accentStyle = isFuture ? { color: "#B833F5" } : isReal ? { color: "#FF4500" } : { color: "rgba(255,255,255,0.6)" }
 
   return (
     <div className="rounded-xl bg-white/5 p-4 space-y-3">
@@ -115,17 +117,14 @@ function OrientationTip({ baseModel }: { baseModel: "EΛVƎ" | "EVΛƎ" | null |
           <span className="text-white/80">{message}</span>
         </p>
       </div>
-      <button
-        onClick={() => router.push("/guide/future-vs-realistic")}
-        className="text-sm text-cyan-400 hover:underline"
-      >
+      <button onClick={() => router.push("/guide/future-vs-realistic")} className="text-sm text-cyan-400 hover:underline">
         もっと詳しく知る →
       </button>
     </div>
   )
 }
 
-/* ============== Component ============== */
+/* ============== Page ============== */
 export default function MyPageClient() {
   const router = useRouter()
 
@@ -135,13 +134,12 @@ export default function MyPageClient() {
   const [profile, setProfile] = useState<ProfileLatest | null>(null)
   const [daily, setDaily] = useState<DailyLatest | null>(null)
 
-  // charts states
   const [range, setRange] = useState<7 | 30 | 90>(30)
   const [today, setToday] = useState<EVAEVectorLocal | null>(null)
   const [series, setSeries] = useState<SeriesPointLocal[] | null>(null)
   const [chartsErr, setChartsErr] = useState<string | null>(null)
 
-  // === envバッジ（UIのみ・APIは現状維持） ===
+  // env ピル（表示のみ）
   const [env, setEnv] = useState<"dev" | "prod">(
     (typeof window !== "undefined" && (localStorage.getItem("ev-env") as any)) || "prod"
   )
@@ -149,7 +147,7 @@ export default function MyPageClient() {
     try {
       const cached = (localStorage.getItem("ev-env") || "prod") as "dev" | "prod"
       setEnv(cached === "dev" ? "dev" : "prod")
-    } catch { /* noop */ }
+    } catch {}
   }, [])
 
   // プロフィール/デイリー
@@ -176,7 +174,7 @@ export default function MyPageClient() {
     return () => { alive = false }
   }, [])
 
-  // チャートデータ
+  // チャート
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -188,17 +186,14 @@ export default function MyPageClient() {
         ])
         if (!tRes.ok) throw new Error("/api/today failed")
         if (!sRes.ok) throw new Error("/api/series failed")
-
         const tJson = await tRes.json()
         const sJson = await sRes.json()
         if (!alive) return
-
         setToday(tJson?.scores ? normalizeToday(tJson.scores) : normalizeToday(tJson))
         setSeries(normalizeSeries(sJson))
       } catch (e: any) {
         if (!alive) return
         setChartsErr(e?.message ?? "charts fetch error")
-        // fallback（常に描ける安全値）
         const d = new Date()
         const mock = Array.from({ length: range }, (_, i) => {
           const dt = new Date(d); dt.setDate(dt.getDate() - (range - 1 - i))
@@ -223,91 +218,77 @@ export default function MyPageClient() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* === 固定ヘッダー：見出し＋envバッジ（UIのみ） === */}
-      <header className="sticky top-0 z-20 bg-black/70 backdrop-blur supports-[backdrop-filter]:bg-black/50">
-        <div className="mx-auto max-w-md px-5 pt-5 pb-3 flex items-center justify-between">
-          <h1 className="text-[28px] font-extrabold tracking-tight">My Page</h1>
-          <button
-            onClick={()=>{
-              const next = env === "prod" ? "dev" : "prod"
-              setEnv(next)
-              try { localStorage.setItem("ev-env", next) } catch {}
-            }}
-            className="text-xs rounded-full border border-white/20 bg-white/10 px-3 py-1.5 hover:bg-white/15"
-            title="環境表示の切替（APIには影響しません）"
-          >
-            env: {env}（切替）
-          </button>
-        </div>
-      </header>
+      {/* ①ブランドヘッダー（最上部） */}
+      <AppHeader />
 
-      {/* === 本文（外枠カードでラップ） === */}
-      <main className="mx-auto max-w-md px-5 py-5">
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-4 space-y-4">
-          {/* 1) クイック診断の型（バッジ＝ボタン） */}
-          <div className="flex justify-center">
-            {typeLabel ? (
-              <button
-                onClick={() => {
-                  if (!normalizedModel) return
-                  router.push(`/guide/future-vs-realistic?model=${encodeURIComponent(normalizedModel)}`)
-                }}
-                className="inline-block rounded-xl px-4 py-2 text-sm border transition hover:brightness-110 active:scale-[0.99]"
-                style={{
-                  borderColor: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
-                  backgroundColor: normalizedModel === "EΛVƎ" ? "#B833F51A" : "#FF45001A",
-                  color: normalizedModel === "EΛVƎ" ? "#B833F5" : "#FF4500",
-                }}
-                aria-label={`${typeLabel}（${normalizedModel}）の解説へ`}
-              >
-                {typeLabel}（{normalizedModel}）
-              </button>
-            ) : (
-              <span className="inline-block rounded-xl px-3 py-2 text-xs border border-white/15 text-white/60 bg-white/5">
-                クイック診断はまだありません
-              </span>
-            )}
+      {/* ②メインカード（角丸大／内側に大見出し） */}
+      <main className="mx-auto max-w-md px-5 pb-10">
+        <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 sm:p-5 space-y-4">
+          {/* H1 + サブコピー + envピル */}
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-[32px] sm:text-[34px] font-extrabold tracking-tight uppercase">
+                MY PAGE
+              </h1>
+              <p className="mt-1 text-sm text-white/60">
+                あなたの軌跡と、いまを映す
+              </p>
+            </div>
+            <button
+              onClick={()=>{
+                const next = env === "prod" ? "dev" : "prod"
+                setEnv(next)
+                try { localStorage.setItem("ev-env", next) } catch {}
+              }}
+              className="mt-1 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/15"
+              title="環境表示の切替（APIには影響しません）"
+            >
+              env: {env}（切替）
+            </button>
           </div>
 
-          {/* 2) プロフィール行 */}
+          {/* プロフィール行 */}
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <Image src={FALLBACK_USER.avatar} alt="Profile Icon" width={48} height={48}
-                    className="h-12 w-12 rounded-full border border-white/20 bg-black/20" />
-              <div className="flex flex-col justify-center">
-                <div className="text-base font-semibold leading-tight">{FALLBACK_USER.name}</div>
-                <div className="text-xs text-white/60 leading-tight">ID: {FALLBACK_USER.idNo}</div>
+              <Image src={FALLBACK_USER.avatar} alt="Profile Icon" width={56} height={56}
+                className="h-14 w-14 rounded-full border border-white/20 bg-black/20" />
+              <div className="leading-tight">
+                <div className="text-xl font-semibold">{FALLBACK_USER.name}</div>
+                <div className="text-sm text-white/70">ID: {FALLBACK_USER.idNo}</div>
               </div>
             </div>
             <button
               onClick={goSettings}
-              className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs hover:bg-white/10"
+              className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs hover:bg-white/10"
               title="設定"
             >
               <span>⚙️</span>設定
             </button>
           </div>
 
-          {/* 3) テーマ＆日時 */}
-          <div className="text-[11px] text-white/50">
-            テーマ: {CURRENT_THEME}<span className="opacity-40 mx-1">•</span>{nowStr}
+          {/* テーマ＆日時 */}
+          <div className="text-[13px] text-white/60">
+            現在のテーマ <span className="mx-1 text-white/80 font-medium">{CURRENT_THEME}</span>
+            <span className="opacity-40 mx-1">•</span>{nowStr}
           </div>
 
-          {/* 4) 直近メッセージ */}
+          {/* 直近メッセージ */}
           <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-sm font-bold">直近のメッセージ</h2>
-              <span className="text-[11px] text-white/50">{fmt(daily?.created_at || profile?.created_at || "")}</span>
+              <h2 className="text-base font-semibold">直近のメッセージ</h2>
+              <span className="text-[11px] text-white/50">
+                {fmt(daily?.created_at || profile?.created_at || "")}
+              </span>
             </div>
             <p className="text-sm text-white/90">
               {daily?.comment || profile?.fortune || "まだメッセージはありません。"}
             </p>
           </section>
 
-          {/* 5) 構造チャート（横スライド：初期Radar） */}
+          {/* 構造チャート */}
           <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-bold">構造バランス</h2>
+              <h2 className="text-base font-semibold">構造バランス</h2>
               <div className="text-[11px] text-white/60">Radar / Line（横スワイプ）</div>
             </div>
 
@@ -336,7 +317,6 @@ export default function MyPageClient() {
                   </div>
                 </div>
 
-                {/* 横スクロールで広く見せるラッパー */}
                 <div className="rounded-xl bg-black/25 border border-white/10">
                   <div className="overflow-x-auto py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,transparent_0,black_16px,black_calc(100%-16px),transparent_100%)] overscroll-x-contain">
                     <div className="inline-block pr-4">
@@ -354,27 +334,8 @@ export default function MyPageClient() {
             </div>
           </section>
 
-          {/* 6) 次の一歩 */}
+          {/* 次の一歩 */}
           <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
-            <h2 className="text-sm font-bold mb-3">次の一歩を選んでください</h2>
+            <h2 className="text-base font-semibold mb-3">次の一歩を選んでください</h2>
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={goDaily} className="rounded-xl border border-white/20 bg-white/10 px-3 py-3 hover:bg-white/15">
-                デイリー診断
-                <div className="text-[11px] text-white/60 mt-1">1問 / 今日のゆらぎ</div>
-              </button>
-              <button className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-white/50 cursor-not-allowed" title="近日公開">
-                診断タイプを選ぶ
-                <div className="text-[11px] text-white/40 mt-1">Weekly / Monthly（予定）</div>
-              </button>
-            </div>
-          </section>
-
-          {/* 7) タイプ吹き出し（任意表示） */}
-          <div className="pt-1">
-            <OrientationTip baseModel={profile?.base_model ?? null} />
-          </div>
-        </div>
-      </main>
-    </div>
-  )
-}
+              <button onClick={goDaily} className="rounded-xl border border-white/20 bg

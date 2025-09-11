@@ -71,14 +71,13 @@ export default function LoginEmailPage() {
             autoComplete="current-password"
           />
           {/* 👁️/🙈 トグルボタン */}
-          <button
-            type="button"
-            onClick={() => setShowPw((v) => !v)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-xl"
-            aria-label={showPw ? 'パスワードを隠す' : 'パスワードを表示'}
-          >
-            {showPw ? '🙈' : '👁️'}
-          </button>
+         <button
+  type="button"
+  onClick={() => setShowPw(v => !v)}
+  className="absolute right-2 top-1/2 -translate-y-1/2 text-2xl leading-none"
+>
+  {showPw ? '🙈' : '👁️'}
+</button>
         </label>
 
         <button

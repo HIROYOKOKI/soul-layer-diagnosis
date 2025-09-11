@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { getBrowserSupabase } from "@/lib/supabase-browser";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -16,8 +21,7 @@ export default function RegisterPage() {
     setLoading(true);
     setErr(null);
     try {
-      const sb = getBrowserSupabase(); // 送信時に初期化（SSRで実行されない）
-      const { error } = await sb.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
@@ -49,7 +53,10 @@ export default function RegisterPage() {
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password"
         />
-        <button disabled={loading} className="w-full rounded bg-white text-black py-2">
+        <button
+          disabled={loading}
+          className="w-full rounded bg-white text-black py-2"
+        >
           {loading ? "処理中…" : "続ける"}
         </button>
         {err && <p className="text-red-400 text-sm">{err}</p>}

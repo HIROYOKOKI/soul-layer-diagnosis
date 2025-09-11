@@ -65,7 +65,7 @@ export default function LoginIntro() {
       {/* bottom buttons (fade-in after still) */}
       <div style={styles.bottomBlock}>
         <div style={{ ...styles.buttonRow, opacity: buttonsOpacity }}>
-          <GlowButton href="/profile" variant="pink">はじめて</GlowButton>
+          <GlowButton href="/profile" variant="pink">新規登録</GlowButton>
           <GlowButton href="/login/email" variant="blue">ログイン</GlowButton>
         </div>
       </div>

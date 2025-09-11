@@ -119,11 +119,13 @@ export default function LoginFormPage() {
                    autoComplete={mode === "login" ? "current-password" : "new-password"}
                    placeholder="8文字以上" value={password} onChange={(e) => setPassword(e.target.value)}
                    required minLength={8} style={{ ...input, paddingRight: 42 }} />
-            <button type="button" onClick={() => setShowPw(v => !v)}
-                    aria-label={showPw ? "パスワードを隠す" : "パスワードを表示"}
-                    style={pwToggle}>
-              {showPw ? "🙈" : "👁️"}
-            </button>
+            <button
+  type="button"
+  onClick={() => setShowPw(v => !v)}
+  style={{ ...pwToggle, fontSize: 32 }}
+>
+  {showPw ? "🙈" : "👁️"}
+</button>
           </div>
 
         <button type="submit" disabled={loading} style={primaryBtn}>

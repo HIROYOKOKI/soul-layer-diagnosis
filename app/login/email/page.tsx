@@ -12,13 +12,12 @@ const sb = createClient(
 
 export default function LoginEmailPage() {
   const router = useRouter();
-
-  // ?email=... をプレフィル（useSearchParamsは使わない）
   const search = typeof window !== 'undefined' ? window.location.search : '';
   const params = useMemo(() => new URLSearchParams(search), [search]);
 
   const [email, setEmail] = useState(() => params.get('email') ?? '');
   const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);   // 👈 表示/非表示フラグ
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -49,35 +48,55 @@ export default function LoginEmailPage() {
 
       <form onSubmit={onSubmit} className="grid gap-3">
         <label className="grid gap-1 text-sm">
-          <span>メールアドレス</span>
+          <span>Email</span>
           <input
-            type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
             className="rounded border border-white/20 bg-black/30 p-2"
             autoComplete="email"
           />
         </label>
 
-        <label className="grid gap-1 text-sm">
-          <span>パスワード</span>
+        <label className="grid gap-1 text-sm relative">
+          <span>Password</span>
           <input
-            type="password" value={password} onChange={(e)=>setPassword(e.target.value)} required
-            className="rounded border border-white/20 bg-black/30 p-2"
-            autoComplete="current-password" minLength={8}
+            type={showPw ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+            className="w-full rounded border border-white/20 bg-black/30 p-2 pr-10"
+            autoComplete="current-password"
           />
+          {/* 👁️/🙈 トグルボタン */}
+          <button
+            type="button"
+            onClick={() => setShowPw((v) => !v)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-xl"
+            aria-label={showPw ? 'パスワードを隠す' : 'パスワードを表示'}
+          >
+            {showPw ? '🙈' : '👁️'}
+          </button>
         </label>
 
         <button
-          type="submit" disabled={loading}
+          type="submit"
+          disabled={loading}
           className="mt-2 rounded bg-white/10 px-4 py-2 font-semibold hover:bg-white/20 disabled:opacity-50"
         >
           {loading ? 'Signing in…' : 'ログイン'}
         </button>
 
-        {err && <p className="text-sm text-red-400 m-0">{err}</p>}
+        {err && <p className="text-sm text-red-400">{err}</p>}
       </form>
 
       <p className="mt-3 text-sm opacity-70">
-        はじめての方は <a href="/signup" className="underline text-sky-300">新規登録</a>
+        はじめての方は{' '}
+        <a href="/signup" className="underline text-sky-300">
+          新規登録
+        </a>
       </p>
     </div>
   );

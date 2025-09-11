@@ -1,3 +1,4 @@
+// app/register/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -18,8 +19,7 @@ export default function RegisterPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setErr(null);
+    setLoading(true); setErr(null);
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -38,25 +38,11 @@ export default function RegisterPage() {
     <div className="max-w-md mx-auto p-6">
       <h1 className="text-2xl font-semibold mb-4">新規登録 / ログイン</h1>
       <form onSubmit={onSubmit} className="space-y-3">
-        <input
-          className="w-full bg-black/40 border border-white/20 rounded px-3 py-2"
-          placeholder="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-        />
-        <input
-          className="w-full bg-black/40 border border-white/20 rounded px-3 py-2"
-          placeholder="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-        />
-        <button
-          disabled={loading}
-          className="w-full rounded bg-white text-black py-2"
-        >
+        <input className="w-full bg-black/40 border border-white/20 rounded px-3 py-2"
+               placeholder="email" value={email} onChange={(e)=>setEmail(e.target.value)} />
+        <input className="w-full bg-black/40 border border-white/20 rounded px-3 py-2"
+               placeholder="password" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} />
+        <button disabled={loading} className="w-full rounded bg-white text-black py-2">
           {loading ? "処理中…" : "続ける"}
         </button>
         {err && <p className="text-red-400 text-sm">{err}</p>}

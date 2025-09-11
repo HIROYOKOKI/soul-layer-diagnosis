@@ -59,12 +59,23 @@ export default function LoginFormPage() {
         if (error) throw error;
         router.push("/mypage");
       } else {
+        // ===== 新規登録：確認メール送信 → 本登録 =====
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
           options: { emailRedirectTo: redirectTo },
         });
-        if (error) throw error;
+
+        if (error) {
+          // 既存ユーザーならログインへ誘導（メッセージはプロバイダ差で表現揺れがあるので幅広く判定）
+          if (/already.*registered|user.*exists|email.*exists|duplicate/i.test(error.message)) {
+            setInfo("このメールはすでに登録済みです。パスワードを入力してログインしてください。");
+            setMode("login");
+            return;
+          }
+          throw error;
+        }
+
         setInfo("確認メールを送信しました。受信箱のリンクを開いて本登録を完了してください。");
       }
     } catch (err: unknown) {
@@ -75,7 +86,31 @@ export default function LoginFormPage() {
     }
   };
 
+  // 確認メールの再送
+  const resend = async () => {
+    setLoading(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: (email || "").trim(),
+        options: { emailRedirectTo: redirectTo },
+      });
+      if (error) throw error;
+      setInfo("確認メールを再送しました。受信箱をご確認ください。");
+    } catch (e: any) {
+      setError(humanizeAuthError(e?.message ?? "再送に失敗しました"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // パスワード再設定メール
   const sendReset = async () => {
+    setLoading(true);
+    setError(null);
+    setInfo(null);
     try {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const { error } = await supabase.auth.resetPasswordForEmail(email || "", {
@@ -86,6 +121,8 @@ export default function LoginFormPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "メール送信に失敗しました";
       setError(humanizeAuthError(msg));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -95,51 +132,81 @@ export default function LoginFormPage() {
         <h1 style={title}>{mode === "login" ? "ログイン" : "新規登録"}</h1>
 
         <div style={tabs}>
-          <button type="button" onClick={() => setMode("login")}
-                  aria-pressed={mode === "login"}
-                  style={{ ...tabBtn, ...(mode === "login" ? tabActive : null) }}>
+          <button
+            type="button"
+            onClick={() => setMode("login")}
+            aria-pressed={mode === "login"}
+            style={{ ...tabBtn, ...(mode === "login" ? tabActive : null) }}
+          >
             ログイン
           </button>
-          <button type="button" onClick={() => setMode("signup")}
-                  aria-pressed={mode === "signup"}
-                  style={{ ...tabBtn, ...(mode === "signup" ? tabActive : null) }}>
+          <button
+            type="button"
+            onClick={() => setMode("signup")}
+            aria-pressed={mode === "signup"}
+            style={{ ...tabBtn, ...(mode === "signup" ? tabActive : null) }}
+          >
             新規登録
           </button>
         </div>
 
         <form onSubmit={handleSubmit} style={form}>
           <label htmlFor="email" style={label}>メールアドレス</label>
-          <input id="email" type="email" inputMode="email" autoComplete="email"
-                 placeholder="you@example.com" value={email}
-                 onChange={(e) => setEmail(e.target.value)} required style={input} />
+          <input
+            id="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            style={input}
+          />
 
           <label htmlFor="password" style={label}>パスワード</label>
           <div style={{ position: "relative" }}>
-            <input id="password" type={showPw ? "text" : "password"}
-                   autoComplete={mode === "login" ? "current-password" : "new-password"}
-                   placeholder="8文字以上" value={password} onChange={(e) => setPassword(e.target.value)}
-                   required minLength={8} style={{ ...input, paddingRight: 42 }} />
+            <input
+              id="password"
+              type={showPw ? "text" : "password"}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              placeholder="8文字以上"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              style={{ ...input, paddingRight: 42 }}
+            />
             <button
-  type="button"
-  onClick={() => setShowPw(v => !v)}
-  style={{ ...pwToggle, fontSize: 32 }}
->
-  {showPw ? "🙈" : "👁️"}
-</button>
+              type="button"
+              onClick={() => setShowPw((v) => !v)}
+              aria-label={showPw ? "パスワードを隠す" : "パスワードを表示"}
+              style={{ ...pwToggle, fontSize: 32 }}  // 👁️ ここでアイコンサイズUP
+            >
+              {showPw ? "🙈" : "👁️"}
+            </button>
           </div>
 
-        <button type="submit" disabled={loading} style={primaryBtn}>
-          {loading ? "処理中…" : mode === "login" ? "ログイン" : "登録する"}
-        </button>
-
-        {mode === "login" && (
-          <button type="button" onClick={sendReset} style={linkBtn}>
-            パスワードをお忘れですか？
+          <button type="submit" disabled={loading} style={primaryBtn}>
+            {loading ? "処理中…" : mode === "login" ? "ログイン" : "登録する"}
           </button>
-        )}
 
-        {info && <p style={infoText}>{info}</p>}
-        {error && <p style={errorText}>{error}</p>}
+          {/* ログイン時の補助動線 */}
+          {mode === "login" && (
+            <button type="button" onClick={sendReset} style={linkBtn}>
+              パスワードをお忘れですか？
+            </button>
+          )}
+
+          {/* サインアップ時の確認メール再送（任意） */}
+          {mode === "signup" && (
+            <button type="button" onClick={resend} style={linkBtn}>
+              確認メールを再送する
+            </button>
+          )}
+
+          {info && <p style={infoText}>{info}</p>}
+          {error && <p style={errorText}>{error}</p>}
         </form>
 
         <p style={hint}>※ 新規登録は確認メールのリンクを開いて本登録完了となります。</p>
@@ -158,11 +225,12 @@ export default function LoginFormPage() {
 function humanizeAuthError(msg: string): string {
   if (/Invalid login credentials/i.test(msg)) return "メールまたはパスワードが違います";
   if (/Email not confirmed/i.test(msg)) return "メール確認が未完了です。受信箱をご確認ください";
+  if (/already.*registered|user.*exists|email.*exists|duplicate/i.test(msg)) return "このメールはすでに登録済みです。ログインしてください。";
   if (/too many requests/i.test(msg)) return "試行回数が多すぎます。少し待ってから再度お試しください";
   return msg;
 }
 
-/* ===== styles（既存のまま） ===== */
+/* ===== styles（既存のまま＋pwToggle基準値） ===== */
 const page = { minHeight: "100dvh", display: "grid", placeItems: "center", background: "#0b0b0b", color: "#fff" } as const;
 const card = { width: 380, display: "grid", gap: 12, padding: "28px 24px 24px", borderRadius: 18, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(2px)", boxShadow: "0 10px 40px rgba(0,0,0,.35)" } as const;
 const title = { margin: 0, fontSize: 22, fontWeight: 700 } as const;

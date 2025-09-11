@@ -30,27 +30,21 @@ export default function MyPageClient({
   const [error, setError] = useState<string | null>(null)
   const [env, setEnv] = useState<"dev" | "prod">(initialEnv)
 
-  // === env を復元（ローカル優先） & 差分あれば即再取得 ===
   useEffect(() => {
     try {
       const v = (localStorage.getItem("ev-env") || initialEnv).toLowerCase()
       const e = v === "prod" ? "prod" : "dev"
       setEnv(e)
       if (e !== initialEnv) refetch(e)
-    } catch {
-      /* noop */
-    }
+    } catch { /* noop */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 手動再取得にも使う共通関数
   async function refetch(targetEnv = env) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/mypage/daily-latest?env=${targetEnv}`, {
-        cache: "no-store",
-      })
+      const res = await fetch(`/api/mypage/daily-latest?env=${targetEnv}`, { cache: "no-store" })
       const json = await res.json()
       setDaily(json?.item ?? null)
     } catch (e: any) {
@@ -68,7 +62,7 @@ export default function MyPageClient({
   const createdAtJst = useMemo(() => {
     const iso = daily?.created_at
     if (!iso) return ""
-    const d = new Date(iso) // 画面はJST前提でそのまま表示
+    const d = new Date(iso)
     const y = d.getFullYear()
     const m = String(d.getMonth() + 1).padStart(2, "0")
     const day = String(d.getDate()).padStart(2, "0")
@@ -83,13 +77,10 @@ export default function MyPageClient({
 
   const badge = (c: EV) => {
     const name =
-      c === "E"
-        ? "衝動・情熱"
-        : c === "V"
-        ? "可能性・夢"
-        : c === "Λ"
-        ? "選択・設計"
-        : "観測・静寂"
+      c === "E" ? "衝動・情熱" :
+      c === "V" ? "可能性・夢" :
+      c === "Λ" ? "選択・設計" :
+      "観測・静寂"
     return (
       <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1">
         <span className="font-mono">{c}</span>
@@ -100,7 +91,7 @@ export default function MyPageClient({
 
   return (
     <div className="min-h-[100svh] bg-black text-white">
-      {/* === 固定ヘッダー（元デザイン復元：見出し＋envバッジ） === */}
+      {/* 固定ヘッダー */}
       <header className="sticky top-0 z-20 bg-black/70 backdrop-blur supports-[backdrop-filter]:bg-black/50">
         <div className="mx-auto max-w-xl px-5 pt-5 pb-3 flex items-center justify-between">
           <h1 className="text-[28px] font-extrabold tracking-tight">My Page</h1>
@@ -120,9 +111,8 @@ export default function MyPageClient({
         </div>
       </header>
 
-      {/* === ページ本体 === */}
+      {/* 本体 */}
       <main className="mx-auto max-w-xl px-5 py-5">
-        {/* 大きなラウンド枠（スクショ準拠） */}
         <div className="rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-5">
           {/* エラー */}
           {error && (
@@ -134,11 +124,94 @@ export default function MyPageClient({
           {/* デイリー最新カード */}
           <section className="rounded-2xl border border-white/12 bg-black/20 p-4 sm:p-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white/80">
-                デイリー診断（最新）
-              </h2>
+              <h2 className="text-sm font-semibold text-white/80">デイリー診断（最新）</h2>
               <div className="text-xs text-white/50">{createdAtJst}</div>
             </div>
 
             {/* 空／ローディング */}
-            {!daily && !loa
+            {!daily && !loading && (
+              <p className="mt-3 text-sm text-white/60">まだ記録がありません。</p>
+            )}
+            {loading && (
+              <p className="mt-3 text-sm text-white/60">読み込み中…</p>
+            )}
+
+            {/* 本文 */}
+            {daily && (
+              <>
+                {/* コード */}
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="text-sm text-white/60">今日のコード</div>
+                  {daily.code ? badge(daily.code) : <span className="text-sm text-white/60">—</span>}
+                </div>
+
+                {/* 行動ログ */}
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <div className="text-white/60 text-xs">初回選択</div>
+                    <div className="mt-1 font-mono text-base">{daily.raw_interactions?.first_choice ?? "—"}</div>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <div className="text-white/60 text-xs">最終選択</div>
+                    <div className="mt-1 font-mono text-base">{daily.raw_interactions?.final_choice ?? "—"}</div>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <div className="text-white/60 text-xs">選び直し回数</div>
+                    <div className="mt-1 font-mono text-base">{daily.raw_interactions?.changes ?? 0}</div>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <div className="text-white/60 text-xs">出題セット</div>
+                    <div className="mt-1 font-mono text-base">
+                      {(daily.raw_interactions?.subset && daily.raw_interactions.subset.length > 0)
+                        ? daily.raw_interactions.subset.join(" / ")
+                        : "—"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* βスコア */}
+                <div className="mt-5">
+                  <div className="mb-2 text-sm text-white/60">βスコア</div>
+                  <div className="space-y-2">
+                    {(["E", "V", "Λ", "Ǝ"] as EV[]).map((k) => {
+                      const v = Number(scores[k] ?? 0)
+                      const w = Math.round((v / maxScore) * 100)
+                      return (
+                        <div key={k}>
+                          <div className="flex items-center justify-between text-xs text-white/60">
+                            <span className="font-mono">{k}</span>
+                            <span>{v.toFixed(2)}</span>
+                          </div>
+                          <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white/10">
+                            <div className="h-full bg-white" style={{ width: `${w}%` }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* コメント & アファメーション */}
+                {(daily.comment || daily.quote) && (
+                  <div className="mt-5 grid gap-3">
+                    {!!daily.comment && (
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 leading-relaxed">
+                        {String(daily.comment)}
+                      </div>
+                    )}
+                    {!!daily.quote && (
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <div className="text-sm text-white/60">きょうのアファメーション</div>
+                        <blockquote className="mt-1">“{String(daily.quote)}”</blockquote>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </div>
+      </main>
+    </div>
+  )
+}

@@ -1,28 +1,15 @@
 // lib/supabaseServer.ts
 import { cookies } from "next/headers";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/**
+ * API Route（app/api/*/route.ts）から呼ぶサーバ用Supabaseクライアント。
+ * - セッションはNextのCookieから自動連携
+ * - envは NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY を利用
+ * - 404/401時にthrowしない（auth.getUser()は {data:{user|null}} を返す）
+ */
 export function getSupabaseServer(): SupabaseClient {
-  const cookieStore = cookies();
-
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !anonKey) {
-    throw new Error("supabase_server_env_missing");
-  }
-
-  return createServerClient(supabaseUrl, anonKey, {
-    cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
-      },
-      set(name: string, value: string, options: CookieOptions) {
-        try { cookieStore.set(name, value, options); } catch { /* read-only on some routes */ }
-      },
-      remove(name: string, options: CookieOptions) {
-        try { cookieStore.set(name, "", { ...options, expires: new Date(0) }); } catch {}
-      },
-    },
-  });
+  return createRouteHandlerClient({ cookies });
 }
+

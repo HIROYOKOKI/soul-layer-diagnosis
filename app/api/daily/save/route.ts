@@ -5,9 +5,9 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// 余計なクォートやカンマを除去
 function cleanStr(v: unknown): string | null {
   if (typeof v !== "string") return null;
-  // 先頭/末尾の余計なクォートやカンマを除去してトリム
   return v.replace(/^[\s'"]+|[,'"\s]+$/g, "").trim() || null;
 }
 
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok:false, error:"INVALID_JSON" }, { status:400 });
   }
 
-  // 既定（テーブル制約に合わせる）
+  // テーブル制約に合わせたデフォルト
   const navigator = cleanStr(body.navigator) ?? "lunea";
   const mode      = cleanStr(body.mode)      ?? "friend";
 

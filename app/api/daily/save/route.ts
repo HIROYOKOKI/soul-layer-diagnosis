@@ -5,23 +5,17 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// 余計なクォートやカンマを除去
 function cleanStr(v: unknown): string | null {
   if (typeof v !== "string") return null;
   return v.replace(/^[\s'"]+|[,'"\s]+$/g, "").trim() || null;
 }
-
-// JSON以外でも text を受けて parse を試みる
 async function safeParseJSON(req: Request): Promise<any> {
   const ct = req.headers.get("content-type") || "";
   try {
-    if (ct.includes("application/json")) {
-      return await req.json();
-    }
+    if (ct.includes("application/json")) return await req.json();
     const text = await req.text();
     return text ? JSON.parse(text) : {};
   } catch {
-    // ダメなら空オブジェクトで継続（必須項目は下で補う）
     return {};
   }
 }
@@ -32,7 +26,6 @@ export async function POST(req: Request) {
 
   const body = await safeParseJSON(req);
 
-  // テーブル制約に合わせたデフォルト（NULL制約がある想定）
   const navigator = cleanStr(body.navigator) ?? "lunea";
   const mode      = cleanStr(body.mode)      ?? "friend";
 

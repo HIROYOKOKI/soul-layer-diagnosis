@@ -217,6 +217,31 @@ export default function MyPageClient() {
             {daily?.comment || profile?.fortune || "まだメッセージはありません。"}
           </p>
         </section>
+        {/* 次の一歩（デイリー診断CTA 復活） */}
+<section className="rounded-2xl border border-white/12 bg-white/5 p-4">
+  <h2 className="text-base font-semibold mb-3">次の一歩</h2>
+  <div className="grid grid-cols-2 gap-3">
+    <button
+      onClick={goDaily}
+      className="rounded-xl border border-white/20 bg-white/10 px-3 py-3 hover:bg-white/15"
+      aria-label="デイリー診断を始める"
+    >
+      デイリー診断
+      <div className="text-[11px] text-white/60 mt-1">1問 / 今日のゆらぎ</div>
+    </button>
+
+    {/* 将来機能（そのまま維持 or 削除可） */}
+    <button
+      className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-white/50 cursor-not-allowed"
+      title="近日公開"
+      disabled
+    >
+      診断タイプを選ぶ
+      <div className="text-[11px] text-white/40 mt-1">Weekly / Monthly（予定）</div>
+    </button>
+  </div>
+</section>
+
 
         {/* 構造チャート */}
         <section className="rounded-2xl border border-white/12 bg-white/5 p-4">

@@ -77,8 +77,6 @@ export default function LoginEmailPage() {
   </button>
 </div>
 
-        </label>
-
         <button
           type="submit"
           disabled={loading}

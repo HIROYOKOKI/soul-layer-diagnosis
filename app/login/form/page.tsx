@@ -4,20 +4,18 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 
-/** ブラウザ用 Supabase クライアント（公開キー必須） */
+// ブラウザ用 Supabase
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export default function LoginFormPage() {
+export default function LoginFormClient() {
   const router = useRouter();
   const params = useSearchParams();
 
-  // ?mode=signup でタブ初期値を登録側に
-  const initialMode = (params.get("mode") === "signup" ? "signup" : "login") as
-    | "login"
-    | "signup";
+  const initialMode =
+    (params.get("mode") === "signup" ? "signup" : "login") as "login" | "signup";
 
   const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [email, setEmail] = useState("");
@@ -27,16 +25,12 @@ export default function LoginFormPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  // サインアップ時のメールリンク遷移先
   const redirectTo = useMemo(() => {
     if (typeof window === "undefined") return undefined;
-    const origin = window.location.origin;
-    // 本登録後、このURLに戻す（Supabase Auth 設定に要登録）
-    return `${origin}/login/form?verified=1`;
+    return `${window.location.origin}/login/form?verified=1`;
   }, []);
 
   useEffect(() => {
-    // 直リンクで戻って来た時の案内
     if (params.get("verified") === "1") {
       setInfo("メール確認が完了しました。ログインできます。");
       setMode("login");
@@ -59,15 +53,12 @@ export default function LoginFormPage() {
           password,
         });
         if (error) throw error;
-        router.push("/mypage"); // ログイン後の遷移
+        router.push("/mypage");
       } else {
-        // ここが「メール送信→本登録」フロー
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: {
-            emailRedirectTo: redirectTo, // ← ここ超重要
-          },
+          options: { emailRedirectTo: redirectTo },
         });
         if (error) throw error;
         setInfo("確認メールを送信しました。受信箱のリンクを開いて本登録を完了してください。");
@@ -81,8 +72,6 @@ export default function LoginFormPage() {
   };
 
   const sendReset = async () => {
-    setError(null);
-    setInfo(null);
     try {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const { error } = await supabase.auth.resetPasswordForEmail(email || "", {
@@ -102,57 +91,31 @@ export default function LoginFormPage() {
         <h1 style={title}>{mode === "login" ? "ログイン" : "新規登録"}</h1>
 
         <div style={tabs}>
-          <button
-            type="button"
-            onClick={() => setMode("login")}
-            aria-pressed={mode === "login"}
-            style={{ ...tabBtn, ...(mode === "login" ? tabActive : null) }}
-          >
+          <button type="button" onClick={() => setMode("login")}
+            aria-pressed={mode === "login"} style={{ ...tabBtn, ...(mode === "login" ? tabActive : null) }}>
             ログイン
           </button>
-          <button
-            type="button"
-            onClick={() => setMode("signup")}
-            aria-pressed={mode === "signup"}
-            style={{ ...tabBtn, ...(mode === "signup" ? tabActive : null) }}
-          >
+          <button type="button" onClick={() => setMode("signup")}
+            aria-pressed={mode === "signup"} style={{ ...tabBtn, ...(mode === "signup" ? tabActive : null) }}>
             新規登録
           </button>
         </div>
 
         <form onSubmit={handleSubmit} style={form}>
           <label htmlFor="email" style={label}>メールアドレス</label>
-          <input
-            id="email"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={input}
-          />
+          <input id="email" type="email" inputMode="email" autoComplete="email"
+            placeholder="you@example.com" value={email}
+            onChange={(e) => setEmail(e.target.value)} required style={input} />
 
           <label htmlFor="password" style={label}>パスワード</label>
           <div style={{ position: "relative" }}>
-            <input
-              id="password"
-              type={showPw ? "text" : "password"}
+            <input id="password" type={showPw ? "text" : "password"}
               autoComplete={mode === "login" ? "current-password" : "new-password"}
-              placeholder="8文字以上"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              style={{ ...input, paddingRight: 42 }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPw((v) => !v)}
-              aria-label={showPw ? "パスワードを隠す" : "パスワードを表示"}
-              style={pwToggle}
-            >
+              placeholder="8文字以上" value={password}
+              onChange={(e) => setPassword(e.target.value)} required minLength={8}
+              style={{ ...input, paddingRight: 42 }} />
+            <button type="button" onClick={() => setShowPw(v => !v)}
+              aria-label={showPw ? "パスワードを隠す" : "パスワードを表示"} style={pwToggle}>
               {showPw ? "🙈" : "👁️"}
             </button>
           </div>
@@ -167,13 +130,11 @@ export default function LoginFormPage() {
             </button>
           )}
 
-          {info && <p style={{ ...infoText }}>{info}</p>}
+          {info && <p style={infoText}>{info}</p>}
           {error && <p style={errorText}>{error}</p>}
         </form>
 
-        <p style={hint}>
-          ※ 新規登録は確認メールのリンクを開いて本登録完了となります。
-        </p>
+        <p style={hint}>※ 新規登録は確認メールのリンクを開いて本登録完了となります。</p>
       </section>
 
       {/* 背景（簡易） */}
@@ -181,17 +142,11 @@ export default function LoginFormPage() {
         <div style={aura} />
         <div style={aura2} />
       </div>
-
-      <style jsx>{`
-        @media (max-width: 420px) { section { width: calc(100% - 28px); } }
-        @keyframes pulse { 0%{transform:scale(.98);opacity:.7}50%{transform:scale(1.02);opacity:1}100%{transform:scale(.98);opacity:.7} }
-        @keyframes drift { 0%{transform:translateY(0)}50%{transform:translateY(-12px)}100%{transform:translateY(0)} }
-      `}</style>
     </main>
   );
 }
 
-/* ===== メッセージ整形 ===== */
+/* ===== helper ===== */
 function humanizeAuthError(msg: string): string {
   if (/Invalid login credentials/i.test(msg)) return "メールまたはパスワードが違います";
   if (/Email not confirmed/i.test(msg)) return "メール確認が未完了です。受信箱をご確認ください";
@@ -199,7 +154,7 @@ function humanizeAuthError(msg: string): string {
   return msg;
 }
 
-/* ===== styles ===== */
+/* ===== styles（そのまま流用） ===== */
 const page = { minHeight: "100dvh", display: "grid", placeItems: "center", background: "#0b0b0b", color: "#fff" } as const;
 const card = { width: 380, display: "grid", gap: 12, padding: "28px 24px 24px", borderRadius: 18, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(2px)", boxShadow: "0 10px 40px rgba(0,0,0,.35)" } as const;
 const title = { margin: 0, fontSize: 22, fontWeight: 700 } as const;

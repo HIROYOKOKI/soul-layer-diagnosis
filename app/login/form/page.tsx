@@ -1,23 +1,25 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 
-// ブラウザ用 Supabase
+// ブラウザ用 Supabase（NEXT_PUBLIC_* 必須）
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export default function LoginFormClient() {
+export default function LoginFormPage() {
   const router = useRouter();
-  const params = useSearchParams();
 
-  const initialMode =
-    (params.get("mode") === "signup" ? "signup" : "login") as "login" | "signup";
+  // ?mode=signup 等は window.location から直接読む（useSearchParamsは使わない）
+  const search = typeof window !== "undefined" ? window.location.search : "";
+  const params = useMemo(() => new URLSearchParams(search), [search]);
 
-  const [mode, setMode] = useState<"login" | "signup">(initialMode);
+  const [mode, setMode] = useState<"login" | "signup">(
+    params.get("mode") === "signup" ? "signup" : "login"
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -25,11 +27,7 @@ export default function LoginFormClient() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  const redirectTo = useMemo(() => {
-    if (typeof window === "undefined") return undefined;
-    return `${window.location.origin}/login/form?verified=1`;
-  }, []);
-
+  // メール確認／リセット後に戻って来た時の表示
   useEffect(() => {
     if (params.get("verified") === "1") {
       setInfo("メール確認が完了しました。ログインできます。");
@@ -40,6 +38,12 @@ export default function LoginFormClient() {
       setMode("login");
     }
   }, [params]);
+
+  // サインアップのリダイレクト先（Supabase Auth に登録しておく）
+  const redirectTo = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+    return `${window.location.origin}/login/form?verified=1`;
+  }, []);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -92,11 +96,13 @@ export default function LoginFormClient() {
 
         <div style={tabs}>
           <button type="button" onClick={() => setMode("login")}
-            aria-pressed={mode === "login"} style={{ ...tabBtn, ...(mode === "login" ? tabActive : null) }}>
+                  aria-pressed={mode === "login"}
+                  style={{ ...tabBtn, ...(mode === "login" ? tabActive : null) }}>
             ログイン
           </button>
           <button type="button" onClick={() => setMode("signup")}
-            aria-pressed={mode === "signup"} style={{ ...tabBtn, ...(mode === "signup" ? tabActive : null) }}>
+                  aria-pressed={mode === "signup"}
+                  style={{ ...tabBtn, ...(mode === "signup" ? tabActive : null) }}>
             新規登録
           </button>
         </div>
@@ -104,34 +110,34 @@ export default function LoginFormClient() {
         <form onSubmit={handleSubmit} style={form}>
           <label htmlFor="email" style={label}>メールアドレス</label>
           <input id="email" type="email" inputMode="email" autoComplete="email"
-            placeholder="you@example.com" value={email}
-            onChange={(e) => setEmail(e.target.value)} required style={input} />
+                 placeholder="you@example.com" value={email}
+                 onChange={(e) => setEmail(e.target.value)} required style={input} />
 
           <label htmlFor="password" style={label}>パスワード</label>
           <div style={{ position: "relative" }}>
             <input id="password" type={showPw ? "text" : "password"}
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-              placeholder="8文字以上" value={password}
-              onChange={(e) => setPassword(e.target.value)} required minLength={8}
-              style={{ ...input, paddingRight: 42 }} />
+                   autoComplete={mode === "login" ? "current-password" : "new-password"}
+                   placeholder="8文字以上" value={password} onChange={(e) => setPassword(e.target.value)}
+                   required minLength={8} style={{ ...input, paddingRight: 42 }} />
             <button type="button" onClick={() => setShowPw(v => !v)}
-              aria-label={showPw ? "パスワードを隠す" : "パスワードを表示"} style={pwToggle}>
+                    aria-label={showPw ? "パスワードを隠す" : "パスワードを表示"}
+                    style={pwToggle}>
               {showPw ? "🙈" : "👁️"}
             </button>
           </div>
 
-          <button type="submit" disabled={loading} style={primaryBtn}>
-            {loading ? "処理中…" : mode === "login" ? "ログイン" : "登録する"}
+        <button type="submit" disabled={loading} style={primaryBtn}>
+          {loading ? "処理中…" : mode === "login" ? "ログイン" : "登録する"}
+        </button>
+
+        {mode === "login" && (
+          <button type="button" onClick={sendReset} style={linkBtn}>
+            パスワードをお忘れですか？
           </button>
+        )}
 
-          {mode === "login" && (
-            <button type="button" onClick={sendReset} style={linkBtn}>
-              パスワードをお忘れですか？
-            </button>
-          )}
-
-          {info && <p style={infoText}>{info}</p>}
-          {error && <p style={errorText}>{error}</p>}
+        {info && <p style={infoText}>{info}</p>}
+        {error && <p style={errorText}>{error}</p>}
         </form>
 
         <p style={hint}>※ 新規登録は確認メールのリンクを開いて本登録完了となります。</p>
@@ -154,7 +160,7 @@ function humanizeAuthError(msg: string): string {
   return msg;
 }
 
-/* ===== styles（そのまま流用） ===== */
+/* ===== styles（既存のまま） ===== */
 const page = { minHeight: "100dvh", display: "grid", placeItems: "center", background: "#0b0b0b", color: "#fff" } as const;
 const card = { width: 380, display: "grid", gap: 12, padding: "28px 24px 24px", borderRadius: 18, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(2px)", boxShadow: "0 10px 40px rgba(0,0,0,.35)" } as const;
 const title = { margin: 0, fontSize: 22, fontWeight: 700 } as const;

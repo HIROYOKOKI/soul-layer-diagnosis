@@ -1,7 +1,7 @@
 // app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
-import AppHeader from "@/components/AppHeader";
+import AppHeader from "./components/AppHeader";
 import { usePathname } from "next/navigation";
 
 export const metadata: Metadata = {

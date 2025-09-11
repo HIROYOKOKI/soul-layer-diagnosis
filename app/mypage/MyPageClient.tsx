@@ -338,4 +338,21 @@ export default function MyPageClient() {
           <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
             <h2 className="text-base font-semibold mb-3">次の一歩を選んでください</h2>
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={goDaily} className="rounded-xl border border-white/20 bg
+              <button onClick={goDaily} className="rounded-xl border border-white/20 bg-white/10 px-3 py-3 hover:bg-white/15">
+                デイリー診断
+                <div className="text-[11px] text-white/60 mt-1">1問 / 今日のゆらぎ</div>
+              </button>
+              <button className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-white/50 cursor-not-allowed" title="近日公開">
+                診断タイプを選ぶ
+                <div className="text-[11px] text-white/40 mt-1">Weekly / Monthly（予定）</div>
+              </button>
+            </div>
+          </section>
+
+          {/* タイプ吹き出し（任意） */}
+          <OrientationTip baseModel={profile?.base_model ?? null} />
+        </div>
+      </main>
+    </div>
+  )
+}

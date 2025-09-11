@@ -59,25 +59,24 @@ export default function LoginEmailPage() {
           />
         </label>
 
-        <label className="grid gap-1 text-sm relative">
-          <span>Password</span>
-          <input
-            type={showPw ? 'text' : 'password'}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            className="w-full rounded border border-white/20 bg-black/30 p-2 pr-10"
-            autoComplete="current-password"
-          />
-          {/* 👁️/🙈 トグルボタン */}
-         <button
-  type="button"
-  onClick={() => setShowPw(v => !v)}
-  className="absolute right-2 top-1/2 -translate-y-1/2 text-2xl leading-none"
->
-  {showPw ? '🙈' : '👁️'}
-</button>
+       <div className="relative flex items-center">
+  <input
+    type={showPw ? 'text' : 'password'}
+    value={password}
+    onChange={(e) => setPassword(e.target.value)}
+    required
+    className="w-full rounded border border-white/20 bg-black/30 p-2 pr-10"
+  />
+  <button
+    type="button"
+    onClick={() => setShowPw(v => !v)}
+    className="absolute right-2 text-2xl leading-none"
+    aria-label={showPw ? 'パスワードを隠す' : 'パスワードを表示'}
+  >
+    {showPw ? '🙈' : '👁️'}
+  </button>
+</div>
+
         </label>
 
         <button

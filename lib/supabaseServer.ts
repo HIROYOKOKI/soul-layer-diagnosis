@@ -1,6 +1,11 @@
-import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+// lib/supabaseServer.ts
+
+// 今は UUID 紐付けを使わないのでスタブにする。
+// 後で @supabase/auth-helpers-nextjs を導入して戻す。
+
 import type { SupabaseClient } from "@supabase/supabase-js";
+
 export function getSupabaseServer(): SupabaseClient {
-  return createRouteHandlerClient({ cookies });
+  throw new Error("getSupabaseServer is disabled in this build");
 }
+

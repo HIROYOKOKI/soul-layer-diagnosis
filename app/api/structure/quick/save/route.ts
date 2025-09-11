@@ -1,5 +1,9 @@
+// app/api/structure/quick/save/route.ts
+import { NextResponse } from "next/server"
+import { cookies } from "next/headers"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { getSupabaseAdmin } from "@/lib/supabase-admin"
-import { getSupabaseServer } from "@/lib/supabaseServer"
+
 const ALLOW_ANON = process.env.ALLOW_ANON_WRITE === "true"
 
 export const runtime = "nodejs"
@@ -11,7 +15,6 @@ type Body = {
   type_label: string
   comment?: string
   scores?: Partial<Record<EVChar, number>>
-  // user_id?: string | null   ← 外部からは受け取らない（サーバで決定）
 }
 
 function json(data: unknown, init?: ResponseInit) {
@@ -22,24 +25,22 @@ function json(data: unknown, init?: ResponseInit) {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  // 1) ログイン中ユーザーを取得（クッキーから）
-  let uid: string | null = null
-  try {
-    const sv = getSupabaseServer()
-    const { data, error } = await sv.auth.getUser()
-    if (error) throw error
-    uid = data.user?.id ?? null
-  } catch {
-    // ここで落とす（紐付け必須仕様）
-    return json({ ok: false, error: "unauthorized" }, { status: 401 })
-  }
-  if (!uid) return json({ ok: false, error: "unauthorized" }, { status: 401 })
-
-  // 2) Adminクライアント
+  // 0) Adminクライアント確保
   const sb = getSupabaseAdmin()
   if (!sb) return json({ ok: false, error: "supabase_env_missing" }, { status: 500 })
 
-  // 3) 入力JSON
+  // 1) ログイン中ユーザー（クッキーから）
+  const sv = createRouteHandlerClient({ cookies })
+  const { data: userResp, error: userErr } = await sv.auth.getUser()
+  if (userErr) {
+    if (!ALLOW_ANON) return json({ ok: false, error: "unauthorized" }, { status: 401 })
+  }
+  const uid = userResp?.user?.id ?? null
+  if (!uid && !ALLOW_ANON) {
+    return json({ ok: false, error: "unauthorized" }, { status: 401 })
+  }
+
+  // 2) 入力JSON
   let body: Body
   try {
     body = (await req.json()) as Body
@@ -50,7 +51,7 @@ export async function POST(req: Request): Promise<Response> {
     return json({ ok: false, error: "INVALID_PAYLOAD" }, { status: 400 })
   }
 
-  // 4) スコア計算
+  // 3) スコア計算（デフォ重み0.5／scores未指定なら選択コードに+1）
   const weight = 0.5
   const addOne = !body.scores
   const rawE = (body.scores?.E ?? 0) + (addOne && body.code === "E" ? 1 : 0)
@@ -59,7 +60,7 @@ export async function POST(req: Request): Promise<Response> {
   const rawR = (body.scores?.["Ǝ"] ?? 0) + (addOne && body.code === "Ǝ" ? 1 : 0)
 
   const row = {
-    user_id: uid,                 // ★ ここをサーバで決め打ち
+    user_id: uid, // ALLOW_ANON=true の時は null も許容
     type_label: body.type_label,
     comment: body.comment ?? null,
     e_score: rawE * weight,

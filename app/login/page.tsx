@@ -207,8 +207,10 @@ const styles: Record<string, CSSProperties> = {
     zIndex: 1,
   },
   buttonRow: {
-    display: 'flex',
-    gap: 18,
-    transition: 'opacity .6s ease',
-  },
+  display: 'flex',
+  gap: 18,
+  transition: 'opacity .6s ease',
+  zIndex: 10,            // 追加
+  position: 'relative',  // 明示
+},
 };

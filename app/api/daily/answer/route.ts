@@ -17,11 +17,19 @@ const schema = z.object({
 })
 
 export async function POST(req: Request) {
+  const cookieStore = cookies()
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies }
+    {
+      cookies: {
+        get(name)   { return cookieStore.get(name)?.value },
+        set(name, value, options)    { cookieStore.set({ name, value, ...options }) },
+        remove(name, options)        { cookieStore.set({ name, value: "", ...options }) },
+      },
+    }
   )
+
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ ok:false, error:"not_authenticated" }, { status:401 })
 

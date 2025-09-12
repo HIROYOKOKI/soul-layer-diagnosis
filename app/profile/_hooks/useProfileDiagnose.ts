@@ -1,70 +1,47 @@
 // app/profile/_hooks/useProfileDiagnose.ts
-"use client"
+"use client";
 
-import { useCallback, useState } from "react"
+import { useEffect, useState } from "react";
 
-export type ProfileInput = {
-  name: string                // 必須（ニックネーム可）
-  birthday: string            // 必須 "YYYY-MM-DD"
-  birthTime?: string | null   // 任意 "HH:mm"（わからなければ null）
-  birthPlace?: string | null  // 任意 例: "Tokyo, JP"
-  sex?: "Male" | "Female" | "Other" | null         // 任意（性別）
-  preference?: "Male" | "Female" | "Both" | "None" | "Other" | null // 任意（恋愛対象）
-  theme?: "dev" | "prod"      // 既存運用に合わせて（デフォルト dev）
-}
+type Result = {
+  ok: boolean;
+  result?: any;
+  error?: string;
+};
 
-export type DiagnoseState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "error"; error: string }
-  | {
-      status: "done"
-      result: {
-        // APIの戻りに合わせて適宜
-        luneaLines: string[]
-        detail?: Record<string, unknown>
+export function useProfileDiagnose(
+  payload: any,
+  opts: { enabled?: boolean } = {}
+) {
+  const { enabled = false } = opts;        // ★ デフォルト無効
+  const [data, setData] = useState<Result | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    if (!enabled) return;                   // ★ 明示指定が無ければ絶対に動かない
+    (async () => {
+      try {
+        setLoading(true); setErr(null);
+        const res = await fetch("/api/profile/diagnose", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify(payload ?? {}),
+        });
+        const j = await res.json();
+        if (!alive) return;
+        if (!res.ok || !j?.ok) throw new Error(j?.error || "diagnose_failed");
+        setData(j);
+      } catch (e: any) {
+        setErr(e?.message || "diagnose_failed");
+      } finally {
+        setLoading(false);
       }
-    }
+    })();
+    return () => { alive = false; };
+  }, [enabled]);                             // ★ payload 変更で連打しない（必要なら依存に追加）
 
-export function useProfileDiagnose() {
-  const [state, setState] = useState<DiagnoseState>({ status: "idle" })
-
-  const diagnose = useCallback(async (input: ProfileInput) => {
-    setState({ status: "loading" })
-
-    try {
-      // 任意項目は null に正規化（空文字が来てもOKにする）
-      const payload = {
-        name: input.name,
-        birthday: input.birthday,
-        birthTime: input.birthTime ? input.birthTime : null,
-        birthPlace: input.birthPlace ? input.birthPlace : null,
-        sex: input.sex ?? null,
-        preference: input.preference ?? null,
-        theme: input.theme ?? "dev",
-      }
-
-      const res = await fetch("/api/profile/diagnose", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-
-      if (!res.ok) {
-        const t = await res.text()
-        throw new Error(`HTTP ${res.status} ${t}`)
-      }
-
-      const json = await res.json()
-      if (!json?.ok) throw new Error(json?.error ?? "unknown_error")
-
-      setState({ status: "done", result: json.result })
-      return json.result
-    } catch (e: any) {
-      setState({ status: "error", error: e?.message ?? String(e) })
-      return null
-    }
-  }, [])
-
-  return { state, diagnose }
+  return { data, loading, error: err };
 }

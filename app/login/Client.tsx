@@ -11,14 +11,12 @@ export default function LoginClient() {
   const redirectTo = `${location.origin}/api/auth/callback?next=/mypage`;
 
   async function syncCookie(event: "SIGNED_IN" | "TOKEN_REFRESHED" | "SIGNED_OUT", session?: any) {
-    try {
-      await fetch("/api/auth/callback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ event, session }),
-      });
-    } catch {}
+    await fetch("/api/auth/callback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ event, session }),
+    });
   }
 
   const signInGoogle = async () => {
@@ -40,7 +38,7 @@ export default function LoginClient() {
     const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
     if (error) setMsg(error.message);
     else {
-      await syncCookie("SIGNED_IN", data.session); // ← これでAPIに届くCookieが確立
+      await syncCookie("SIGNED_IN", data.session);   // ★ Cookie同期
       location.href = "/mypage";
     }
     setLoading(false);
@@ -48,7 +46,7 @@ export default function LoginClient() {
 
   const signOut = async () => {
     await sb.auth.signOut();
-    await syncCookie("SIGNED_OUT"); // ← サーバー側Cookieも破棄
+    await syncCookie("SIGNED_OUT");                  // ★ Cookie破棄
     location.reload();
   };
 
@@ -62,10 +60,10 @@ export default function LoginClient() {
       <input value={pass} onChange={(e) => setPass(e.target.value)} type="password" placeholder="パスワード" className="w-full rounded border px-3 py-2 bg-white/5" />
       <div className="grid grid-cols-2 gap-2">
         <button onClick={signUp} className="rounded border px-3 py-2" disabled={loading}>新規登録</button>
-        <button onClick={signIn} className="rounded bg-white text-black px-3 py-2" disabled={loading}>ログイン</button>
+        <button onClick={signIn} className="rounded bg白 text黒 px-3 py-2" disabled={loading}>ログイン</button>
       </div>
-      {msg && <p className="text-sm text-amber-300">{msg}</p>}
       <button onClick={signOut} className="text-xs text-white/60 underline">ログアウト</button>
+      {msg && <p className="text-sm text-amber-300">{msg}</p>}
     </div>
   );
 }

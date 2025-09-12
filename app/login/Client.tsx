@@ -1,4 +1,3 @@
-// app/login/Client.tsx
 "use client";
 import { useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
@@ -10,6 +9,17 @@ export default function LoginClient() {
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const redirectTo = `${location.origin}/api/auth/callback?next=/mypage`;
+
+  async function syncCookie(event: "SIGNED_IN" | "TOKEN_REFRESHED" | "SIGNED_OUT", session?: any) {
+    try {
+      await fetch("/api/auth/callback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ event, session }),
+      });
+    } catch {}
+  }
 
   const signInGoogle = async () => {
     setLoading(true);
@@ -27,10 +37,19 @@ export default function LoginClient() {
 
   const signIn = async () => {
     setLoading(true);
-    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
     if (error) setMsg(error.message);
-    else location.href = "/mypage";
+    else {
+      await syncCookie("SIGNED_IN", data.session); // ← これでAPIに届くCookieが確立
+      location.href = "/mypage";
+    }
     setLoading(false);
+  };
+
+  const signOut = async () => {
+    await sb.auth.signOut();
+    await syncCookie("SIGNED_OUT"); // ← サーバー側Cookieも破棄
+    location.reload();
   };
 
   return (
@@ -46,6 +65,7 @@ export default function LoginClient() {
         <button onClick={signIn} className="rounded bg-white text-black px-3 py-2" disabled={loading}>ログイン</button>
       </div>
       {msg && <p className="text-sm text-amber-300">{msg}</p>}
+      <button onClick={signOut} className="text-xs text-white/60 underline">ログアウト</button>
     </div>
   );
 }

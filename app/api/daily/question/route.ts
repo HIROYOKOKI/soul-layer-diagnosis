@@ -10,11 +10,17 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  // 1) Cookieでユーザー判定
-  const helper = createRouteHandlerClient({ cookies });
-  let { data: { user }, error } = await helper.auth.getUser();
+  // --- 観測ログ（必要なら残す）
+  // console.log("daily.question.check", {
+  //   cookies: (await import("next/headers")).cookies().getAll().map(c => c.name),
+  //   auth: req.headers.get("authorization")?.slice(0, 16) || null,
+  // });
 
-  // 2) Cookieが無い場合は Bearer で補助（あなたのクライアントに合わせる）
+  // 1) Cookie（通常ルート）
+  const helper = createRouteHandlerClient({ cookies });
+  let { data: { user } } = await helper.auth.getUser();
+
+  // 2) Cookieが無いときは Bearer を受ける（あなたのClientが送っている）
   if (!user) {
     const auth = req.headers.get("authorization");
     const token = auth?.startsWith("Bearer ") ? auth.slice(7) : undefined;
@@ -27,12 +33,13 @@ export async function GET(req: NextRequest) {
       user = r.data.user ?? null;
     }
   }
+
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const slot = getSlot();
 
   try {
-    // 3) ここで“ユーザーのRLSコンテキスト”で必要最小の参照だけ
+    // 3) 必要データは “ユーザーのRLSコンテキスト” で最小限取得
     const { data: rows } = await helper
       .from("daily_results")
       .select("code, scores, comment, created_at")
@@ -45,20 +52,19 @@ export async function GET(req: NextRequest) {
       .from("profiles")
       .select("theme")
       .eq("id", user.id)
-      .single();
+      .maybeSingle(); // ← .single()だと行が無いと例外、maybeSingleで安全
 
     const theme = (profile as any)?.theme ?? undefined;
 
+    // 4) 純関数で質問を組み立て（SRK不要）
     const item = buildQuestionFromData(user.id, slot, rows ?? [], theme);
+
     return NextResponse.json(item);
   } catch (e: any) {
     console.error("daily.question.fail", {
-      userId: user.id,
-      slot,
-      message: e?.message,
-      stack: e?.stack,
+      userId: user.id, slot, message: e?.message, stack: e?.stack
     });
-    // 失敗しても必ず200でダミーを返す（UIは落とさない）
+    // 失敗してもUIは落とさない
     return NextResponse.json(fallbackQuestion(slot));
   }
 }

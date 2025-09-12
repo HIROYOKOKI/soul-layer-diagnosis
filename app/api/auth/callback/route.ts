@@ -10,7 +10,6 @@ export async function GET(req: Request) {
 
   if (code) {
     const supabase = createRouteHandlerClient({ cookies });
-    // ← ここで Supabase のセッションを“Cookie”として確立
     await supabase.auth.exchangeCodeForSession(code);
   }
   return NextResponse.redirect(new URL(next, origin));

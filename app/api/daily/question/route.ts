@@ -4,17 +4,17 @@ import { cookies } from "next/headers";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { createClient } from "@supabase/supabase-js";
 import { getSlot } from "@/lib/daily";
-import { generateQuestion, fallbackQuestion } from "@/lib/question-gen";
+import { buildQuestionFromData, fallbackQuestion } from "@/lib/question-gen";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  // まずは Cookie で試す
+  // 1) Cookieでユーザー判定
   const helper = createRouteHandlerClient({ cookies });
-  let { data: { user } } = await helper.auth.getUser();
+  let { data: { user }, error } = await helper.auth.getUser();
 
-  // Cookie で取れない場合は Authorization: Bearer で認証
+  // 2) Cookieが無い場合は Bearer で補助（あなたのクライアントに合わせる）
   if (!user) {
     const auth = req.headers.get("authorization");
     const token = auth?.startsWith("Bearer ") ? auth.slice(7) : undefined;
@@ -27,15 +27,38 @@ export async function GET(req: NextRequest) {
       user = r.data.user ?? null;
     }
   }
-
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const slot = getSlot();
+
   try {
-    const item = (await generateQuestion(user.id, slot)) ?? fallbackQuestion(slot);
+    // 3) ここで“ユーザーのRLSコンテキスト”で必要最小の参照だけ
+    const { data: rows } = await helper
+      .from("daily_results")
+      .select("code, scores, comment, created_at")
+      .eq("user_id", user.id)
+      .eq("env", "prod")
+      .order("created_at", { ascending: false })
+      .limit(24);
+
+    const { data: profile } = await helper
+      .from("profiles")
+      .select("theme")
+      .eq("id", user.id)
+      .single();
+
+    const theme = (profile as any)?.theme ?? undefined;
+
+    const item = buildQuestionFromData(user.id, slot, rows ?? [], theme);
     return NextResponse.json(item);
   } catch (e: any) {
-    console.error("daily.question.fail", { userId: user.id, slot, message: e.message });
+    console.error("daily.question.fail", {
+      userId: user.id,
+      slot,
+      message: e?.message,
+      stack: e?.stack,
+    });
+    // 失敗しても必ず200でダミーを返す（UIは落とさない）
     return NextResponse.json(fallbackQuestion(slot));
   }
 }

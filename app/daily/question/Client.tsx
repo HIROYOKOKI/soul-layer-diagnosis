@@ -1,54 +1,16 @@
+// app/daily/question/Client.tsx
 "use client";
 
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
 
-useEffect(() => {
-  let alive = true;
-  (async () => {
-    try {
-      setLoading(true); setErr(null);
-      const sb = getBrowserSupabase();
-      const { data: { session } } = await sb.auth.getSession();
-      const token = session?.access_token;
-
-      const res = await fetch("/api/daily/question", {
-        cache: "no-store",
-        credentials: "same-origin",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      if (!res.ok) {
-        if (res.status === 401) throw new Error("unauthorized");
-        throw new Error("question_failed");
-      }
-
-      const j = await res.json();   // APIは DailyQuestion をそのまま返す
-      if (!alive) return;
-      setQ(j);
-    } catch (e: any) {
-      setErr(e?.message || "failed");
-    } finally {
-      setLoading(false);
-    }
-  })();
-  return () => { alive = false; };
-}, []);
-
-
-async function celebrate(n: 10 | 30 | 90) {
-  try {
-    const { default: confetti } = await import("canvas-confetti");
-    confetti({ particleCount: 80, spread: 70, scalar: 0.8 });
-  } catch {
-    // 依存が無くても UI は継続（静かにスキップ）
-  }
-}
 type EV = "E" | "V" | "Λ" | "Ǝ";
 type DailyQuestion = {
   id: string;
   slot: 1 | 2 | 3;
   text: string;
   options: { key: EV; label: string }[];
+  subset?: EV[];
 };
 type Done = { comment: string; affirmation: string; milestone: 10 | 30 | 90 | null };
 
@@ -59,6 +21,16 @@ const EV_COLOR: Record<EV, string> = {
   Λ: "text-emerald-300",
   Ǝ: "text-fuchsia-400",
 };
+
+// 軽量：必要時のみ読み込む
+async function celebrate(n: 10 | 30 | 90) {
+  try {
+    const { default: confetti } = await import("canvas-confetti");
+    confetti({ particleCount: 80, spread: 70, scalar: 0.8, origin: { y: 0.6 } });
+  } catch {
+    // 依存が無くても UI は継続（静かにスキップ）
+  }
+}
 
 export default function DailyQuestionClient() {
   const [q, setQ] = useState<DailyQuestion | null>(null);
@@ -71,15 +43,28 @@ export default function DailyQuestionClient() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
 
-  // 取得：/api/daily/question は DailyQuestion を **そのまま返す**
+  // 取得：/api/daily/question は DailyQuestion をそのまま返す（Bearer付き）
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         setLoading(true);
         setErr(null);
-        const res = await fetch("/api/daily/question", { cache: "no-store" });
-        if (!res.ok) throw new Error("question_failed");
+        const sb = getBrowserSupabase();
+        const { data: { session } } = await sb.auth.getSession();
+        const token = session?.access_token;
+
+        const res = await fetch("/api/daily/question", {
+          cache: "no-store",
+          credentials: "same-origin",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+
+        if (!res.ok) {
+          if (res.status === 401) throw new Error("unauthorized");
+          throw new Error("question_failed");
+        }
+
         const j: DailyQuestion = await res.json();
         if (!alive) return;
         setQ(j);
@@ -137,9 +122,7 @@ export default function DailyQuestionClient() {
 
   // マイルストーン祝福（紙吹雪）
   useEffect(() => {
-    if (done?.milestone) {
-      confetti({ particleCount: 90, spread: 70, scalar: 0.9, origin: { y: 0.6 } });
-    }
+    if (done?.milestone) celebrate(done.milestone);
   }, [done?.milestone]);
 
   const onSubmit = async () => {
@@ -149,7 +132,6 @@ export default function DailyQuestionClient() {
 
     // サーバー側で question_id を再計算 → 改竄対策
     const payload = {
-      // id は送らない（サーバー計算を正とする）
       first_choice: first,
       final_choice: finalK,
       changes,
@@ -160,6 +142,7 @@ export default function DailyQuestionClient() {
       const res = await fetch("/api/daily/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify(payload),
       });
       const j = await res.json();
@@ -171,7 +154,6 @@ export default function DailyQuestionClient() {
         if (q.id && !s.includes(q.id)) localStorage.setItem("daily-answered-ids", JSON.stringify([...s, q.id]));
       } catch {}
 
-      // コメント/アファは現行APIでは未返却の可能性があるため安全にフォールバック
       setDone({
         comment: j.item?.comment ?? "",
         affirmation: j.item?.quote ?? j.item?.affirmation ?? "",
@@ -197,6 +179,7 @@ export default function DailyQuestionClient() {
       const res = await fetch("/api/daily/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify(head),
       });
       const j = await res.json();
@@ -210,7 +193,7 @@ export default function DailyQuestionClient() {
         setErr(null);
       }
     } catch {
-      // 何もしない（次回手動再送）
+      // 次回手動再送
     }
   };
 

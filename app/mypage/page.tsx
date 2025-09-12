@@ -1,41 +1,29 @@
-// app/mypage/page.tsx
-import MyPageClient from "./MyPageClient"
+import { cookies } from "next/headers";
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 
-type EV = "E" | "V" | "Λ" | "Ǝ"
-type DailyLatest = {
-  code?: EV | null
-  comment?: string | null
-  quote?: string | null
-  scores?: Partial<Record<EV, number>> | null
-  raw_interactions?: {
-    first_choice?: EV | null
-    final_choice?: EV | null
-    changes?: number
-    subset?: EV[] | null
-  } | null
-  created_at?: string | null
-}
+export default async function MyPage() {
+  const sb = createServerComponentClient({ cookies });
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return <div>ログインしてください</div>;
 
-const SERVER_ENV: "dev" | "prod" =
-  process.env.VERCEL_ENV === "production" ? "prod" : "dev"
+  const { data: latest } = await sb
+    .from("daily_results")
+    .select("question_id, code, comment, quote, created_at")
+    .eq("user_id", user.id)
+    .eq("env", "prod")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-async function fetchDailyLatest(env: "dev" | "prod"): Promise<DailyLatest | null> {
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? ""
-  const url = base
-    ? `${base}/api/mypage/daily-latest?env=${env}`
-    : `/api/mypage/daily-latest?env=${env}`
-
-  try {
-    const res = await fetch(url, { cache: "no-store" })
-    if (!res.ok) return null
-    const json = await res.json()
-    return json?.item ?? null
-  } catch {
-    return null
-  }
-}
-
-export default async function Page() {
-  const dailyLatest = await fetchDailyLatest(SERVER_ENV)
-  return <MyPageClient initialDailyLatest={dailyLatest} initialEnv={SERVER_ENV} />
+  return (
+    <main className="mx-auto max-w-md p-5 space-y-4 text-white">
+      <h1 className="text-2xl font-bold">マイページ</h1>
+      <section className="rounded-xl border border-white/15 p-4 bg-white/5">
+        <div className="text-sm text-white/60">最新のデイリー</div>
+        <div className="mt-1 text-lg">{latest?.comment ?? "—"}</div>
+        <blockquote className="mt-2 text-xl">“{latest?.quote ?? "今日は静かに進む"}”</blockquote>
+        <div className="mt-2 text-xs text-white/50">{latest?.question_id ?? ""}</div>
+      </section>
+    </main>
+  );
 }

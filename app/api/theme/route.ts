@@ -23,9 +23,15 @@ export async function POST(req: Request) {
   const theme = parsed.data.theme;
 
   try {
+    // 1) DBへ反映（profiles.theme が無ければ後述のSQLを実行）
     const { error } = await supabase.from("profiles").upsert({ id: user.id, theme });
     if (error) throw error;
-    return NextResponse.json({ ok: true });
+
+    // 2) CookieもDBと揃える（UIのズレ防止）
+    const res = NextResponse.json({ ok: true, theme });
+    res.cookies.set("theme", theme, { path: "/", sameSite: "lax", httpOnly: false });
+    res.cookies.set("theme_set_at", new Date().toISOString(), { path: "/", sameSite: "lax", httpOnly: false });
+    return res;
   } catch (e: any) {
     console.error("theme.update.fail", { userId: user.id, message: e?.message });
     return NextResponse.json({ ok: false, error: "update_failed" }, { status: 500 });

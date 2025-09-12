@@ -1,17 +1,12 @@
 // app/layout.tsx
-import { cookies } from "next/headers";
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import SupabaseProvider from "@/components/SupabaseProvider";
+import "./globals.css";
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createServerComponentClient({ cookies });
-  const { data: { session } } = await supabase.auth.getSession();
+export const dynamic = "force-dynamic";
 
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
-      <body>
-        <SupabaseProvider session={session}>{children}</SupabaseProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

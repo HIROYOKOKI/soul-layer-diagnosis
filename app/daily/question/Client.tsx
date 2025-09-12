@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import confetti from "canvas-confetti";
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
 type DailyQuestion = {
@@ -30,6 +31,7 @@ export default function DailyQuestionClient() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
 
+  // 取得：/api/daily/question は DailyQuestion を **そのまま返す**
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -37,10 +39,10 @@ export default function DailyQuestionClient() {
         setLoading(true);
         setErr(null);
         const res = await fetch("/api/daily/question", { cache: "no-store" });
-        const j = await res.json();
+        if (!res.ok) throw new Error("question_failed");
+        const j: DailyQuestion = await res.json();
         if (!alive) return;
-        if (!j?.ok) throw new Error("question_failed");
-        setQ(j.item);
+        setQ(j);
       } catch (e: any) {
         setErr(e?.message || "failed");
       } finally {
@@ -68,6 +70,7 @@ export default function DailyQuestionClient() {
     setFinalK(k);
   };
 
+  // キーボード操作（←→↑↓ で選択移動、Enter/Space で確定）
   const gridRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = gridRef.current;
@@ -92,17 +95,27 @@ export default function DailyQuestionClient() {
     return () => el.removeEventListener("keydown", handler);
   }, [q, finalK]);
 
+  // マイルストーン祝福（紙吹雪）
+  useEffect(() => {
+    if (done?.milestone) {
+      confetti({ particleCount: 90, spread: 70, scalar: 0.9, origin: { y: 0.6 } });
+    }
+  }, [done?.milestone]);
+
   const onSubmit = async () => {
     if (!q || !finalK || submitting) return;
     setSubmitting(true);
     setErr(null);
+
+    // サーバー側で question_id を再計算 → 改竄対策
     const payload = {
-      id: q.id,
+      // id は送らない（サーバー計算を正とする）
       first_choice: first,
       final_choice: finalK,
       changes,
       subset: q.options?.map((o) => o.key) ?? null,
     };
+
     try {
       const res = await fetch("/api/daily/answer", {
         method: "POST",
@@ -110,20 +123,25 @@ export default function DailyQuestionClient() {
         body: JSON.stringify(payload),
       });
       const j = await res.json();
-      if (!j?.ok) throw new Error(j?.error || "save_failed");
+      if (!res.ok || !j?.ok) throw new Error(j?.error || "save_failed");
+
+      // ローカル「回答済みID」マーキング（UIの上書き警告用）
       try {
         const s = JSON.parse(localStorage.getItem("daily-answered-ids") || "[]") as string[];
-        if (!s.includes(q.id)) localStorage.setItem("daily-answered-ids", JSON.stringify([...s, q.id]));
+        if (q.id && !s.includes(q.id)) localStorage.setItem("daily-answered-ids", JSON.stringify([...s, q.id]));
       } catch {}
+
+      // コメント/アファは現行APIでは未返却の可能性があるため安全にフォールバック
       setDone({
         comment: j.item?.comment ?? "",
         affirmation: j.item?.quote ?? j.item?.affirmation ?? "",
-        milestone: j.milestone ?? null,
+        milestone: (j.milestone as 10 | 30 | 90 | undefined) ?? null,
       });
     } catch (e: any) {
+      // 再送キューへ退避（ローカル）
       try {
         const list = JSON.parse(localStorage.getItem("daily-queue") || "[]");
-        localStorage.setItem("daily-queue", JSON.stringify([...list, payload]));
+        localStorage.setItem("daily-queue", JSON.stringify([...(Array.isArray(list) ? list : []), payload]));
       } catch {}
       setErr(e?.message || "save_failed");
     } finally {
@@ -142,20 +160,23 @@ export default function DailyQuestionClient() {
         body: JSON.stringify(head),
       });
       const j = await res.json();
-      if (j?.ok) {
+      if (res.ok && j?.ok) {
         localStorage.setItem("daily-queue", JSON.stringify(list.slice(1)));
         setDone({
           comment: j.item?.comment ?? "",
           affirmation: j.item?.quote ?? j.item?.affirmation ?? "",
-          milestone: j.milestone ?? null,
+          milestone: (j.milestone as 10 | 30 | 90 | undefined) ?? null,
         });
         setErr(null);
       }
-    } catch {}
+    } catch {
+      // 何もしない（次回手動再送）
+    }
   };
 
   if (loading)
     return <div className="min-h-screen bg-black text-white grid place-items-center">読み込み中…</div>;
+
   if (err && !q)
     return (
       <div className="min-h-screen bg-black text-white grid place-items-center">
@@ -187,7 +208,13 @@ export default function DailyQuestionClient() {
           <section className="rounded-2xl border border-white/12 bg-white/5 p-5 space-y-5">
             <p className="text-lg font-medium">{q.text}</p>
 
-            <div ref={gridRef} tabIndex={0} className="grid grid-cols-2 gap-3 focus:outline-none" aria-label="選択肢">
+            <div
+              ref={gridRef}
+              tabIndex={0}
+              className="grid grid-cols-2 gap-3 focus:outline-none"
+              aria-label="選択肢"
+              role="group"
+            >
               {q.options.map((o) => {
                 const active = finalK === o.key;
                 const firstPick = first === o.key;
@@ -199,6 +226,7 @@ export default function DailyQuestionClient() {
                       active ? "border-white/70 bg-white/20" : "border-white/15 bg-white/10 hover:bg-white/15"
                     }`}
                     aria-pressed={active}
+                    aria-label={`${o.key} ${o.label}`}
                   >
                     <div className={`font-mono text-xl ${EV_COLOR[o.key]}`}>{o.key}</div>
                     <div className="text-sm text-white/80">{o.label}</div>

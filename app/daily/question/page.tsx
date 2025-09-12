@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import Client from "./Client"
 
 /* ─────────────────────────────
    型
@@ -145,7 +145,7 @@ function useChoiceTrack<Code extends string>() {
 /* ─────────────────────────────
    ページ本体
    ───────────────────────────── */
-export default function DailyQuestionPage() {
+export default function Page() { return <Client /> }
  const env = useMemo(getEnvForLog, [])
   const slot = useMemo(currentSlot, []); // マウント時点のslotを固定
   const questionId = useMemo(() => buildQuestionId(slot), [slot]);

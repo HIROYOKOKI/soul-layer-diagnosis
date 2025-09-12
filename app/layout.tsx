@@ -1,17 +1,16 @@
 // app/layout.tsx
-import "./globals.css";
-import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
+import SupabaseProvider from "@/components/SupabaseProvider";
 
-export const metadata: Metadata = {
-  title: "Soul Layer Diagnosis",
-  description: "EVΛƎ ソウルレイヤー診断",
-};
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const supabase = createServerComponentClient({ cookies });
+  const { data: { session } } = await supabase.auth.getSession();
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
-      <body className="bg-black text-white overflow-x-hidden">
-        <main className="min-h-[100dvh]">{children}</main>
+      <body>
+        <SupabaseProvider session={session}>{children}</SupabaseProvider>
       </body>
     </html>
   );

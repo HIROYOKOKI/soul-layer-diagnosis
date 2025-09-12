@@ -7,12 +7,12 @@ export async function GET(req: Request) {
   if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 })
 
   const url = new URL(req.url)
-  const env = url.searchParams.get("env") ?? null
+  const env = url.searchParams.get("env")
 
   let q = sb
     .from("daily_results")
-    .select("code, comment, quote, theme, env, created_at")
-    .order("created_at", { ascending:false })
+    .select("code, comment, quote, theme, env, created_at, updated_at")
+    .order("updated_at", { ascending:false })  // 上書き更新も拾える
     .limit(1)
     .maybeSingle()
 

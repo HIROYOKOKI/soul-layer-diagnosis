@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import confetti from "canvas-confetti";
-
+async function celebrate(n: 10 | 30 | 90) {
+  try {
+    const { default: confetti } = await import("canvas-confetti");
+    confetti({ particleCount: 80, spread: 70, scalar: 0.8 });
+  } catch {
+    // 依存が無くても UI は継続（静かにスキップ）
+  }
+}
 type EV = "E" | "V" | "Λ" | "Ǝ";
 type DailyQuestion = {
   id: string;

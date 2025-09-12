@@ -1,4 +1,3 @@
-// app/mypage/SyncThemeButton.tsx
 "use client";
 
 import { useState } from "react";
@@ -17,11 +16,11 @@ export default function SyncThemeButton({ theme }: { theme: string }) {
         credentials: "same-origin",
         body: JSON.stringify({ theme }),
       });
-      if (!res.ok) throw new Error("sync_failed");
+      const j = await res.json();
+      if (!res.ok || !j?.ok) throw new Error(j?.error || "sync_failed");
       setMsg("テーマを同期しました。");
-      // 反映のためリロード
       location.reload();
-    } catch (e: any) {
+    } catch {
       setMsg("同期に失敗しました");
     } finally {
       setSyncing(false);

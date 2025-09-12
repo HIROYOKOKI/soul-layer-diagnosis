@@ -43,28 +43,24 @@ function softClampText(
   { min, max, tol = 20, fallback }: { min: number; max: number; tol?: number; fallback: string }
 ) {
   const text = (src || "").trim();
-  if (!text) return fallback;
+  if (!text) return fallback; // ← フォールバックはそのまま短文で返す（水増ししない）
 
   if (text.length > max + tol) return text.slice(0, max);
 
   if (text.length < min - tol) {
-    const need = min - text.length;
-    const add = (fallback || "").slice(0, need + 10);
-    const merged = (text + " " + add).replace(/\s+/g, " ").trim();
-    return merged.length > max ? merged.slice(0, max) : merged;
-  }
+    // AIが短すぎたときだけ、軽く整える（fallbackは混ぜない）
++    const pad = " ……";
++    return (text + pad).slice(0, Math.min(max, text.length + 5));
+   }
 
   return text;
 }
 
 const FALLBACKS = {
-  fortune:
-    "今は小さな熱源が灯っている時期。迷いがあっても、最初の一歩を踏み出せば流れは整う。焦らず、でも止まらず、今日の小さな行動を重ねていこう。",
-  personality:
-    "直感の火力が高く、方向が定まると一気に集中できるタイプ。芯を決めると継続力が生まれ、周囲を巻き込む推進力に変わる。",
-  work: "小さく試す→すぐ学ぶの反復が吉。短いスプリントで検証を回すと成果が伸びる。",
-  partner:
-    "熱量を尊重しつつ、リズムを整えてくれる相手と好相性。歩幅を合わせてくれる関係が長続きする。",
+  fortune: "観測中。今日の小さな一歩に意識を。",      // ★ニュートラル
+  personality: "あなたの今の傾向を整理しています。",
+  work: "短いスプリントで検証しよう。",
+  partner: "互いのリズムを尊重し合おう。",
 };
 
 function getRanges(pending: Pending) {

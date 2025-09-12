@@ -1,3 +1,4 @@
+// app/api/mypage/daily-latest/route.ts
 import { NextResponse } from "next/server"
 import { getSupabaseAdmin } from "../../../../lib/supabase-admin"
 
@@ -6,24 +7,18 @@ export async function GET(req: Request) {
   if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 })
 
   const url = new URL(req.url)
-  const env = (url.searchParams.get("env") || "prod").toLowerCase() as "dev"|"prod"
-  const debug = url.searchParams.get("debug") === "1"
+  const env = url.searchParams.get("env") ?? null
 
-  // ★ 索引に最適化：eq + ORDER BY created_at DESC
-  const base = sb
+  let q = sb
     .from("daily_results")
-    .select("code, comment, quote, scores, raw_interactions, created_at")
-    .eq("raw_interactions->>env", env)
-.order("created_at", { ascending: false })
-.limit(1)
+    .select("code, comment, quote, theme, env, created_at")
+    .order("created_at", { ascending:false })
+    .limit(1)
+    .maybeSingle()
 
-  if (debug) {
-    const { data, error } = await base.limit(3)
-    if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 })
-    return NextResponse.json({ ok:true, rows:data ?? [] })
-  }
+  if (env) q = q.eq("env", env)
 
-  const { data, error } = await base.limit(1).maybeSingle()
+  const { data, error } = await q
   if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 })
   return NextResponse.json({ ok:true, item: data ?? null })
 }

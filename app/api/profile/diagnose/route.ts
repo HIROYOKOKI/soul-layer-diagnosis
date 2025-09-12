@@ -56,15 +56,6 @@ function softClampText(
   return text;
 }
 
-
-const FALLBACKS = {
-  fortune: "観測中。今日の小さな一歩に意識を。",
-  personality: "あなたの今の傾向を整理しています。",
-  work: "短いスプリントで検証しよう。",
-  partner: "互いのリズムを尊重し合おう。",
-};
-
-
 function getRanges(pending: Pending) {
   const hasAstro = Boolean(pending?.birthTime && pending?.birthPlace);
   return {

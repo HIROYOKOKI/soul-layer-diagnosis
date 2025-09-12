@@ -1,6 +1,40 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { getBrowserSupabase } from "@/lib/supabase-browser";
+
+useEffect(() => {
+  let alive = true;
+  (async () => {
+    try {
+      setLoading(true); setErr(null);
+      const sb = getBrowserSupabase();
+      const { data: { session } } = await sb.auth.getSession();
+      const token = session?.access_token;
+
+      const res = await fetch("/api/daily/question", {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!res.ok) {
+        if (res.status === 401) throw new Error("unauthorized");
+        throw new Error("question_failed");
+      }
+
+      const j = await res.json();   // APIは DailyQuestion をそのまま返す
+      if (!alive) return;
+      setQ(j);
+    } catch (e: any) {
+      setErr(e?.message || "failed");
+    } finally {
+      setLoading(false);
+    }
+  })();
+  return () => { alive = false; };
+}, []);
+
+
 async function celebrate(n: 10 | 30 | 90) {
   try {
     const { default: confetti } = await import("canvas-confetti");

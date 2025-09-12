@@ -145,7 +145,9 @@ function useChoiceTrack<Code extends string>() {
 /* ─────────────────────────────
    ページ本体
    ───────────────────────────── */
-export default function Page() { return <Client /> }
+export default function Page() {
+  return <Client />;
+}
  const env = useMemo(getEnvForLog, [])
   const slot = useMemo(currentSlot, []); // マウント時点のslotを固定
   const questionId = useMemo(() => buildQuestionId(slot), [slot]);

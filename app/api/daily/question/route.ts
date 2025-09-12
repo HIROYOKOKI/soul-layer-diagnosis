@@ -1,23 +1,24 @@
-import { NextResponse } from "next/server"
-import { buildQuestionId, getSlot } from "@/lib/daily"
+// app/api/daily/question/route.ts
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { getSlot } from "@/lib/daily";
+import { generateQuestion, fallbackQuestion } from "@/lib/question-gen";
 
-export const runtime = "nodejs"
-export const dynamic = "force-dynamic"
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function GET() {
-  const slot = getSlot()
-  const id = buildQuestionId()
-  const text = ["今の一歩に最も近いのは？","今日の選択の軸はどれ？","いま優先したい感覚は？"][slot-1]
-  return NextResponse.json({
-    ok: true,
-    item: {
-      id, slot, text,
-      options: [
-        { key: "E", label: "衝動・情熱" },
-        { key: "V", label: "可能性・夢" },
-        { key: "Λ", label: "選択・設計" },
-        { key: "Ǝ", label: "観測・静寂" },
-      ],
-    }
-  })
+  const supabase = createRouteHandlerClient({ cookies });
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const slot = getSlot();
+  try {
+    const item = (await generateQuestion(user.id, slot)) ?? fallbackQuestion(slot);
+    return NextResponse.json(item);
+  } catch (e) {
+    console.error("daily.question.fail", { userId: user.id, slot, error: (e as Error).message });
+    return NextResponse.json(fallbackQuestion(slot));
+  }
 }

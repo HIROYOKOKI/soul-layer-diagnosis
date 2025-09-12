@@ -9,6 +9,7 @@ import { buildQuestionFromData, fallbackQuestion } from "@/lib/question-gen";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+
 export async function GET(req: NextRequest) {
   // --- 観測（必要なら残す）
   // console.log("daily.question.check", {

@@ -10,7 +10,20 @@ export async function GET(req: Request) {
 
   if (code) {
     const supabase = createRouteHandlerClient({ cookies });
-    await supabase.auth.exchangeCodeForSession(code);
+    await supabase.auth.exchangeCodeForSession(code); // OAuth/メールリンク → Cookie確立
   }
   return NextResponse.redirect(new URL(next, origin));
+}
+
+// ← これが重要：パスワードログインや signOut 時に Cookie を同期する
+export async function POST(req: Request) {
+  const supabase = createRouteHandlerClient({ cookies });
+  const { event, session } = await req.json(); // { event: 'SIGNED_IN'|'TOKEN_REFRESHED'|'SIGNED_OUT', session }
+  if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+    await supabase.auth.setSession(session);
+  }
+  if (event === "SIGNED_OUT") {
+    await supabase.auth.signOut();
+  }
+  return NextResponse.json({ ok: true });
 }

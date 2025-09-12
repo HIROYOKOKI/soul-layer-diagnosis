@@ -43,25 +43,27 @@ function softClampText(
   { min, max, tol = 20, fallback }: { min: number; max: number; tol?: number; fallback: string }
 ) {
   const text = (src || "").trim();
-  if (!text) return fallback; // ← フォールバックはそのまま短文で返す（水増ししない）
+  if (!text) return fallback;
 
   if (text.length > max + tol) return text.slice(0, max);
 
   if (text.length < min - tol) {
     // AIが短すぎたときだけ、軽く整える（fallbackは混ぜない）
-+    const pad = " ……";
-+    return (text + pad).slice(0, Math.min(max, text.length + 5));
-   }
+    const pad = " ……";
+    return (text + pad).slice(0, Math.min(max, text.length + 5));
+  }
 
   return text;
 }
 
+
 const FALLBACKS = {
-  fortune: "観測中。今日の小さな一歩に意識を。",      // ★ニュートラル
+  fortune: "観測中。今日の小さな一歩に意識を。",
   personality: "あなたの今の傾向を整理しています。",
   work: "短いスプリントで検証しよう。",
   partner: "互いのリズムを尊重し合おう。",
 };
+
 
 function getRanges(pending: Pending) {
   const hasAstro = Boolean(pending?.birthTime && pending?.birthPlace);

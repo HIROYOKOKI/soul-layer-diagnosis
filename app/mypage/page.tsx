@@ -1,8 +1,11 @@
 // app/mypage/page.tsx
+
 import { cookies } from "next/headers";
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 
 import SyncThemeButton from "./SyncThemeButton";
 

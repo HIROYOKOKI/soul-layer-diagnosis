@@ -1,4 +1,3 @@
-// app/api/daily/question/route.ts
 import { NextResponse } from "next/server"
 import { buildQuestionId, getSlot } from "@/lib/daily"
 

@@ -17,15 +17,19 @@ type ProfileLatest = {
   fortune?: string | null
   personality?: string | null
   partner?: string | null
-  created_at?: string
-  base_model?: "EΛVƎ" | "EVΛƎ" | null
-  base_order?: EV[] | null
+  created_at?: string | null
+  base_model?: "EΛVƎ" | "EVΛƎ" | null     // quick診断の型
+  base_order?: EV[] | null                 // jsonb配列をそのまま受ける
 }
+
 type DailyLatest = {
-  code?: string | null
-  comment?: string | null
-  quote?: string | null
-  created_at?: string
+  code?: string | null                     // "E" | "V" | "Λ" | "Ǝ" いずれか
+  comment?: string | null                  // 直近メッセージ（本文）
+  quote?: string | null                    // 直近メッセージ（短句）
+  theme?: string | null                    // 選択テーマ
+  env?: "dev" | "prod" | null              // 保存環境
+  created_at?: string | null
+  updated_at?: string | null               // 上書き更新対策で使用
 }
 
 type EVAEVectorLocal = EVAEVector

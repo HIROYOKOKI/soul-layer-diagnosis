@@ -60,10 +60,15 @@ function fmt(dt?: string | null) {
   try {
     const d = dt ? new Date(dt) : new Date()
     return new Intl.DateTimeFormat("ja-JP", {
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
     }).format(d)
-  } catch { return "" }
+  } catch {
+    return ""
+  }
 }
 
 function normalizeToday(v: any): EVAEVectorLocal {
@@ -76,7 +81,10 @@ function normalizeSeries(list: any[]): SeriesPointLocal[] {
     const L = typeof d?.L === "number" ? d.L : (typeof d?.["Λ"] === "number" ? d["Λ"] : 0)
     return {
       date: String(d?.date ?? "").slice(0, 10),
-      E: clamp01(d?.E), V: clamp01(d?.V), L: clamp01(L), Eexists: clamp01(d?.Eexists ?? d?.["Ǝ"]),
+      E: clamp01(d?.E),
+      V: clamp01(d?.V),
+      L: clamp01(L),
+      Eexists: clamp01(d?.Eexists ?? d?.["Ǝ"]),
     }
   })
 }
@@ -91,7 +99,9 @@ function modelMeta(model: "EΛVƎ" | "EVΛƎ" | null) {
 function hexToRgba(hex: string, alpha = 0.15) {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
   if (!m) return `rgba(255,255,255,${alpha})`
-  const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16)
+  const r = parseInt(m[1], 16),
+    g = parseInt(m[2], 16),
+    b = parseInt(m[3], 16)
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
@@ -123,7 +133,7 @@ export default function MyPageClient() {
   // env（dev/prod）
   const [env, setEnv] = useState<"dev" | "prod">("prod")
 
-  // 初回マウント時に localStorage の env を復元
+  // 初回：localStorage から env 復元
   useEffect(() => {
     try {
       const saved = localStorage.getItem("ev-env")
@@ -134,34 +144,50 @@ export default function MyPageClient() {
       }
     } catch {}
   }, [])
-   // ← 追加: ?env=dev|prod で上書き（iPhoneで /mypage?env=dev を開けばOK）
- useEffect(() => {
+
+  // URLクエリ ?env=dev|prod で上書き（iPhoneで /mypage?env=dev を開けばOK）
+  useEffect(() => {
     const p = search?.get("env")
     if (p === "dev" || p === "prod") {
       setEnv(p)
-      try { localStorage.setItem("ev-env", p) } catch {}
+      try {
+        localStorage.setItem("ev-env", p)
+      } catch {}
     }
   }, [search])
 
-  // env をクエリで渡しつつ取得。env 変更で再フェッチ
+  // env をクエリで渡して取得。prod が空なら dev を1回だけフォールバック
   useEffect(() => {
     let alive = true
     ;(async () => {
       try {
-        setError(null); setLoading(true)
+        setError(null)
+        setLoading(true)
+
         const qs = `?env=${encodeURIComponent(env)}`
-       let [p, d] = await Promise.all([ ...profile..., ...daily(env)... ])
- // フォールバック：prod が空なら dev を1回だけ再取得
- if (env === "prod" && d?.ok && !d?.item) {
-   const dDev = await fetch(`/api/mypage/daily-latest?env=dev`, { cache:"no-store" }).then(r=>r.json())
-   if (dDev?.ok && dDev?.item) d = dDev
- }
-          fetch("/api/mypage/profile-latest", { cache: "no-store" }).then((r) => r.json()),
-          fetch(`/api/mypage/daily-latest${qs}`,  { cache: "no-store" }).then((r) => r.json()),
+        const [pRes, dRes] = await Promise.all([
+          fetch("/api/mypage/profile-latest", { cache: "no-store" }),
+          fetch(`/api/mypage/daily-latest${qs}`, { cache: "no-store" }),
         ])
+
         if (!alive) return
+        if (!pRes.ok) throw new Error("profile_latest_failed")
+        if (!dRes.ok) throw new Error("daily_latest_failed")
+
+        const p = await pRes.json()
+        let d = await dRes.json()
+
+        // フォールバック：prod で item が空なら dev を一度だけ試す
+        if (env === "prod" && d?.ok && !d?.item) {
+          try {
+            const dDev = await fetch(`/api/mypage/daily-latest?env=dev`, { cache: "no-store" }).then((r) => r.json())
+            if (dDev?.ok && dDev?.item) d = dDev
+          } catch {}
+        }
+
         if (!p?.ok) throw new Error(p?.error || "profile_latest_failed")
         if (!d?.ok) throw new Error(d?.error || "daily_latest_failed")
+
         setProfile(p.item ?? null)
         setDaily(d.item ?? null)
       } catch (e: any) {
@@ -170,7 +196,9 @@ export default function MyPageClient() {
         if (alive) setLoading(false)
       }
     })()
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [env])
 
   // チャート系
@@ -195,7 +223,9 @@ export default function MyPageClient() {
         setChartsErr(e?.message ?? "charts fetch error")
       }
     })()
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [range])
 
   // quick診断の型: profile.base_model を優先、なければ daily.code から推定
@@ -207,7 +237,7 @@ export default function MyPageClient() {
   const goSettings = () => router.push("/settings")
 
   if (loading) return <div className="p-6 text-white/70">読み込み中…</div>
-  if (error)   return <div className="p-6 text-red-400">エラー: {error}</div>
+  if (error) return <div className="p-6 text-red-400">エラー: {error}</div>
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -221,40 +251,48 @@ export default function MyPageClient() {
             <h1 className="text-[32px] font-extrabold tracking-tight uppercase">MY PAGE</h1>
             <p className="mt-1 text-sm text-white/60">あなたの軌跡と、いまを映す</p>
 
-            {/* QUICK型バッジ（色分け対応） */}
-{meta.label && (
-  <div
-    className="mt-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-medium"
-    style={{
-      border: `1px solid ${meta.color}`,
-      color: meta.color,
-      backgroundColor: hexToRgba(meta.color, 0.12),
-      boxShadow: `0 0 0.25rem ${hexToRgba(meta.color, 0.4)}`
-    }}
-    aria-label={meta.label}
-  >
-    {meta.label}
-  </div>
-)}
+            {/* 型バッジ（テキストのみ表示） */}
+            {meta.label && (
+              <div
+                className="mt-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-medium"
+                style={{
+                  border: `1px solid ${meta.color}`,
+                  color: meta.color,
+                  backgroundColor: hexToRgba(meta.color, 0.12),
+                  boxShadow: `0 0 0.25rem ${hexToRgba(meta.color, 0.4)}`,
+                }}
+                aria-label={meta.label}
+              >
+                {meta.label}
+              </div>
+            )}
           </div>
 
-          {/* envバッジ（開発時のみ表示） */}
-         - {process.env.NODE_ENV !== "production" && (
-+ {true && ( // ← 一時的に常時表示。戻す時は false or 元コードへ
-   <button ...>env: {env}（切替）</button>
- )}
-              className="mt-1 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/15"
-            >
-              env: {env}（切替）
-            </button>
-          )}
+          {/* envトグル（暫定：常時表示。戻す時はガードを付けてOK） */}
+          <button
+            onClick={() => {
+              const next = env === "prod" ? "dev" : "prod"
+              setEnv(next)
+              try {
+                localStorage.setItem("ev-env", next)
+              } catch {}
+            }}
+            className="mt-1 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/15"
+          >
+            env: {env}（切替）
+          </button>
         </div>
 
         {/* プロフィール */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <Image src={FALLBACK_USER.avatar} alt="Profile Icon" width={56} height={56}
-              className="h-14 w-14 rounded-full border border-white/20 bg-black/20" />
+            <Image
+              src={FALLBACK_USER.avatar}
+              alt="Profile Icon"
+              width={56}
+              height={56}
+              className="h-14 w-14 rounded-full border border-white/20 bg-black/20"
+            />
             <div>
               <div className="text-xl font-semibold">{FALLBACK_USER.name}</div>
               <div className="text-sm text-white/70">ID: {FALLBACK_USER.idNo}</div>
@@ -268,17 +306,14 @@ export default function MyPageClient() {
           </button>
         </div>
 
-        {/* テーマ＆日時（DB値に切替） */}
+        {/* テーマ＆日時（DB値） */}
         <div className="text-[13px] text-white/60">
           現在のテーマ{" "}
           <span className="mx-1 text-white/80 font-medium">{daily?.theme ?? "—"}</span>
-          <span className="opacity-40 mx-1">•</span>{nowStr}
-          {process.env.NODE_ENV !== "production" && (
-            <>
-              <span className="opacity-40 mx-1">•</span>
-              <span className="text-white/50">env: {env}</span>
-            </>
-          )}
+          <span className="opacity-40 mx-1">•</span>
+          {nowStr}
+          <span className="opacity-40 mx-1"> • </span>
+          <span className="text-white/50">env: {env}</span>
         </div>
 
         {/* 直近メッセージ（daily最優先） */}
@@ -289,7 +324,8 @@ export default function MyPageClient() {
           </p>
           {(daily?.updated_at || daily?.created_at) && (
             <div className="mt-1 text-[11px] text-white/50">
-              更新: {fmt(daily?.updated_at || daily?.created_at)}{daily?.env ? `（env: ${daily.env}）` : ""}
+              更新: {fmt(daily?.updated_at || daily?.created_at)}
+              {daily?.env ? `（env: ${daily.env}）` : ""}
             </div>
           )}
         </section>
@@ -307,18 +343,24 @@ export default function MyPageClient() {
               <div className="flex justify-between items-center mb-2">
                 <div className="text-sm text-white/80">Line（{range}日推移）</div>
                 <div className="flex gap-2 text-xs">
-                  {[7,30,90].map((n)=>(
+                  {[7, 30, 90].map((n) => (
                     <button
                       key={n}
-                      onClick={()=>setRange(n as 7|30|90)}
-                      className={`px-3 py-1 rounded border ${range===n?"bg-white/15 border-white/30":"bg-white/5 border-white/10 hover:bg-white/10"}`}
+                      onClick={() => setRange(n as 7 | 30 | 90)}
+                      className={`px-3 py-1 rounded border ${
+                        range === n ? "bg-white/15 border-white/30" : "bg-white/5 border-white/10 hover:bg-white/10"
+                      }`}
                     >
                       {n}日
                     </button>
                   ))}
                 </div>
               </div>
-              {series ? <TimeSeriesChart data={series} /> : <div className="h-56 grid place-items-center text-white/60">読み込み中…</div>}
+              {series ? (
+                <TimeSeriesChart data={series} />
+              ) : (
+                <div className="h-56 grid place-items-center text-white/60">読み込み中…</div>
+              )}
               {chartsErr && <div className="mt-2 text-xs text-red-300">[{chartsErr}] フォールバック表示中</div>}
             </div>
           </div>

@@ -49,11 +49,15 @@ function normalizeModel(s?: string | null): "EΛVƎ" | "EVΛƎ" | null {
   if (t.includes("EVΛƎ")) return "EVΛƎ"
   return null
 }
-
 function decideModelFromCode(code?: string | null): "EΛVƎ" | "EVΛƎ" | null {
   const c = (code || "").trim()
   if (!c) return null
   return c === "E" || c === "Λ" ? "EΛVƎ" : c === "V" || c === "Ǝ" ? "EVΛƎ" : null
+}
+function decideModelFromOrder(order?: EV[] | null): "EΛVƎ" | "EVΛƎ" | null {
+  if (!order?.length) return null
+  const top = order[0]
+  return top === "E" || top === "Λ" ? "EΛVƎ" : top === "V" || top === "Ǝ" ? "EVΛƎ" : null
 }
 
 function fmt(dt?: string | null) {
@@ -89,7 +93,7 @@ function normalizeSeries(list: any[]): SeriesPointLocal[] {
   })
 }
 
-/* ====== QUICKバッジ用ユーティリティ ====== */
+/* ====== 型バッジ用 ====== */
 function modelMeta(model: "EΛVƎ" | "EVΛƎ" | null) {
   if (model === "EΛVƎ") return { color: "#B833F5", label: "EΛVƎ:現実思考型" } // 紫
   if (model === "EVΛƎ") return { color: "#FF4500", label: "EVΛƎ:未来志向型" } // オレンジ
@@ -145,7 +149,7 @@ export default function MyPageClient() {
     } catch {}
   }, [])
 
-  // URLクエリ ?env=dev|prod で上書き（iPhoneで /mypage?env=dev を開けばOK）
+  // URLクエリ ?env=dev|prod で上書き
   useEffect(() => {
     const p = search?.get("env")
     if (p === "dev" || p === "prod") {
@@ -156,7 +160,7 @@ export default function MyPageClient() {
     }
   }, [search])
 
-  // env をクエリで渡して取得。prod が空なら dev を1回だけフォールバック
+  // 取得：今の env が空なら反対 env を自動フォールバック（双方向）
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -169,22 +173,27 @@ export default function MyPageClient() {
           fetch("/api/mypage/profile-latest", { cache: "no-store" }),
           fetch(`/api/mypage/daily-latest${qs}`, { cache: "no-store" }),
         ])
-
-        if (!alive) return
         if (!pRes.ok) throw new Error("profile_latest_failed")
         if (!dRes.ok) throw new Error("daily_latest_failed")
 
         const p = await pRes.json()
         let d = await dRes.json()
 
-        // フォールバック：prod で item が空なら dev を一度だけ試す
-        if (env === "prod" && d?.ok && !d?.item) {
+        // どちらのenvでも、itemが空なら反対envを試す
+        if (!d?.item) {
+          const other = env === "prod" ? "dev" : "prod"
           try {
-            const dDev = await fetch(`/api/mypage/daily-latest?env=dev`, { cache: "no-store" }).then((r) => r.json())
-            if (dDev?.ok && dDev?.item) d = dDev
+            const dOther = await fetch(`/api/mypage/daily-latest?env=${other}`, { cache: "no-store" }).then((r) => r.json())
+            if (dOther?.ok && dOther?.item) {
+              d = dOther
+              // 実際に表示した環境をこの端末の既定に
+              setEnv(other)
+              try { localStorage.setItem("ev-env", other) } catch {}
+            }
           } catch {}
         }
 
+        if (!alive) return
         if (!p?.ok) throw new Error(p?.error || "profile_latest_failed")
         if (!d?.ok) throw new Error(d?.error || "daily_latest_failed")
 
@@ -196,9 +205,7 @@ export default function MyPageClient() {
         if (alive) setLoading(false)
       }
     })()
-    return () => {
-      alive = false
-    }
+    return () => { alive = false }
   }, [env])
 
   // チャート系
@@ -223,13 +230,14 @@ export default function MyPageClient() {
         setChartsErr(e?.message ?? "charts fetch error")
       }
     })()
-    return () => {
-      alive = false
-    }
+    return () => { alive = false }
   }, [range])
 
-  // quick診断の型: profile.base_model を優先、なければ daily.code から推定
-  const normalizedModel = normalizeModel(profile?.base_model) || decideModelFromCode(daily?.code)
+  // 型推定：base_model → daily.code → base_order(top)
+  const normalizedModel =
+    normalizeModel(profile?.base_model) ||
+    decideModelFromCode(daily?.code) ||
+    decideModelFromOrder(profile?.base_order)
   const meta = modelMeta(normalizedModel)
   const nowStr = fmt()
 
@@ -268,14 +276,12 @@ export default function MyPageClient() {
             )}
           </div>
 
-          {/* envトグル（暫定：常時表示。戻す時はガードを付けてOK） */}
+          {/* envトグル（暫定：常時表示） */}
           <button
             onClick={() => {
               const next = env === "prod" ? "dev" : "prod"
               setEnv(next)
-              try {
-                localStorage.setItem("ev-env", next)
-              } catch {}
+              try { localStorage.setItem("ev-env", next) } catch {}
             }}
             className="mt-1 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/15"
           >
@@ -313,7 +319,8 @@ export default function MyPageClient() {
           <span className="opacity-40 mx-1">•</span>
           {nowStr}
           <span className="opacity-40 mx-1"> • </span>
-          <span className="text-white/50">env: {env}</span>
+          {/* 実際に表示中のレコードのenvを優先表示 */}
+          <span className="text-white/50">env: {daily?.env ?? env}</span>
         </div>
 
         {/* 直近メッセージ（daily最優先） */}

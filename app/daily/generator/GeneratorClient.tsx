@@ -1,20 +1,14 @@
-// app/daily/generator/GeneratorClient.tsx
 "use client";
-
 import { useState } from "react";
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
 type Option = { key: EV; label: string };
 type GenResp = {
-  ok: boolean;
-  id: string;
+  ok: boolean; id: string;
   slot: "morning" | "noon" | "night";
   env: "dev" | "prod";
-  text: string;
-  options: Option[];
-  ts: string;
-  theme?: string;
-  error?: string;
+  text: string; options: Option[]; ts: string;
+  theme?: string; error?: string;
 };
 
 export default function GeneratorClient() {
@@ -26,9 +20,7 @@ export default function GeneratorClient() {
   const [err, setErr] = useState<string | null>(null);
 
   const handleGenerate = async () => {
-    setLoading(true);
-    setErr(null);
-    setResp(null);
+    setLoading(true); setErr(null); setResp(null);
     try {
       const r = await fetch("/api/daily/generate", {
         method: "POST",
@@ -39,6 +31,7 @@ export default function GeneratorClient() {
       if (!j.ok) setErr(j.error || "unknown_error");
       else {
         setResp(j);
+        // confirm用に保存
         sessionStorage.setItem("daily:pending", JSON.stringify(j));
       }
     } catch (e: any) {
@@ -53,7 +46,8 @@ export default function GeneratorClient() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label className="text-sm text-gray-600 mb-1 block">slot</label>
-          <select className="border rounded-lg px-3 py-2" value={slot} onChange={(e)=>setSlot(e.target.value as any)}>
+          <select className="border rounded-lg px-3 py-2" value={slot}
+                  onChange={(e)=>setSlot(e.target.value as any)}>
             <option value="morning">morning（4択）</option>
             <option value="noon">noon（3択）</option>
             <option value="night">night（2択）</option>
@@ -61,7 +55,8 @@ export default function GeneratorClient() {
         </div>
         <div>
           <label className="text-sm text-gray-600 mb-1 block">theme</label>
-          <select className="border rounded-lg px-3 py-2" value={theme} onChange={(e)=>setTheme(e.target.value)}>
+          <select className="border rounded-lg px-3 py-2" value={theme}
+                  onChange={(e)=>setTheme(e.target.value)}>
             <option value="self">self</option>
             <option value="work">work</option>
             <option value="love">love</option>
@@ -70,14 +65,16 @@ export default function GeneratorClient() {
         </div>
         <div>
           <label className="text-sm text-gray-600 mb-1 block">env</label>
-          <select className="border rounded-lg px-3 py-2" value={env} onChange={(e)=>setEnv(e.target.value as any)}>
+          <select className="border rounded-lg px-3 py-2" value={env}
+                  onChange={(e)=>setEnv(e.target.value as any)}>
             <option value="prod">prod</option>
             <option value="dev">dev</option>
           </select>
         </div>
       </div>
 
-      <button onClick={handleGenerate} disabled={loading} className="rounded-xl px-5 py-2.5 border shadow-sm">
+      <button onClick={handleGenerate} disabled={loading}
+              className="rounded-xl px-5 py-2.5 border shadow-sm">
         {loading ? "生成中..." : "AIで生成"}
       </button>
 
@@ -96,7 +93,9 @@ export default function GeneratorClient() {
           </ul>
           <div className="text-xs text-gray-400">ts: {new Date(resp.ts).toLocaleString()}</div>
           <div className="pt-2">
-            <a href="/daily/confirm" className="text-indigo-600 underline">確認ページへ</a>
+            <a href="/daily/confirm" className="text-indigo-600 underline">
+              確認ページへ
+            </a>
           </div>
         </div>
       )}

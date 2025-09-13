@@ -26,13 +26,13 @@ type Answer = {
 type DiagnoseResp = {
   ok: boolean;
   item?: {
-    id?: string;            // 返ってくるなら上書き
+    id?: string;
     slot?: Pending["slot"];
     env?: Pending["env"];
     theme?: string;
     code?: EV;
     comment?: string;
-    quote?: string;
+    quote?: string; // アファメーション的な短文
   };
   error?: string;
 };
@@ -43,10 +43,10 @@ export default function ResultClient() {
   const [comment, setComment] = useState<string | null>(null);
   const [quote, setQuote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // 1) セッションから取り出し
+  // 1) セッションから取り出し（同一タブ前提）
   useEffect(() => {
     try {
       const p = sessionStorage.getItem("daily:pending");
@@ -60,21 +60,20 @@ export default function ResultClient() {
 
   const metaLine = useMemo(() => {
     if (!pending) return "";
-    const when =
-      pending.slot === "morning" ? "朝" :
-      pending.slot === "noon" ? "昼" : "夜";
+    const when = pending.slot === "morning" ? "朝" : pending.slot === "noon" ? "昼" : "夜";
     return `id: ${pending.id} / ${when} / env: ${pending.env}`;
   }, [pending]);
 
-  // 2) 診断API → 保存API（初回だけ）
+  // 2) 診断 → 保存（初回のみ）
   useEffect(() => {
     const run = async () => {
       if (!pending || !answer) { setLoaded(true); return; }
       setError(null);
 
-      // 診断
-      let dComment = "";
-      let dQuote = "";
+      let c = "";
+      let q = "";
+
+      // 診断API（OpenAI未設定でも後続フォールバックで表示可）
       try {
         const r = await fetch("/api/daily/diagnose", {
           method: "POST",
@@ -89,18 +88,18 @@ export default function ResultClient() {
         });
         const j = (await r.json()) as DiagnoseResp;
         if (!j.ok) throw new Error(j.error || "diagnose_failed");
-        dComment = j.item?.comment || "";
-        dQuote = j.item?.quote || "";
-      } catch (e: any) {
-        // フォールバック（OpenAI未設定でも表示）
-        dComment =
-          `今日のキーは「${answer.choice}」。小さく一歩、今の自分ができる行動を選ぼう。`;
-        dQuote = "“The journey of a thousand miles begins with one step.”";
+        c = j.item?.comment || "";
+        q = j.item?.quote || "";
+      } catch {
+        // フォールバック（最低限表示）
+        c = `今日のキーは「${answer.choice}」。小さな一歩で流れを作ろう。`;
+        q = "“The first step sets the tone.”";
       }
-      setComment(dComment);
-      setQuote(dQuote);
 
-      // 保存
+      setComment(c);
+      setQuote(q);
+
+      // 保存API（失敗しても画面は続行）
       try {
         setSaving(true);
         await fetch("/api/daily/save", {
@@ -112,13 +111,13 @@ export default function ResultClient() {
             env: pending.env,
             theme: pending.theme ?? answer.theme ?? "self",
             choice: answer.choice,
-            comment: dComment,
-            quote: dQuote,
+            comment: c,
+            quote: q,
             ts: new Date().toISOString(),
           }),
         });
       } catch {
-        // 保存失敗は致命ではないので画面表示は続行
+        /* no-op */
       } finally {
         setSaving(false);
         setLoaded(true);
@@ -126,20 +125,15 @@ export default function ResultClient() {
     };
 
     run();
-    // 1回きりでOK
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending?.id]);
 
-  // guard：セッション無し
+  // セッション未設定ガード
   if (!pending || !answer) {
     return (
       <div className="rounded-xl border p-4 space-y-3">
-        <p className="text-red-600 text-sm mb-2">
-          直前の質問か回答データが見つかりませんでした。
-        </p>
-        <a href="/daily/generator" className="text-indigo-600 underline">
-          生成ページへ戻る
-        </a>
+        <p className="text-red-600 text-sm mb-2">直前の質問/回答データが見つかりませんでした。</p>
+        <a href="/daily/generator" className="text-indigo-600 underline">生成ページへ戻る</a>
       </div>
     );
   }
@@ -161,9 +155,7 @@ export default function ResultClient() {
       </div>
 
       {!loaded ? (
-        <div className="rounded-xl border p-4">
-          診断中…（数秒）
-        </div>
+        <div className="rounded-xl border p-4">診断中…（数秒）</div>
       ) : (
         <>
           <div className="rounded-xl border p-4 space-y-2">
@@ -175,19 +167,11 @@ export default function ResultClient() {
             <blockquote className="italic">“{quote}”</blockquote>
           </div>
 
-          {error && <div className="text-sm text-red-600">{error}</div>}
-
           <div className="flex items-center gap-3">
-            <a
-              href="/mypage"
-              className="inline-flex items-center justify-center rounded-xl px-4 py-2 border hover:bg-gray-50"
-            >
+            <a href="/mypage" className="inline-flex items-center justify-center rounded-xl px-4 py-2 border hover:bg-gray-50">
               マイページへ
             </a>
-            <a
-              href="/daily/generator"
-              className="inline-flex items-center justify-center rounded-xl px-4 py-2 border hover:bg-gray-50"
-            >
+            <a href="/daily/generator" className="inline-flex items-center justify-center rounded-xl px-4 py-2 border hover:bg-gray-50">
               最初から
             </a>
             {saving && <span className="text-xs text-gray-400">保存中…</span>}

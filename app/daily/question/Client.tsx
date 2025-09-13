@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
-type QuestionRes = { ok: boolean; question?: string; choices?: EV[]; error?: string };
+type QuestionRes = { ok?: boolean; question?: string; choices?: EV[]; error?: string };
 type AnswerReq = { choice: EV; env?: "dev" | "prod" };
 
 export default function DailyQuestionClient() {
@@ -19,77 +19,79 @@ export default function DailyQuestionClient() {
 
   // env を localStorage から復元（既定は prod）
   const [env, setEnv] = useState<"dev" | "prod">("prod");
-  // 1) 質問の取得（GET）
-useEffect(() => {
-  const controller = new AbortController();
-  let alive = true;
-
-  (async () => {
+  useEffect(() => {
     try {
-      setErr(null);
-      setLoading(true);
+      const saved = localStorage.getItem("ev-env");
+      if (saved === "dev" || saved === "prod") setEnv(saved);
+      else localStorage.setItem("ev-env", "prod");
+    } catch {}
+  }, []);
 
-      const res = await fetch("/api/daily/question", {
-        method: "GET",
-        cache: "no-store",
-        credentials: "include",           // Auth Cookie を同送
-        signal: controller.signal,
-      });
+  // 1) 質問の取得（GET）
+  useEffect(() => {
+    const controller = new AbortController();
+    let alive = true;
 
-      // HTMLが返ってきた＝たぶんログインページ（middlewareで弾かれた等）
-      const ctype = res.headers.get("content-type") || "";
-      const text = await res.text();
-      if (ctype.includes("text/html")) {
-        router.push("/login?return=/daily/question");
-        return;
+    (async () => {
+      try {
+        setErr(null);
+        setLoading(true);
+
+        const res = await fetch("/api/daily/question", {
+          method: "GET",
+          cache: "no-store",
+          credentials: "include", // Auth Cookie 同送（公開APIでも問題なし）
+          signal: controller.signal,
+        });
+
+        // HTMLが返ってきた＝ログインページ等 → ログインへ
+        const ctype = res.headers.get("content-type") || "";
+        const text = await res.text();
+        if (ctype.includes("text/html")) {
+          router.push("/login?return=/daily/question");
+          return;
+        }
+
+        // JSONとして解釈
+        let json: QuestionRes | any = {};
+        try { json = JSON.parse(text); } catch {}
+
+        // 401 は明示遷移
+        if (res.status === 401 || json?.error === "unauthorized") {
+          router.push("/login?return=/daily/question");
+          return;
+        }
+
+        // HTTPエラー
+        if (!res.ok) throw new Error(`http_${res.status}`);
+
+        // ok が false のときだけ失敗扱い（未定義は許容）
+        if (json?.ok === false) throw new Error(json?.error || "fetch_failed");
+
+        // question/choices があれば成功
+        const q = json?.question ?? json?.data?.question ?? "";
+        const ch = (json?.choices ?? json?.data?.choices ?? []) as EV[];
+        if (!q || !Array.isArray(ch) || ch.length === 0) {
+          throw new Error(json?.error || "fetch_failed");
+        }
+
+        if (!alive) return;
+        setQuestion(q);
+        setChoices(ch);
+        setSelected(null);
+      } catch (e: any) {
+        if (!alive || e?.name === "AbortError") return;
+        setErr(e?.message || "failed");
+      } finally {
+        if (alive) setLoading(false);
       }
+    })();
 
-      // JSONとして再パース
-      let json: any = {};
-      try { json = JSON.parse(text); } catch { /* JSONでない → 失敗 */ }
-
-      // 401 は明示遷移
-      if (res.status === 401 || json?.error === "unauthorized") {
-        router.push("/login?return=/daily/question");
-        return;
-      }
-
-      // HTTPエラー
-      if (!res.ok) {
-        throw new Error(`http_${res.status}`);
-      }
-
-      // --- 重要: ok が「falseのとき」だけ失敗扱い。未定義は許容 ---
-      if (json?.ok === false) {
-        throw new Error(json?.error || "fetch_failed");
-      }
-
-      // 返却形のゆらぎに強くする（question/choices があれば成功とみなす）
-      const q = json?.question ?? json?.data?.question ?? "";
-      const ch = (json?.choices ?? json?.data?.choices ?? []) as EV[];
-
-      if (!q || !Array.isArray(ch) || ch.length === 0) {
-        throw new Error(json?.error || "fetch_failed");
-      }
-
-      if (!alive) return;
-      setQuestion(q);
-      setChoices(ch);
-      setSelected(null);
-    } catch (e: any) {
-      if (!alive || e?.name === "AbortError") return;
-      setErr(e?.message || "failed");
-    } finally {
-      if (alive) setLoading(false);
-    }
-  })();
-
-  return () => {
-    alive = false;
-    controller.abort();
-  };
-}, [router]);
-
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [router]);
 
   // 2) 回答の送信（POST）
   async function submitAnswer() {
@@ -100,7 +102,7 @@ useEffect(() => {
       const res = await fetch("/api/daily/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",            // ← 重要（Auth Cookieを同送）
+        credentials: "include", // 認証必須
         body: JSON.stringify({ choice: selected, env } as AnswerReq),
       });
       if (res.status === 401) {
@@ -109,7 +111,6 @@ useEffect(() => {
       }
       if (!res.ok) throw new Error(`answer_failed_${res.status}`);
 
-      // 成功 → マイページへ
       router.push("/mypage");
     } catch (e: any) {
       setErr(e?.message || "failed");
@@ -119,10 +120,7 @@ useEffect(() => {
   }
 
   // ===== UI =====
-
-  if (loading) {
-    return <div className="min-h-dvh grid place-items-center">読み込み中…</div>;
-  }
+  if (loading) return <div className="min-h-dvh grid place-items-center">読み込み中…</div>;
 
   if (err) {
     return (
@@ -154,9 +152,7 @@ useEffect(() => {
             onClick={() => setSelected(c)}
             aria-pressed={selected === c}
             className={`rounded-xl border px-3 py-2 ${
-              selected === c
-                ? "bg-white/15 border-white/40"
-                : "bg-white/5 border-white/15 hover:bg-white/10"
+              selected === c ? "bg-white/15 border-white/40" : "bg-white/5 border-white/15 hover:bg-white/10"
             }`}
             disabled={submitting}
           >

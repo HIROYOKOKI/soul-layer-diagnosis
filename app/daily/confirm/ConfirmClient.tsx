@@ -37,41 +37,44 @@ export default function ConfirmClient() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // sessionStorage からロード（pending）＋既存の回答があれば選択復元
+  // 1) セッションから pending を取得
   useEffect(() => {
     try {
       const pRaw = sessionStorage.getItem("daily:pending");
       if (!pRaw) return;
       const p = JSON.parse(pRaw) as Pending;
       if (p?.ok && p?.id) setPending(p);
-
-      const aRaw = sessionStorage.getItem("daily:answer");
-      if (aRaw) {
-        const a = JSON.parse(aRaw) as Answer;
-        if (a?.id === p?.id && a?.choice) setChoice(a.choice);
-      }
     } catch {
       /* no-op */
     }
   }, []);
 
-  // /daily/question からの事前選択を反映（あれば）
+  // 2) /daily/question で選んだ値（pre_choice）または既存の answer から初期選択を復元
   useEffect(() => {
     try {
       const pre = sessionStorage.getItem("daily:pre_choice");
       if (isEV(pre)) {
         setChoice(pre);
-        sessionStorage.removeItem("daily:pre_choice");
+        // ※ 戻る→再遷移のときのために pre_choice は消さずに残しておいてもOK
+        // sessionStorage.removeItem("daily:pre_choice");
+        return;
       }
-    } catch {}
+      // 既に confirm 済みで戻ってきたとき
+      const aRaw = sessionStorage.getItem("daily:answer");
+      if (aRaw) {
+        const a = JSON.parse(aRaw) as Answer;
+        if (a?.id === pending?.id && isEV(a?.choice)) setChoice(a.choice);
+      }
+    } catch {
+      /* no-op */
+    }
   }, [pending?.id]);
 
-  // 事前プリフェッチ（体感を軽く）
+  // 3) 次ページをプリフェッチ
   useEffect(() => {
     router.prefetch("/daily/result");
   }, [router]);
 
-  // ★ ガード：pending を読む前に必ず null チェック
   if (!pending) {
     return (
       <div className="rounded-xl border p-4">
@@ -83,16 +86,18 @@ export default function ConfirmClient() {
     );
   }
 
-  // ガード後なので安全に参照できる
   const whenText =
-    pending.slot === "morning" ? "（朝 / 4択）" :
-    pending.slot === "noon"    ? "（昼 / 3択）" :
-                                 "（夜 / 2択）";
+    pending.slot === "morning" ? "（朝 / 4択）"
+    : pending.slot === "noon"  ? "（昼 / 3択）"
+                               : "（夜 / 2択）";
+
+  const labelFromChoice = (c: EV | null) =>
+    c ? (pending.options.find(o => o.key === c)?.label ?? "") : "";
 
   const handleConfirm = async () => {
     setError(null);
     if (!choice) {
-      setError("1つ選択してください。");
+      setError("選択が見つかりませんでした。設問ページへ戻って選び直してください。");
       return;
     }
     setSubmitting(true);
@@ -114,7 +119,7 @@ export default function ConfirmClient() {
     }
   };
 
-  // Enterで確定できるように（アクセシビリティ）
+  // Enterで確定できるように
   const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
     if (e.key === "Enter") handleConfirm();
   };
@@ -126,43 +131,24 @@ export default function ConfirmClient() {
         {new Date(pending.ts).toLocaleString()}
       </div>
 
+      {/* ルネア吹き出しで質問再掲（確認用） */}
       <div className="rounded-xl border p-4">
-        <LuneaBubble
-          key={pending.id} // テキスト変更時にタイプライタをリセット
-          text={`${pending.text} ${whenText}`}
-          speed={18}
-        />
+        <LuneaBubble key={pending.id} text={`${pending.text} ${whenText}`} speed={18} />
       </div>
 
-      <div className="grid grid-cols-1 gap-3">
-        {pending.options?.map((opt) => {
-          const id = `opt-${opt.key}`;
-          const selected = choice === opt.key;
-          return (
-            <label
-              key={opt.key}
-              htmlFor={id}
-              className={`flex items-center justify-between border rounded-xl px-4 py-3 cursor-pointer transition ${
-                selected ? "border-indigo-500 ring-2 ring-indigo-200" : "hover:bg-gray-50"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <input
-                  id={id}
-                  type="radio"
-                  name="ev_choice"
-                  value={opt.key}
-                  checked={selected}
-                  onChange={() => setChoice(opt.key)}
-                  className="h-4 w-4"
-                />
-                <span className="font-mono text-sm">{opt.key}</span>
-                <span className="text-base">{opt.label}</span>
-              </div>
-              <span className="text-xs px-2 py-1 rounded-full border">EVΛƎ</span>
-            </label>
-          );
-        })}
+      {/* ✅ 選んだ回答の“確認だけ”を表示（ラジオ一覧は出さない） */}
+      <div className="rounded-2xl border px-4 py-3">
+        <div className="text-sm text-gray-500 mb-1">あなたの回答</div>
+        {choice ? (
+          <div className="text-lg">
+            <span className="font-mono mr-2">{choice}</span>
+            <span>{labelFromChoice(choice)}</span>
+          </div>
+        ) : (
+          <div className="text-red-600 text-sm">
+            まだ選択がありません。<a className="underline" href="/daily/question">設問に戻る</a>
+          </div>
+        )}
       </div>
 
       {error && <div className="text-sm text-red-600">{error}</div>}
@@ -172,7 +158,7 @@ export default function ConfirmClient() {
           href="/daily/question"
           className="inline-flex items-center justify-center rounded-xl px-4 py-2 border hover:bg-gray-50"
         >
-          戻る
+          変更する（戻る）
         </a>
         <button
           onClick={handleConfirm}

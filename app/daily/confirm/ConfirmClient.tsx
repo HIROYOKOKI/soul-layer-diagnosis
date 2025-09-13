@@ -30,6 +30,29 @@ type Answer = {
 
 const isEV = (v: any): v is EV => v === "E" || v === "V" || v === "Λ" || v === "Ǝ";
 
+/** 確認ページ用に設問文から命令表現や注釈を除く */
+const toConfirmText = (s: string) => {
+  try {
+    let t = s;
+
+    // （昼 / 3択）などの注釈を除去
+    t = t.replace(/[ 　]*[（(][^）)]*\/\s*\d+択[）)]/g, "");
+
+    // 「〜から選んでください」「選択してください」などの命令表現を除去
+    t = t.replace(/、?\s*次の[^。]*?選(?:択)?んでください。?/g, "");
+    t = t.replace(/、?\s*どれか[^。]*?選(?:択)?んでください。?/g, "");
+    t = t.replace(/から選(?:択)?んでください。?/g, "");
+    t = t.replace(/選(?:択)?んでください。?/g, "");
+
+    // 末尾の余分な句読点/空白を整える
+    t = t.replace(/[。.\s]+$/g, "").trim();
+
+    return t || s;
+  } catch {
+    return s;
+  }
+};
+
 export default function ConfirmClient() {
   const router = useRouter();
   const [pending, setPending] = useState<Pending | null>(null);
@@ -54,12 +77,11 @@ export default function ConfirmClient() {
     try {
       const pre = sessionStorage.getItem("daily:pre_choice");
       if (isEV(pre)) {
-        setChoice(pre);
-        // ※ 戻る→再遷移のときのために pre_choice は消さずに残しておいてもOK
+        setChoice(pre as EV);
+        // 残しておくと戻った時も復元できる。消したい場合は次行を有効化
         // sessionStorage.removeItem("daily:pre_choice");
         return;
       }
-      // 既に confirm 済みで戻ってきたとき
       const aRaw = sessionStorage.getItem("daily:answer");
       if (aRaw) {
         const a = JSON.parse(aRaw) as Answer;
@@ -85,11 +107,6 @@ export default function ConfirmClient() {
       </div>
     );
   }
-
-  const whenText =
-    pending.slot === "morning" ? "（朝 / 4択）"
-    : pending.slot === "noon"  ? "（昼 / 3択）"
-                               : "（夜 / 2択）";
 
   const labelFromChoice = (c: EV | null) =>
     c ? (pending.options.find(o => o.key === c)?.label ?? "") : "";
@@ -131,12 +148,12 @@ export default function ConfirmClient() {
         {new Date(pending.ts).toLocaleString()}
       </div>
 
-      {/* ルネア吹き出しで質問再掲（確認用） */}
+      {/* ルネア吹き出しで質問再掲（命令文は排除） */}
       <div className="rounded-xl border p-4">
-        <LuneaBubble key={pending.id} text={`${pending.text} ${whenText}`} speed={18} />
+        <LuneaBubble key={pending.id} text={toConfirmText(pending.text)} speed={18} />
       </div>
 
-      {/* ✅ 選んだ回答の“確認だけ”を表示（ラジオ一覧は出さない） */}
+      {/* 選んだ回答の“確認だけ”を表示 */}
       <div className="rounded-2xl border px-4 py-3">
         <div className="text-sm text-gray-500 mb-1">あなたの回答</div>
         {choice ? (

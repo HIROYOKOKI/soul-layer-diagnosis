@@ -35,6 +35,17 @@ type AiJson = {
 };
 
 /* ========================
+   Fallbacks（← 追加）
+   OpenAIが失敗/短文でもユーザー体験を壊さないための最小文面
+======================== */
+const FALLBACKS: DiagnoseDetail = {
+  fortune: "今日は小さく始めるほど流れが整う日。10分だけの行動で良いので一歩進めよう。",
+  personality: "観測と直感のバランスが良い時期。小さな違和感を丁寧に拾えるタイプです。",
+  work: "短いサイクルで試作→観測→調整が◎。完璧より速度、数で当てにいこう。",
+  partner: "相手の“いまの気分”を言葉にして返すと関係が整いやすいでしょう。",
+};
+
+/* ========================
    Helpers
 ======================== */
 /** 許容バッファつきの長さ調整（±10〜20字許容） */
@@ -115,7 +126,7 @@ export async function POST(req: Request) {
     const user = buildProfilePrompt(pending);
 
     // 一部モデルは max_tokens ではなく max_completion_tokens、
-   // かつ temperature=1 固定（任意値不可）のため、温度は指定しない
+    // かつ temperature=1 固定（任意値不可）のため、温度は指定しない
     const resp = await openai.chat.completions.create({
       model,
       response_format: { type: "json_object" },

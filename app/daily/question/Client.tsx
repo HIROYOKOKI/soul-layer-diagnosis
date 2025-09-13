@@ -4,8 +4,19 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
-type QuestionRes = { ok?: boolean; question?: string; choices?: EV[]; error?: string };
-type AnswerReq = { choice: EV; env?: "dev" | "prod" };
+type QuestionRes = {
+  ok?: boolean;
+  // どちらかが来る：
+  question?: string;           // 旧
+  choices?: EV[];              // 旧
+  text?: string;               // 新
+  options?: { key: EV; label?: string }[]; // 新
+  id?: string;                 // 新
+  slot?: number;               // 新
+  error?: string;
+  data?: any;                  // さらに data ラップされるケースも許容
+};
+type AnswerReq = { choice: EV; env?: "dev" | "prod"; id?: string; slot?: number };
 
 export default function DailyQuestionClient() {
   const router = useRouter();
@@ -14,8 +25,11 @@ export default function DailyQuestionClient() {
   const [err, setErr] = useState<string | null>(null);
   const [question, setQuestion] = useState<string>("");
   const [choices, setChoices] = useState<EV[]>([]);
+  const [labels, setLabels] = useState<Record<EV, string> | null>(null);
   const [selected, setSelected] = useState<EV | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [qid, setQid] = useState<string | null>(null);
+  const [slot, setSlot] = useState<number | null>(null);
 
   // env を localStorage から復元（既定は prod）
   const [env, setEnv] = useState<"dev" | "prod">("prod");
@@ -27,7 +41,7 @@ export default function DailyQuestionClient() {
     } catch {}
   }, []);
 
-  // 1) 質問の取得（GET）
+  // 1) 質問の取得（GET）— 形式差を吸収
   useEffect(() => {
     const controller = new AbortController();
     let alive = true;
@@ -40,13 +54,13 @@ export default function DailyQuestionClient() {
         const res = await fetch("/api/daily/question", {
           method: "GET",
           cache: "no-store",
-          credentials: "include", // Auth Cookie 同送（公開APIでも問題なし）
+          credentials: "include", // 公開APIでもAuth Cookie同送は無害
           signal: controller.signal,
         });
 
-        // HTMLが返ってきた＝ログインページ等 → ログインへ
+        // HTMLが返ってきた＝ログインページ等
         const ctype = res.headers.get("content-type") || "";
-        const text = await res.text();
+        const textBody = await res.text();
         if (ctype.includes("text/html")) {
           router.push("/login?return=/daily/question");
           return;
@@ -54,31 +68,47 @@ export default function DailyQuestionClient() {
 
         // JSONとして解釈
         let json: QuestionRes | any = {};
-        try { json = JSON.parse(text); } catch {}
+        try { json = JSON.parse(textBody); } catch {}
 
-        // 401 は明示遷移
         if (res.status === 401 || json?.error === "unauthorized") {
           router.push("/login?return=/daily/question");
           return;
         }
-
-        // HTTPエラー
         if (!res.ok) throw new Error(`http_${res.status}`);
-
-        // ok が false のときだけ失敗扱い（未定義は許容）
         if (json?.ok === false) throw new Error(json?.error || "fetch_failed");
 
-        // question/choices があれば成功
-        const q = json?.question ?? json?.data?.question ?? "";
-        const ch = (json?.choices ?? json?.data?.choices ?? []) as EV[];
-        if (!q || !Array.isArray(ch) || ch.length === 0) {
-          throw new Error(json?.error || "fetch_failed");
+        // data ラップを吸収
+        const src = (json?.data && typeof json.data === "object") ? json.data : json;
+
+        // 旧 or 新 どちらにも対応して吸い上げ
+        const qText: string =
+          src.question ?? src.text ?? "";
+        const optKeys: EV[] =
+          Array.isArray(src.choices) ? src.choices as EV[]
+          : Array.isArray(src.options) ? (src.options.map((o: any) => o.key) as EV[])
+          : [];
+
+        if (!qText || !Array.isArray(optKeys) || optKeys.length === 0) {
+          throw new Error("fetch_failed");
+        }
+
+        // ラベル（あれば使う／なければキーをそのまま表示）
+        let lab: Record<EV, string> | null = null;
+        if (Array.isArray(src.options)) {
+          lab = {} as Record<EV, string>;
+          for (const o of src.options as any[]) {
+            const k = o?.key as EV;
+            if (k) lab[k] = o?.label || k;
+          }
         }
 
         if (!alive) return;
-        setQuestion(q);
-        setChoices(ch);
+        setQuestion(qText);
+        setChoices(optKeys);
+        setLabels(lab);
         setSelected(null);
+        setQid(src.id ?? null);
+        setSlot(typeof src.slot === "number" ? src.slot : null);
       } catch (e: any) {
         if (!alive || e?.name === "AbortError") return;
         setErr(e?.message || "failed");
@@ -93,17 +123,22 @@ export default function DailyQuestionClient() {
     };
   }, [router]);
 
-  // 2) 回答の送信（POST）
+  // 2) 回答の送信（POST）— id/slot を同梱（あれば）
   async function submitAnswer() {
     if (!selected || submitting) return;
     try {
       setErr(null);
       setSubmitting(true);
+
+      const payload: AnswerReq = { choice: selected, env };
+      if (qid) payload.id = qid;
+      if (slot != null) payload.slot = slot;
+
       const res = await fetch("/api/daily/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include", // 認証必須
-        body: JSON.stringify({ choice: selected, env } as AnswerReq),
+        body: JSON.stringify(payload),
       });
       if (res.status === 401) {
         router.push("/login?return=/daily/question");
@@ -156,7 +191,7 @@ export default function DailyQuestionClient() {
             }`}
             disabled={submitting}
           >
-            {c}
+            {labels?.[c] ?? c}
           </button>
         ))}
       </div>

@@ -1,0 +1,26 @@
+// middleware.ts
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
+import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
+
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
+  const { data: { session } } = await supabase.auth.getSession()
+
+  // 守るパス（必要に応じて追加/削除）
+  const protectedPaths = [/^\/mypage(?:\/|$)/, /^\/daily\/(question|result)(?:\/|$)/]
+  const needsAuth = protectedPaths.some(re => re.test(req.nextUrl.pathname))
+
+  if (needsAuth && !session) {
+    const url = req.nextUrl.clone()
+    url.pathname = "/login"
+    url.searchParams.set("return", req.nextUrl.pathname + req.nextUrl.search)
+    return NextResponse.redirect(url)
+  }
+  return res
+}
+
+export const config = {
+  matcher: ["/mypage/:path*", "/daily/:path*"],
+}

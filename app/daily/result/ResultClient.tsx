@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import LuneaBubble from "@/components/LuneaBubble";
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
 
@@ -40,11 +41,15 @@ type DiagnoseResp = {
 export default function ResultClient() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [answer, setAnswer] = useState<Answer | null>(null);
-  const [comment, setComment] = useState<string | null>(null);
-  const [quote, setQuote] = useState<string | null>(null);
+  const [comment, setComment] = useState<string>("");
+  const [quote, setQuote] = useState<string>("");
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // StrictMode での二重実行を防ぐためのフラグ
+  const didDiagnose = useRef(false);
 
   // 1) セッションから取り出し（同一タブ前提）
   useEffect(() => {
@@ -64,16 +69,17 @@ export default function ResultClient() {
     return `id: ${pending.id} / ${when} / env: ${pending.env}`;
   }, [pending]);
 
-  // 2) 診断 → 保存（初回のみ）
+  // 2) 診断のみ自動実行（保存はボタンで）
   useEffect(() => {
-    const run = async () => {
-      if (!pending || !answer) { setLoaded(true); return; }
+    if (didDiagnose.current) return;
+    if (!pending || !answer) {
+      setLoading(false);
+      return;
+    }
+    didDiagnose.current = true;
+
+    (async () => {
       setError(null);
-
-      let c = "";
-      let q = "";
-
-      // 診断API（OpenAI未設定でも後続フォールバックで表示可）
       try {
         const r = await fetch("/api/daily/diagnose", {
           method: "POST",
@@ -88,45 +94,48 @@ export default function ResultClient() {
         });
         const j = (await r.json()) as DiagnoseResp;
         if (!j.ok) throw new Error(j.error || "diagnose_failed");
-        c = j.item?.comment || "";
-        q = j.item?.quote || "";
+        setComment(j.item?.comment ?? "");
+        setQuote(j.item?.quote ?? "");
       } catch {
-        // フォールバック（最低限表示）
-        c = `今日のキーは「${answer.choice}」。小さな一歩で流れを作ろう。`;
-        q = "“The first step sets the tone.”";
-      }
-
-      setComment(c);
-      setQuote(q);
-
-      // 保存API（失敗しても画面は続行）
-      try {
-        setSaving(true);
-        await fetch("/api/daily/save", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: pending.id,
-            slot: pending.slot,
-            env: pending.env,
-            theme: pending.theme ?? answer.theme ?? "self",
-            choice: answer.choice,
-            comment: c,
-            quote: q,
-            ts: new Date().toISOString(),
-          }),
-        });
-      } catch {
-        /* no-op */
+        // フォールバック（OpenAI未設定でも最低限表示）
+        setComment(`今日のキーは「${answer.choice}」。小さな一歩で流れを作ろう。`);
+        setQuote("“The first step sets the tone.”");
       } finally {
-        setSaving(false);
-        setLoaded(true);
+        setLoading(false);
       }
-    };
+    })();
+  }, [pending, answer]);
 
-    run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending?.id]);
+  const handleSave = async () => {
+    if (!pending || !answer) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/daily/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: pending.id,
+          slot: pending.slot,
+          env: pending.env,
+          theme: pending.theme ?? answer.theme ?? "self",
+          choice: answer.choice,
+          comment,
+          quote,
+          ts: new Date().toISOString(),
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok || j?.ok === false) throw new Error(j?.error || "save_failed");
+      setSaved(true);
+      // マイページの即時反映に使える簡易フラグ
+      sessionStorage.setItem(`daily:saved:${pending.id}`, "1");
+    } catch (e: any) {
+      setError(e?.message || "save_failed");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // セッション未設定ガード
   if (!pending || !answer) {
@@ -154,30 +163,45 @@ export default function ResultClient() {
         </div>
       </div>
 
-      {!loaded ? (
-        <div className="rounded-xl border p-4">診断中…（数秒）</div>
-      ) : (
-        <>
-          <div className="rounded-xl border p-4 space-y-2">
-            <div className="text-sm text-gray-500">コメント</div>
-            <p className="leading-relaxed">{comment}</p>
-          </div>
-          <div className="rounded-xl border p-4">
+      {/* ルネア吹き出しで診断メッセージ表示 */}
+      <div className="rounded-xl border p-4 space-y-4">
+        {loading ? (
+          <LuneaBubble text="診断中…（数秒）" speed={22} />
+        ) : (
+          <LuneaBubble key={pending.id} text={comment} speed={16} />
+        )}
+
+        {!loading && (
+          <div>
             <div className="text-sm text-gray-500 mb-1">アファメーション</div>
             <blockquote className="italic">“{quote}”</blockquote>
           </div>
+        )}
+      </div>
 
-          <div className="flex items-center gap-3">
-            <a href="/mypage" className="inline-flex items-center justify-center rounded-xl px-4 py-2 border hover:bg-gray-50">
-              マイページへ
-            </a>
-            <a href="/daily/generator" className="inline-flex items-center justify-center rounded-xl px-4 py-2 border hover:bg-gray-50">
-              最初から
-            </a>
-            {saving && <span className="text-xs text-gray-400">保存中…</span>}
-          </div>
-        </>
-      )}
+      {error && <div className="text-sm text-red-600">{error}</div>}
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={loading || saving || saved}
+          className="inline-flex items-center justify-center rounded-xl px-5 py-2.5 border shadow-sm hover:shadow transition"
+        >
+          {saved ? "保存済み" : saving ? "保存中..." : "保存"}
+        </button>
+        <a
+          href="/mypage"
+          className="inline-flex items-center justify-center rounded-xl px-4 py-2 border hover:bg-gray-50"
+        >
+          マイページへ
+        </a>
+        <a
+          href="/daily/generator"
+          className="inline-flex items-center justify-center rounded-xl px-4 py-2 border hover:bg-gray-50"
+        >
+          最初から
+        </a>
+      </div>
     </div>
   );
 }

@@ -208,20 +208,21 @@ export default function MyPageClient() {
             <p className="mt-1 text-sm text-white/60">あなたの軌跡と、いまを映す</p>
 
             {/* QUICK型バッジ（色分け対応） */}
-            {meta.label && (
-              <div
-                className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
-                style={{
-                  border: `1px solid ${meta.color}`,
-                  color: meta.color,
-                  backgroundColor: hexToRgba(meta.color, 0.12),
-                  boxShadow: `0 0 0.25rem ${hexToRgba(meta.color, 0.4)}`
-                }}
-              >
-                <span>QUICK 診断</span>
-                <span className="opacity-50">•</span>
-                <span>{meta.label}</span>
-              </div>
+{meta.label && (
+  <div
+    className="mt-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-medium"
+    style={{
+      border: `1px solid ${meta.color}`,
+      color: meta.color,
+      backgroundColor: hexToRgba(meta.color, 0.12),
+      boxShadow: `0 0 0.25rem ${hexToRgba(meta.color, 0.4)}`
+    }}
+    aria-label={meta.label}
+  >
+    {meta.label}
+  </div>
+)}
+
             )}
           </div>
 

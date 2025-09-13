@@ -1,160 +1,140 @@
-// app/daily/generator/GeneratorClient.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
-type Slot = "morning" | "noon" | "night";
-type GenRes = {
+type Option = { key: EV; label: string };
+
+type GenResp = {
   ok: boolean;
   id: string;
-  slot: Slot;
+  slot: "morning" | "noon" | "night";
   env: "dev" | "prod";
   text: string;
-  options: { key: EV; label?: string }[];
+  options: Option[];
   ts: string;
+  theme?: string;
   error?: string;
 };
 
-const SLOT_COUNTS: Record<Slot, number> = { morning: 4, noon: 3, night: 2 };
-
 export default function GeneratorClient() {
-  const [slot, setSlot] = useState<Slot>("morning");
-  const [theme, setTheme] = useState("self");
+  const [slot, setSlot] = useState<"morning" | "noon" | "night">("morning");
+  const [theme, setTheme] = useState<string>("self"); // 好きなテーマに合わせて
   const [env, setEnv] = useState<"dev" | "prod">("prod");
   const [loading, setLoading] = useState(false);
+  const [resp, setResp] = useState<GenResp | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [data, setData] = useState<GenRes | null>(null);
 
-  useEffect(() => {
+  const handleGenerate = async () => {
+    setLoading(true);
+    setErr(null);
+    setResp(null);
     try {
-      const saved = localStorage.getItem("ev-env");
-      if (saved === "dev" || saved === "prod") setEnv(saved);
-    } catch {}
-  }, []);
-
-  const count = SLOT_COUNTS[slot];
-
-  async function generate() {
-    try {
-      setErr(null);
-      setLoading(true);
-      setData(null);
-      const res = await fetch("/api/daily/generate", {
+      const r = await fetch("/api/daily/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        credentials: "include",
         body: JSON.stringify({ slot, theme, env }),
       });
-      const json = (await res.json()) as GenRes;
-      if (!res.ok || !json.ok) throw new Error(json.error || `status_${res.status}`);
-      setData(json);
-      try { localStorage.setItem("ev-env", env) } catch {}
+      const j = (await r.json()) as GenResp;
+      if (!j.ok) {
+        setErr(j.error || "unknown_error");
+      } else {
+        setResp(j);
+        // 次ステップ用：確認ページで拾えるようにセッションに保存
+        sessionStorage.setItem("daily:pending", JSON.stringify(j));
+      }
     } catch (e: any) {
-      setErr(e?.message || "generate_failed");
+      setErr(e?.message || "fetch_failed");
     } finally {
       setLoading(false);
     }
-  }
-
-  async function copyJson() {
-    if (!data) return;
-    const text = JSON.stringify(data, null, 2);
-    await navigator.clipboard.writeText(text);
-    alert("JSONをコピーしました");
-  }
-
-  const pretty = useMemo(() => {
-    if (!data) return "";
-    const lines = data.options.map((o) => `- ${o.key}：${o.label ?? o.key}`).join("\n");
-    return `${data.text}\n${lines}`;
-  }, [data]);
+  };
 
   return (
-    <div className="mx-auto max-w-md p-6 text-white">
-      <h1 className="text-2xl font-bold">DAILY 設問ジェネレーター（AI）</h1>
-      <p className="mt-1 text-sm text-white/70">slotに応じて選択肢数（朝4 / 昼3 / 夜2）を自動調整します。</p>
-
-      <div className="mt-4 space-y-3">
-        <div className="flex items-center gap-3">
-          <label className="text-sm w-20 text-white/70">slot</label>
-          <div className="flex gap-2">
-            {(["morning","noon","night"] as Slot[]).map((s) => (
-              <button
-                key={s}
-                onClick={() => setSlot(s)}
-                className={`px-3 py-1 rounded border ${slot===s?"bg-white/15 border-white/40":"bg-white/5 border-white/15 hover:bg-white/10"}`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-          <div className="text-xs text-white/50 ml-2">選択肢: {count}件</div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <label className="text-sm w-20 text-white/70">theme</label>
-          <input
-            value={theme}
-            onChange={(e)=>setTheme(e.target.value)}
-            placeholder="self / work / love / future …"
-            className="flex-1 rounded border border-white/20 bg-black/30 px-3 py-1 text-sm"
-          />
-        </div>
-
-        <div className="flex items-center gap-3">
-          <label className="text-sm w-20 text-white/70">env</label>
-          <div className="flex gap-2">
-            {(["prod","dev"] as const).map((e)=>(
-              <button
-                key={e}
-                onClick={()=>setEnv(e)}
-                className={`px-3 py-1 rounded border ${env===e?"bg-white/15 border-white/40":"bg-white/5 border-white/15 hover:bg-white/10"}`}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="pt-2">
-          <button
-            onClick={generate}
-            disabled={loading}
-            className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 disabled:opacity-40"
+    <div className="space-y-6">
+      {/* フォーム */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="flex flex-col">
+          <label className="text-sm text-gray-600 mb-1">slot</label>
+          <select
+            className="border rounded-lg px-3 py-2"
+            value={slot}
+            onChange={(e) => setSlot(e.target.value as any)}
           >
-            {loading ? "生成中…" : "AIで生成"}
-          </button>
+            <option value="morning">morning（4択）</option>
+            <option value="noon">noon（3択）</option>
+            <option value="night">night（2択）</option>
+          </select>
+        </div>
+        <div className="flex flex-col">
+          <label className="text-sm text-gray-600 mb-1">theme</label>
+          <select
+            className="border rounded-lg px-3 py-2"
+            value={theme}
+            onChange={(e) => setTheme(e.target.value)}
+          >
+            <option value="self">self（自己）</option>
+            <option value="work">work（仕事）</option>
+            <option value="love">love（恋愛）</option>
+            <option value="future">future（未来）</option>
+          </select>
+        </div>
+        <div className="flex flex-col">
+          <label className="text-sm text-gray-600 mb-1">env</label>
+          <select
+            className="border rounded-lg px-3 py-2"
+            value={env}
+            onChange={(e) => setEnv(e.target.value as any)}
+          >
+            <option value="prod">prod</option>
+            <option value="dev">dev</option>
+          </select>
         </div>
       </div>
 
-      <div className="mt-6">
-        {err && <div className="text-red-300 text-sm mb-3">エラー: {String(err)}</div>}
-        {data && (
-          <div className="rounded-2xl border border-white/12 bg-white/5 p-4 space-y-3">
-            <div className="text-xs text-white/50">id: {data.id} / slot: {data.slot} / env: {data.env}</div>
-            <div className="text-base">{data.text}</div>
-            <ul className="text-sm list-disc pl-5">
-              {data.options.map((o)=>(
-                <li key={o.key} className="mt-0.5">
-                  <span className="font-semibold">{o.key}</span>：{o.label ?? o.key}
-                </li>
-              ))}
-            </ul>
+      <button
+        onClick={handleGenerate}
+        disabled={loading}
+        className="w-full sm:w-auto inline-flex items-center justify-center rounded-xl px-5 py-2.5 border shadow-sm hover:shadow transition"
+      >
+        {loading ? "生成中..." : "AIで生成"}
+      </button>
 
-            <div className="flex gap-2 pt-2">
-              <button onClick={copyJson} className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-sm">
-                JSONをコピー
-              </button>
-              <a href="/daily/question" className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-sm">
-                /daily/question を開く
-              </a>
-            </div>
+      {/* 結果表示 */}
+      {err && (
+        <div className="text-red-600 text-sm">
+          エラー：{err}
+        </div>
+      )}
+
+      {resp && (
+        <div className="border rounded-xl p-4 space-y-3">
+          <div className="text-xs text-gray-500">
+            id: {resp.id} / slot: {resp.slot} / env: {resp.env}
           </div>
-        )}
-      </div>
+          <p className="text-base">{resp.text}</p>
+          <ul className="list-disc ml-5">
+            {resp.options?.map((o) => (
+              <li key={o.key}>
+                <span className="font-mono mr-2">{o.key}</span>
+                {o.label}
+              </li>
+            ))}
+          </ul>
+          <div className="text-xs text-gray-400">
+            ts: {new Date(resp.ts).toLocaleString()}
+          </div>
+          {/* 次ステップ：確認ページへ（今は配置だけ） */}
+          <div className="pt-2">
+            <a
+              href="/daily/confirm"
+              className="text-indigo-600 underline hover:no-underline"
+            >
+              確認ページへ（Step 2 で実装）
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

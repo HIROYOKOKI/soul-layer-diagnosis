@@ -1,16 +1,15 @@
 export const dynamic = "force-dynamic";
 
-import GeneratorClient from "./GeneratorClient";
+import ConfirmClient from "./ConfirmClient"; // ← ここを修正
 
 export default function Page() {
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-semibold mb-4">Daily Question Generator</h1>
+      <h1 className="text-2xl font-semibold mb-4">回答の確認</h1>
       <p className="text-sm text-gray-500 mb-6">
-        slot / theme / env を選んで「AIで生成」を押すと、質問と選択肢を取得します。
-        （OpenAI未設定でもフォールバックで表示されます）
+        生成された質問に対して、あなたの選択を1つ選んでください。
       </p>
-      <GeneratorClient />
+      <ConfirmClient />
     </main>
   );
 }

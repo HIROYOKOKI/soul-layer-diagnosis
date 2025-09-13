@@ -49,17 +49,13 @@ function normalizeModel(s?: string | null): "EΛVƎ" | "EVΛƎ" | null {
   if (t.includes("EVΛƎ")) return "EVΛƎ"
   return null
 }
-function toTypeLabel(model?: string | null) {
-  const m = normalizeModel(model)
-  if (m === "EΛVƎ") return "現実思考型"
-  if (m === "EVΛƎ") return "未来志向型"
-  return null
-}
+
 function decideModelFromCode(code?: string | null): "EΛVƎ" | "EVΛƎ" | null {
   const c = (code || "").trim()
   if (!c) return null
   return c === "E" || c === "Λ" ? "EΛVƎ" : c === "V" || c === "Ǝ" ? "EVΛƎ" : null
 }
+
 function fmt(dt?: string | null) {
   try {
     const d = dt ? new Date(dt) : new Date()
@@ -69,10 +65,12 @@ function fmt(dt?: string | null) {
     }).format(d)
   } catch { return "" }
 }
+
 function normalizeToday(v: any): EVAEVectorLocal {
   const L = typeof v?.L === "number" ? v.L : (typeof v?.["Λ"] === "number" ? v["Λ"] : 0)
   return { E: clamp01(v?.E), V: clamp01(v?.V), L: clamp01(L), Eexists: clamp01(v?.Eexists ?? v?.["Ǝ"]) }
 }
+
 function normalizeSeries(list: any[]): SeriesPointLocal[] {
   return (list ?? []).map((d) => {
     const L = typeof d?.L === "number" ? d.L : (typeof d?.["Λ"] === "number" ? d["Λ"] : 0)
@@ -81,6 +79,20 @@ function normalizeSeries(list: any[]): SeriesPointLocal[] {
       E: clamp01(d?.E), V: clamp01(d?.V), L: clamp01(L), Eexists: clamp01(d?.Eexists ?? d?.["Ǝ"]),
     }
   })
+}
+
+/* ====== QUICKバッジ用ユーティリティ ====== */
+function modelMeta(model: "EΛVƎ" | "EVΛƎ" | null) {
+  if (model === "EΛVƎ") return { color: "#B833F5", label: "EΛVƎ:現実思考型" } // 紫
+  if (model === "EVΛƎ") return { color: "#FF4500", label: "EVΛƎ:未来志向型" } // オレンジ
+  return { color: "#888888", label: "" }
+}
+/** #RRGGBB → rgba(r,g,b,alpha) */
+function hexToRgba(hex: string, alpha = 0.15) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  if (!m) return `rgba(255,255,255,${alpha})`
+  const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 /* ============== ブランドヘッダー ============== */
@@ -107,10 +119,10 @@ export default function MyPageClient() {
   const [series, setSeries] = useState<SeriesPointLocal[] | null>(null)
   const [chartsErr, setChartsErr] = useState<string | null>(null)
 
-  // ← 追加: env 状態（dev/prod）
+  // env（dev/prod）
   const [env, setEnv] = useState<"dev" | "prod">("prod")
 
-  // ← 追加: 初回マウント時に localStorage の env を復元（なければ prod 保存）
+  // 初回マウント時に localStorage の env を復元
   useEffect(() => {
     try {
       const saved = localStorage.getItem("ev-env")
@@ -122,7 +134,7 @@ export default function MyPageClient() {
     } catch {}
   }, [])
 
-  // ← 修正: env をクエリで渡しつつ取得。env 変更で再フェッチ
+  // env をクエリで渡しつつ取得。env 変更で再フェッチ
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -147,7 +159,7 @@ export default function MyPageClient() {
     return () => { alive = false }
   }, [env])
 
-  // 既存（チャート）の取得はそのまま
+  // チャート系
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -174,7 +186,7 @@ export default function MyPageClient() {
 
   // quick診断の型: profile.base_model を優先、なければ daily.code から推定
   const normalizedModel = normalizeModel(profile?.base_model) || decideModelFromCode(daily?.code)
-  const typeLabel = toTypeLabel(normalizedModel || undefined)
+  const meta = modelMeta(normalizedModel)
   const nowStr = fmt()
 
   const goDaily = () => router.push("/daily/question")
@@ -195,12 +207,20 @@ export default function MyPageClient() {
             <h1 className="text-[32px] font-extrabold tracking-tight uppercase">MY PAGE</h1>
             <p className="mt-1 text-sm text-white/60">あなたの軌跡と、いまを映す</p>
 
-            {/* quick型バッジ */}
-            {typeLabel && (
-              <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs text-white/80">
-                <span className="opacity-70">QUICK 診断</span>
-                <span className="opacity-40">•</span>
-                <span className="font-medium">{typeLabel}</span>
+            {/* QUICK型バッジ（色分け対応） */}
+            {meta.label && (
+              <div
+                className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium"
+                style={{
+                  border: `1px solid ${meta.color}`,
+                  color: meta.color,
+                  backgroundColor: hexToRgba(meta.color, 0.12),
+                  boxShadow: `0 0 0.25rem ${hexToRgba(meta.color, 0.4)}`
+                }}
+              >
+                <span>QUICK 診断</span>
+                <span className="opacity-50">•</span>
+                <span>{meta.label}</span>
               </div>
             )}
           </div>

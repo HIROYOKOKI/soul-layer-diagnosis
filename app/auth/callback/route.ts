@@ -7,7 +7,6 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const next = url.searchParams.get("next") || "/welcome";
-
   const supabase = createRouteHandlerClient({ cookies });
 
   if (code) {

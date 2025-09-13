@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 type Phase = 'video' | 'still';
@@ -8,13 +9,32 @@ export default function LoginIntro() {
   const [phase, setPhase] = useState<Phase>('video');
   const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const failSafeRef = useRef<number | null>(null);
 
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
 
+    // アクセシビリティ：reduce motion の人には静止画のみ
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) {
+      setPhase('still');
+      return;
+    }
+
+    // iOS対策（自動再生必須条件）
     v.muted = true;
-    v.playsInline = true;
+    (v as any).playsInline = true;
+
+    // タブ非表示中は静止画に
+    const onVisibility = () => {
+      if (document.hidden) {
+        setPhase('still');
+        v.pause();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     v.play()
       .then(() => setPlaying(true))
       .catch(() => setPhase('still'));
@@ -24,13 +44,17 @@ export default function LoginIntro() {
     v.addEventListener('ended', onEnded);
     v.addEventListener('error', onError);
 
-    // fail-safe: 万一endedが来ない端末用（約3〜4.5秒）
-    const failSafe = window.setTimeout(() => setPhase('still'), 4500);
+    // fail-safe（モバイル端末で ended が発火しないケース）
+    failSafeRef.current = window.setTimeout(() => setPhase('still'), 4500);
 
     return () => {
       v.removeEventListener('ended', onEnded);
       v.removeEventListener('error', onError);
-      clearTimeout(failSafe);
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (failSafeRef.current) {
+        clearTimeout(failSafeRef.current);
+        failSafeRef.current = null;
+      }
     };
   }, []);
 
@@ -40,12 +64,11 @@ export default function LoginIntro() {
 
   return (
     <main style={styles.page}>
-      {/* background stack: video -> still crossfade */}
+      {/* 背景（動画→静止画クロスフェード） */}
       <div style={styles.bgStack} aria-hidden>
         <img
           src="/login-still.png"
           alt=""
-          aria-hidden
           decoding="async"
           loading="eager"
           style={{ ...styles.bgMedia, opacity: imageOpacity }}
@@ -62,15 +85,19 @@ export default function LoginIntro() {
         />
       </div>
 
-      {/* bottom buttons (fade-in after still) */}
+      {/* 下部ボタン（静止画フェーズでフェードイン） */}
       <div style={styles.bottomBlock}>
         <div style={{ ...styles.buttonRow, opacity: buttonsOpacity }}>
-         <GlowButton href="/signup" variant="pink">はじめて</GlowButton>
-  <GlowButton href="/login/email" variant="blue">ログイン</GlowButton>
+          <GlowButton href="/signup" variant="pink" ariaLabel="新規登録へ">
+            新規登録
+          </GlowButton>
+          <GlowButton href="/login/email" variant="blue" ariaLabel="ログインへ">
+            ログイン
+          </GlowButton>
         </div>
       </div>
 
-      {/* ripple keyframes */}
+      {/* リップル用キーフレーム */}
       <style jsx global>{`
         @keyframes evaeRipple {
           0%   { transform: translate(-50%, -50%) scale(0);  opacity: .9; }
@@ -82,15 +109,17 @@ export default function LoginIntro() {
   );
 }
 
-/* ---------- GlowButton (anchor with ripple & glow) ---------- */
+/* ---------- GlowButton (Next.js Link + ripple & glow) ---------- */
 function GlowButton({
   href,
   children,
   variant,
+  ariaLabel,
 }: {
   href: string;
   children: ReactNode;
   variant: 'pink' | 'blue';
+  ariaLabel?: string;
 }) {
   const glow = variant === 'pink' ? 'rgba(255,79,223,.65)' : 'rgba(79,195,255,.65)';
   const baseShadow =
@@ -99,7 +128,7 @@ function GlowButton({
   const pressedShadow = `0 0 14px ${glow}, 0 0 28px ${glow}`;
 
   const onPointerDown = (e: React.PointerEvent<HTMLAnchorElement>) => {
-    const a = e.currentTarget;
+    const a = e.currentTarget as HTMLAnchorElement;
     const rect = a.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -122,22 +151,17 @@ function GlowButton({
     ripple.style.animation = 'evaeRipple .45s ease-out forwards';
 
     a.appendChild(ripple);
-    ripple.addEventListener(
-      'animationend',
-      () => {
-        ripple.remove();
-      },
-      { once: true },
-    );
+    ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLAnchorElement>) => {
-    e.currentTarget.style.boxShadow = baseShadow;
+    (e.currentTarget as HTMLAnchorElement).style.boxShadow = baseShadow;
   };
 
   return (
-    <a
+    <Link
       href={href}
+      aria-label={ariaLabel}
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
@@ -151,7 +175,7 @@ function GlowButton({
         color: '#fff',
         background: '#000',
         boxShadow: baseShadow,
-        overflow: 'hidden', // clip ripple inside
+        overflow: 'hidden', // ripple を内側にクリップ
       }}
     >
       {children}
@@ -167,7 +191,7 @@ function GlowButton({
           pointerEvents: 'none',
         }}
       />
-    </a>
+    </Link>
   );
 }
 
@@ -184,7 +208,7 @@ const styles: Record<string, CSSProperties> = {
     position: 'fixed',
     inset: 0,
     zIndex: 0,
-    pointerEvents: 'none',
+    pointerEvents: 'none', // 背景はクリック不可
   },
   bgMedia: {
     position: 'absolute',
@@ -207,10 +231,10 @@ const styles: Record<string, CSSProperties> = {
     zIndex: 1,
   },
   buttonRow: {
-  display: 'flex',
-  gap: 18,
-  transition: 'opacity .6s ease',
-  zIndex: 10,            // 追加
-  position: 'relative',  // 明示
-},
+    display: 'flex',
+    gap: 18,
+    transition: 'opacity .6s ease',
+    zIndex: 10,           // ボタンを前面に
+    position: 'relative', // ripple の座標基準
+  },
 };

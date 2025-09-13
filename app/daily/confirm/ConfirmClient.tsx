@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type React from "react";
 import { useRouter } from "next/navigation";
 import LuneaBubble from "@/components/LuneaBubble";
 
@@ -27,6 +28,8 @@ type Answer = {
   ts: string;
 };
 
+const isEV = (v: any): v is EV => v === "E" || v === "V" || v === "Λ" || v === "Ǝ";
+
 export default function ConfirmClient() {
   const router = useRouter();
   const [pending, setPending] = useState<Pending | null>(null);
@@ -52,6 +55,17 @@ export default function ConfirmClient() {
     }
   }, []);
 
+  // /daily/question からの事前選択を反映（あれば）
+  useEffect(() => {
+    try {
+      const pre = sessionStorage.getItem("daily:pre_choice");
+      if (isEV(pre)) {
+        setChoice(pre);
+        sessionStorage.removeItem("daily:pre_choice");
+      }
+    } catch {}
+  }, [pending?.id]);
+
   // 事前プリフェッチ（体感を軽く）
   useEffect(() => {
     router.prefetch("/daily/result");
@@ -62,8 +76,8 @@ export default function ConfirmClient() {
     return (
       <div className="rounded-xl border p-4">
         <p className="text-red-600 text-sm mb-3">直前の質問データが見つかりませんでした。</p>
-        <a className="text-indigo-600 underline" href="/daily/generator">
-          生成ページへ戻る
+        <a className="text-indigo-600 underline" href="/daily/question">
+          設問ページへ戻る
         </a>
       </div>
     );
@@ -155,15 +169,15 @@ export default function ConfirmClient() {
 
       <div className="flex items-center gap-3">
         <a
-          href="/daily/generator"
+          href="/daily/question"
           className="inline-flex items-center justify-center rounded-xl px-4 py-2 border hover:bg-gray-50"
         >
           戻る
         </a>
         <button
           onClick={handleConfirm}
-          disabled={submitting}
-          className="inline-flex items-center justify-center rounded-xl px-5 py-2.5 border shadow-sm hover:shadow transition"
+          disabled={!choice || submitting}
+          className="inline-flex items-center justify-center rounded-xl px-5 py-2.5 border shadow-sm hover:shadow transition disabled:opacity-50"
         >
           {submitting ? "送信中..." : "この内容で回答"}
         </button>

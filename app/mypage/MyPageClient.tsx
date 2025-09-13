@@ -222,8 +222,6 @@ export default function MyPageClient() {
     {meta.label}
   </div>
 )}
-
-            )}
           </div>
 
           {/* envバッジ（開発時のみ表示） */}

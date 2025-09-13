@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import LuneaBubble from "@/components/LuneaBubble";
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
 type Option = { key: EV; label: string };
@@ -17,6 +18,15 @@ type Pending = {
   theme?: string;
 };
 
+type Answer = {
+  id: string;
+  slot: "morning" | "noon" | "night";
+  env: "dev" | "prod";
+  theme: string;
+  choice: EV;
+  ts: string;
+};
+
 export default function ConfirmClient() {
   const router = useRouter();
   const [pending, setPending] = useState<Pending | null>(null);
@@ -24,25 +34,34 @@ export default function ConfirmClient() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // sessionStorage からロード（クライアントのみ）
+  // sessionStorage からロード（pending）＋既存の回答があれば選択復元
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem("daily:pending");
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as Pending;
-      if (parsed?.ok && parsed?.id) setPending(parsed);
+      const pRaw = sessionStorage.getItem("daily:pending");
+      if (!pRaw) return;
+      const p = JSON.parse(pRaw) as Pending;
+      if (p?.ok && p?.id) setPending(p);
+
+      const aRaw = sessionStorage.getItem("daily:answer");
+      if (aRaw) {
+        const a = JSON.parse(aRaw) as Answer;
+        if (a?.id === p?.id && a?.choice) setChoice(a.choice);
+      }
     } catch {
       /* no-op */
     }
   }, []);
 
+  // 事前プリフェッチ（体感を軽く）
+  useEffect(() => {
+    router.prefetch("/daily/result");
+  }, [router]);
+
   // ★ ガード：pending を読む前に必ず null チェック
   if (!pending) {
     return (
       <div className="rounded-xl border p-4">
-        <p className="text-red-600 text-sm mb-3">
-          直前の質問データが見つかりませんでした。
-        </p>
+        <p className="text-red-600 text-sm mb-3">直前の質問データが見つかりませんでした。</p>
         <a className="text-indigo-600 underline" href="/daily/generator">
           生成ページへ戻る
         </a>
@@ -52,11 +71,9 @@ export default function ConfirmClient() {
 
   // ガード後なので安全に参照できる
   const whenText =
-    pending.slot === "morning"
-      ? "（朝 / 4択）"
-      : pending.slot === "noon"
-      ? "（昼 / 3択）"
-      : "（夜 / 2択）";
+    pending.slot === "morning" ? "（朝 / 4択）" :
+    pending.slot === "noon"    ? "（昼 / 3択）" :
+                                 "（夜 / 2択）";
 
   const handleConfirm = async () => {
     setError(null);
@@ -66,7 +83,7 @@ export default function ConfirmClient() {
     }
     setSubmitting(true);
     try {
-      const answer = {
+      const answer: Answer = {
         id: pending.id,
         slot: pending.slot,
         env: pending.env,
@@ -83,17 +100,24 @@ export default function ConfirmClient() {
     }
   };
 
+  // Enterで確定できるように（アクセシビリティ）
+  const onKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
+    if (e.key === "Enter") handleConfirm();
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" onKeyDown={onKeyDown}>
       <div className="text-xs text-gray-500">
         id: {pending.id} / slot: {pending.slot} / env: {pending.env} / ts:{" "}
         {new Date(pending.ts).toLocaleString()}
       </div>
 
       <div className="rounded-xl border p-4">
-        <p className="text-base font-medium">
-          {pending.text} <span className="text-gray-400 text-sm">{whenText}</span>
-        </p>
+        <LuneaBubble
+          key={pending.id} // テキスト変更時にタイプライタをリセット
+          text={`${pending.text} ${whenText}`}
+          speed={18}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-3">

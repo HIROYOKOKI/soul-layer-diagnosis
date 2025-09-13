@@ -3,6 +3,15 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import LoginClient from "./Client";
+export default function LoginPage() {
+  return (
+    <main className="mx-auto max-w-md px-6 py-10">
+      <h1 className="text-2xl font-semibold mb-6">ログイン</h1>
+      <LoginClient />
+    </main>
+  );
+}
 
 // ブラウザ用 Supabase（NEXT_PUBLIC_* 必須）
 const supabase = createClient(

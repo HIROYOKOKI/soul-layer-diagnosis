@@ -11,8 +11,8 @@ export default function RegisterPage() {
   const [err, setErr] = useState<string | null>(null);
 
   const canSubmit = useMemo(() => {
-    // 超軽量バリデーション（@と.がある程度）
-    return /\S+@\S+\.\S+/.test(email) && !sending;
+    const v = email.trim().toLowerCase();
+    return /\S+@\S+\.\S+/.test(v) && !sending;
   }, [email, sending]);
 
   async function onSubmit(e: React.FormEvent) {
@@ -23,16 +23,19 @@ export default function RegisterPage() {
     setErr(null);
 
     try {
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const BASE_URL =
+        (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") as string) ||
+        (typeof window !== "undefined" ? window.location.origin : "");
+
       const { error } = await sb.auth.signInWithOtp({
-        email,
+        email: email.trim().toLowerCase(),
         options: {
-          // メール内リンクの着地点：/login でセッション検知→/profile へ
-          emailRedirectTo: `${origin}/login?intro=1`,
+          // 新規登録者の到着ページ（Supabaseの Redirect URLs に /welcome を登録しておく）
+          emailRedirectTo: `${BASE_URL}/welcome?intro=1`,
         },
       });
       if (error) throw error;
-      setMsg("確認メールを送信しました。受信箱をご確認ください。");
+      setMsg("確認メールを送信しました。受信箱のリンクから続行してください。");
     } catch (e: any) {
       setErr(e?.message ?? "送信に失敗しました。時間をおいて再度お試しください。");
     } finally {

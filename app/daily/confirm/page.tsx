@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 
 import ConfirmClient from "./ConfirmClient";
 
-export default function Page() {
+export default function Page() { return <div>OK</div> }
+
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-semibold mb-4">回答の確認</h1>

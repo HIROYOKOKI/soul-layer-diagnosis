@@ -2,13 +2,17 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import LoginIntro from "@/components/LoginIntro";
-export default function IntroPage() {
-  return <LoginIntro />;
-}
+
 type Phase = 'video' | 'still';
 
-export default function LoginIntro() {
+export default function IntroPage() {
+  return <IntroView />;
+}
+
+/* =========================
+   Intro 本体（動画→静止画→ボタン）
+   ========================= */
+function IntroView() {
   const [phase, setPhase] = useState<Phase>('video');
   const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -18,18 +22,18 @@ export default function LoginIntro() {
     const v = videoRef.current;
     if (!v) return;
 
-    // アクセシビリティ：reduce motion の人には静止画のみ
+    // 動きの少ない設定のユーザーは静止画へ
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     if (reduceMotion) {
       setPhase('still');
       return;
     }
 
-    // iOS対策（自動再生必須条件）
+    // iOS 自動再生要件
     v.muted = true;
     (v as any).playsInline = true;
 
-    // タブ非表示中は静止画に
+    // タブ非表示なら静止画
     const onVisibility = () => {
       if (document.hidden) {
         setPhase('still');
@@ -38,16 +42,14 @@ export default function LoginIntro() {
     };
     document.addEventListener('visibilitychange', onVisibility);
 
-    v.play()
-      .then(() => setPlaying(true))
-      .catch(() => setPhase('still'));
+    v.play().then(() => setPlaying(true)).catch(() => setPhase('still'));
 
     const onEnded = () => setPhase('still');
     const onError = () => setPhase('still');
     v.addEventListener('ended', onEnded);
     v.addEventListener('error', onError);
 
-    // fail-safe（モバイル端末で ended が発火しないケース）
+    // モバイルで ended が来ないケースの保険
     failSafeRef.current = window.setTimeout(() => setPhase('still'), 4500);
 
     return () => {
@@ -67,7 +69,7 @@ export default function LoginIntro() {
 
   return (
     <main style={styles.page}>
-      {/* 背景（動画→静止画クロスフェード） */}
+      {/* 背景：動画→静止画クロスフェード */}
       <div style={styles.bgStack} aria-hidden>
         <img
           src="/login-still.png"
@@ -91,10 +93,10 @@ export default function LoginIntro() {
       {/* 下部ボタン（静止画フェーズでフェードイン） */}
       <div style={styles.bottomBlock}>
         <div style={{ ...styles.buttonRow, opacity: buttonsOpacity }}>
-          <GlowButton href="/signup" variant="pink" ariaLabel="新規登録へ">
+          <GlowButton href="/register" variant="pink" ariaLabel="新規登録へ">
             新規登録
           </GlowButton>
-          <GlowButton href="/login/email" variant="blue" ariaLabel="ログインへ">
+          <GlowButton href="/login" variant="blue" ariaLabel="ログインへ">
             ログイン
           </GlowButton>
         </div>
@@ -127,7 +129,6 @@ function GlowButton({
   const glow = variant === 'pink' ? 'rgba(255,79,223,.65)' : 'rgba(79,195,255,.65)';
   const baseShadow =
     'inset 0 1px 2px rgba(255,255,255,.15), inset 0 -2px 6px rgba(0,0,0,.5)';
-
   const pressedShadow = `0 0 14px ${glow}, 0 0 28px ${glow}`;
 
   const onPointerDown = (e: React.PointerEvent<HTMLAnchorElement>) => {
@@ -136,10 +137,8 @@ function GlowButton({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // temporary glow
     a.style.boxShadow = pressedShadow;
 
-    // ripple element
     const ripple = document.createElement('span');
     ripple.style.position = 'absolute';
     ripple.style.left = `${x}px`;
@@ -178,11 +177,10 @@ function GlowButton({
         color: '#fff',
         background: '#000',
         boxShadow: baseShadow,
-        overflow: 'hidden', // ripple を内側にクリップ
+        overflow: 'hidden',
       }}
     >
       {children}
-      {/* glass highlight */}
       <span
         aria-hidden
         style={{
@@ -211,7 +209,7 @@ const styles: Record<string, CSSProperties> = {
     position: 'fixed',
     inset: 0,
     zIndex: 0,
-    pointerEvents: 'none', // 背景はクリック不可
+    pointerEvents: 'none',
   },
   bgMedia: {
     position: 'absolute',
@@ -237,7 +235,7 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     gap: 18,
     transition: 'opacity .6s ease',
-    zIndex: 10,           // ボタンを前面に
-    position: 'relative', // ripple の座標基準
+    zIndex: 10,
+    position: 'relative',
   },
 };

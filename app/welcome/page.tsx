@@ -22,7 +22,7 @@ export default function WelcomePage() {
       <div className="grid gap-3 sm:grid-cols-2">
         <a
           href="/profile"
-          className="text-center rounded-md bg白 text-black py-2 font-medium"
+          className="text-center rounded-md bg-white text-black py-2 font-medium"
         >
           プロフィール入力へ
         </a>

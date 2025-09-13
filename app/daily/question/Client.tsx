@@ -19,54 +19,77 @@ export default function DailyQuestionClient() {
 
   // env を localStorage から復元（既定は prod）
   const [env, setEnv] = useState<"dev" | "prod">("prod");
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("ev-env");
-      if (saved === "dev" || saved === "prod") setEnv(saved);
-    } catch {}
-  }, []);
-
   // 1) 質問の取得（GET）
-  useEffect(() => {
-    const controller = new AbortController();
-    let alive = true;
+useEffect(() => {
+  const controller = new AbortController();
+  let alive = true;
 
-    (async () => {
-      try {
-        setErr(null);
-        setLoading(true);
-        const res = await fetch("/api/daily/question", {
-          method: "GET",
-          cache: "no-store",
-          credentials: "include",           // ← 重要（Auth Cookieを同送）
-          signal: controller.signal,
-        });
-        if (res.status === 401) {
-          router.push("/login?return=/daily/question"); // 未ログインならログインへ
-          return;
-        }
-        if (!res.ok) throw new Error(`fetch_failed_${res.status}`);
+  (async () => {
+    try {
+      setErr(null);
+      setLoading(true);
 
-        const json: QuestionRes = await res.json();
-        if (!alive) return;
-        if (!json.ok) throw new Error(json.error || "fetch_failed");
+      const res = await fetch("/api/daily/question", {
+        method: "GET",
+        cache: "no-store",
+        credentials: "include",           // Auth Cookie を同送
+        signal: controller.signal,
+      });
 
-        setQuestion(json.question || "");
-        setChoices((json.choices as EV[]) || []);
-        setSelected(null);
-      } catch (e: any) {
-        if (!alive || e?.name === "AbortError") return;
-        setErr(e?.message || "failed");
-      } finally {
-        if (alive) setLoading(false);
+      // HTMLが返ってきた＝たぶんログインページ（middlewareで弾かれた等）
+      const ctype = res.headers.get("content-type") || "";
+      const text = await res.text();
+      if (ctype.includes("text/html")) {
+        router.push("/login?return=/daily/question");
+        return;
       }
-    })();
 
-    return () => {
-      alive = false;
-      controller.abort();
-    };
-  }, [router]);
+      // JSONとして再パース
+      let json: any = {};
+      try { json = JSON.parse(text); } catch { /* JSONでない → 失敗 */ }
+
+      // 401 は明示遷移
+      if (res.status === 401 || json?.error === "unauthorized") {
+        router.push("/login?return=/daily/question");
+        return;
+      }
+
+      // HTTPエラー
+      if (!res.ok) {
+        throw new Error(`http_${res.status}`);
+      }
+
+      // --- 重要: ok が「falseのとき」だけ失敗扱い。未定義は許容 ---
+      if (json?.ok === false) {
+        throw new Error(json?.error || "fetch_failed");
+      }
+
+      // 返却形のゆらぎに強くする（question/choices があれば成功とみなす）
+      const q = json?.question ?? json?.data?.question ?? "";
+      const ch = (json?.choices ?? json?.data?.choices ?? []) as EV[];
+
+      if (!q || !Array.isArray(ch) || ch.length === 0) {
+        throw new Error(json?.error || "fetch_failed");
+      }
+
+      if (!alive) return;
+      setQuestion(q);
+      setChoices(ch);
+      setSelected(null);
+    } catch (e: any) {
+      if (!alive || e?.name === "AbortError") return;
+      setErr(e?.message || "failed");
+    } finally {
+      if (alive) setLoading(false);
+    }
+  })();
+
+  return () => {
+    alive = false;
+    controller.abort();
+  };
+}, [router]);
+
 
   // 2) 回答の送信（POST）
   async function submitAnswer() {

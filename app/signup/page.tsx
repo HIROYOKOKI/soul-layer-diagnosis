@@ -26,7 +26,10 @@ export default function SignupEmailOnly() {
       const origin = window.location.origin;
       const { error } = await sb.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: `${origin}/login?intro=1` },
+        options: {
+          // ← ここだけ変更
+          emailRedirectTo: `${origin}/auth/callback?next=/welcome?intro=1`,
+        },
       });
       if (error) throw error;
       setMsg("確認メールを送信しました。受信箱をご確認ください。");
@@ -43,7 +46,10 @@ export default function SignupEmailOnly() {
     const origin = window.location.origin;
     await sb.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${origin}/login?intro=1` },
+      options: {
+        // ← 再送も同じリダイレクト先に
+        emailRedirectTo: `${origin}/auth/callback?next=/welcome?intro=1`,
+      },
     });
     setMsg("確認メールを再送しました。受信箱をご確認ください。");
   }
@@ -71,7 +77,6 @@ export default function SignupEmailOnly() {
         </button>
       </form>
 
-      {/* 再送リンクは送信後だけ表示 */}
       {sentOnce && (
         <button onClick={onResend} className="mt-4 underline text-sm">
           確認メールを再送する

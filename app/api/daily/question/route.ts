@@ -9,94 +9,91 @@ import { buildQuestionFromData, fallbackQuestion } from "@/lib/question-gen";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-
 export async function GET(req: NextRequest) {
-  // --- 観測（必要なら残す）
-  // console.log("daily.question.check", {
-  //   cookieNames: cookies().getAll().map((c) => c.name),
-  //   authHead: req.headers.get("authorization")?.slice(0, 16) ?? null,
-  // });
+  const slot = getSlot();
+  const noStore = { headers: { "cache-control": "no-store" } };
 
-  // 1) Cookie（通常ルート）
-  const helper = createRouteHandlerClient({ cookies });
-  let {
-    data: { user },
-    error: helperAuthErr,
-  } = await helper.auth.getUser();
+  let authedUser: { id: string } | null = null;
+  let helperAuthErr: Error | null = null;
 
-  // 2) Cookieが無いときは Bearer で補助
-  if (!user) {
-    const auth = req.headers.get("authorization");
-    const token = auth?.startsWith("Bearer ") ? auth.slice(7) : undefined;
-    if (token) {
-      try {
-        const sb = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
-        const r = await sb.auth.getUser(token);
-        user = r.data.user ?? null;
-      } catch (e: any) {
-        console.error("daily.question.bearer.fail", { message: e?.message });
+  try {
+    // 1) Cookie 経由の認証（あるなら使う）
+    const helper = createRouteHandlerClient({ cookies });
+    const { data, error } = await helper.auth.getUser();
+    helperAuthErr = (error as any) ?? null;
+    authedUser = (data?.user as any) ?? null;
+
+    // 2) Cookie が無ければ Bearer で補助（任意）
+    if (!authedUser) {
+      const auth = req.headers.get("authorization");
+      const token = auth?.startsWith("Bearer ") ? auth.slice(7) : undefined;
+      if (token && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        try {
+          const sb = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+          );
+          const r = await sb.auth.getUser(token);
+          authedUser = (r.data.user as any) ?? null;
+        } catch (e) {
+          // bearer 失敗は無視してゲストで続行
+          console.error("daily.question.bearer.fail", (e as any)?.message);
+        }
       }
     }
-  }
 
-  if (!user) {
-    // 認証不在 → 401
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+    // 3) 認証あり → 個別データを使って設問生成 / なし → ゲスト用（公開）
+    if (authedUser) {
+      // recent rows
+      const { data: rows, error: rowsError } = await helper
+        .from("daily_results")
+        .select("code, scores, comment, created_at")
+        .eq("user_id", authedUser.id)
+        .eq("env", "prod")
+        .order("created_at", { ascending: false })
+        .limit(24);
 
-  const slot = getSlot();
+      if (rowsError) {
+        console.error("daily.question.rows.fail", {
+          userId: authedUser.id,
+          slot,
+          message: rowsError.message,
+        });
+      }
 
-  // 3) データ取得（必ず try/catch で落とさない）
-  try {
-    // recent rows
-    const { data: rows, error: rowsError } = await helper
-      .from("daily_results")
-      .select("code, scores, comment, created_at")
-      .eq("user_id", user.id)
-      .eq("env", "prod")
-      .order("created_at", { ascending: false })
-      .limit(24);
+      // theme（※カラム名は user_id。以前の id 指定はヒットしないので修正）
+      const { data: profile, error: profileError } = await helper
+        .from("profiles")
+        .select("theme")
+        .eq("user_id", authedUser.id) // ← 修正ポイント
+        .maybeSingle();
 
-    if (rowsError) {
-      console.error("daily.question.rows.fail", {
-        userId: user.id,
-        slot,
-        message: rowsError.message,
-      });
+      if (profileError) {
+        console.error("daily.question.profile.fail", {
+          userId: authedUser.id,
+          slot,
+          message: profileError.message,
+        });
+      }
+
+      const theme = (profile as any)?.theme ?? undefined;
+      const item = buildQuestionFromData(authedUser.id, slot, rows ?? [], theme);
+
+      // 常に ok: true を付与（クライアント互換）
+      return NextResponse.json({ ok: true, ...item, auth: "user" }, noStore);
+    } else {
+      // 未ログイン = 公開GET：ゲスト用の汎用設問を返す
+      const item = fallbackQuestion(slot);
+      return NextResponse.json({ ok: true, ...item, auth: "guest" }, noStore);
     }
-
-    // theme
-    const { data: profile, error: profileError } = await helper
-      .from("profiles")
-      .select("theme")
-      .eq("id", user.id)
-      .maybeSingle(); // 行なしでもOK
-
-    if (profileError) {
-      console.error("daily.question.profile.fail", {
-        userId: user.id,
-        slot,
-        message: profileError.message,
-      });
-    }
-
-    const theme = (profile as any)?.theme ?? undefined;
-
-    // 4) 純関数で組み立て（失敗なし）
-    const item = buildQuestionFromData(user.id, slot, rows ?? [], theme);
-    return NextResponse.json(item);
   } catch (e: any) {
-    // どこかで例外が出ても UI は維持
+    // 例外時も UI を止めない（フォールバック返却）
     console.error("daily.question.fail", {
-      userId: user.id,
       slot,
       message: e?.message,
-      stack: e?.stack,
-      helperAuthErr: helperAuthErr?.message ?? null,
+      helperAuthErr: helperAuthErr ? (helperAuthErr as any).message : null,
     });
-    return NextResponse.json(fallbackQuestion(slot));
+    const item = fallbackQuestion(slot);
+    return NextResponse.json({ ok: true, ...item, error: e?.message ?? "question_fallback" }, noStore);
   }
 }

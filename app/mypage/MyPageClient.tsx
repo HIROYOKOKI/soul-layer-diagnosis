@@ -18,25 +18,24 @@ type ProfileLatest = {
   personality?: string | null
   partner?: string | null
   created_at?: string | null
-  base_model?: "EΛVƎ" | "EVΛƎ" | null     // quick診断の型
-  base_order?: EV[] | null                 // jsonb配列をそのまま受ける
+  base_model?: "EΛVƎ" | "EVΛƎ" | null
+  base_order?: EV[] | null
 }
 
 type DailyLatest = {
-  code?: string | null                     // "E" | "V" | "Λ" | "Ǝ" いずれか
-  comment?: string | null                  // 直近メッセージ（本文）
-  quote?: string | null                    // 直近メッセージ（短句）
-  theme?: string | null                    // 選択テーマ
-  env?: "dev" | "prod" | null              // 保存環境
+  code?: string | null
+  comment?: string | null
+  quote?: string | null
+  theme?: string | null
+  env?: "dev" | "prod" | null
   created_at?: string | null
-  updated_at?: string | null               // 上書き更新対策で使用
+  updated_at?: string | null
 }
 
 type EVAEVectorLocal = EVAEVector
 type SeriesPointLocal = SeriesPoint
 
 const FALLBACK_USER = { name: "Hiro", idNo: "0001", avatar: "/icon-512.png" }
-const CURRENT_THEME = "self"
 
 const clamp01 = (v: unknown) => {
   const n = typeof v === "number" ? v : Number(v)
@@ -56,7 +55,12 @@ function toTypeLabel(model?: string | null) {
   if (m === "EVΛƎ") return "未来志向型"
   return null
 }
-function fmt(dt?: string) {
+function decideModelFromCode(code?: string | null): "EΛVƎ" | "EVΛƎ" | null {
+  const c = (code || "").trim()
+  if (!c) return null
+  return c === "E" || c === "Λ" ? "EΛVƎ" : c === "V" || c === "Ǝ" ? "EVΛƎ" : null
+}
+function fmt(dt?: string | null) {
   try {
     const d = dt ? new Date(dt) : new Date()
     return new Intl.DateTimeFormat("ja-JP", {
@@ -103,16 +107,31 @@ export default function MyPageClient() {
   const [series, setSeries] = useState<SeriesPointLocal[] | null>(null)
   const [chartsErr, setChartsErr] = useState<string | null>(null)
 
+  // ← 追加: env 状態（dev/prod）
   const [env, setEnv] = useState<"dev" | "prod">("prod")
 
+  // ← 追加: 初回マウント時に localStorage の env を復元（なければ prod 保存）
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ev-env")
+      if (saved === "dev" || saved === "prod") {
+        setEnv(saved)
+      } else {
+        localStorage.setItem("ev-env", "prod")
+      }
+    } catch {}
+  }, [])
+
+  // ← 修正: env をクエリで渡しつつ取得。env 変更で再フェッチ
   useEffect(() => {
     let alive = true
     ;(async () => {
       try {
         setError(null); setLoading(true)
+        const qs = `?env=${encodeURIComponent(env)}`
         const [p, d] = await Promise.all([
           fetch("/api/mypage/profile-latest", { cache: "no-store" }).then((r) => r.json()),
-          fetch("/api/mypage/daily-latest",  { cache: "no-store" }).then((r) => r.json()),
+          fetch(`/api/mypage/daily-latest${qs}`,  { cache: "no-store" }).then((r) => r.json()),
         ])
         if (!alive) return
         if (!p?.ok) throw new Error(p?.error || "profile_latest_failed")
@@ -126,8 +145,9 @@ export default function MyPageClient() {
       }
     })()
     return () => { alive = false }
-  }, [])
+  }, [env])
 
+  // 既存（チャート）の取得はそのまま
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -152,8 +172,9 @@ export default function MyPageClient() {
     return () => { alive = false }
   }, [range])
 
-  const normalizedModel = normalizeModel(profile?.base_model)
-  const typeLabel = toTypeLabel(profile?.base_model)
+  // quick診断の型: profile.base_model を優先、なければ daily.code から推定
+  const normalizedModel = normalizeModel(profile?.base_model) || decideModelFromCode(daily?.code)
+  const typeLabel = toTypeLabel(normalizedModel || undefined)
   const nowStr = fmt()
 
   const goDaily = () => router.push("/daily/question")
@@ -173,6 +194,15 @@ export default function MyPageClient() {
           <div>
             <h1 className="text-[32px] font-extrabold tracking-tight uppercase">MY PAGE</h1>
             <p className="mt-1 text-sm text-white/60">あなたの軌跡と、いまを映す</p>
+
+            {/* quick型バッジ */}
+            {typeLabel && (
+              <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs text-white/80">
+                <span className="opacity-70">QUICK 診断</span>
+                <span className="opacity-40">•</span>
+                <span className="font-medium">{typeLabel}</span>
+              </div>
+            )}
           </div>
 
           {/* envバッジ（開発時のみ表示） */}
@@ -208,20 +238,31 @@ export default function MyPageClient() {
           </button>
         </div>
 
-        {/* テーマ＆日時 */}
+        {/* テーマ＆日時（DB値に切替） */}
         <div className="text-[13px] text-white/60">
-          現在のテーマ <span className="mx-1 text-white/80 font-medium">{CURRENT_THEME}</span>
+          現在のテーマ{" "}
+          <span className="mx-1 text-white/80 font-medium">{daily?.theme ?? "—"}</span>
           <span className="opacity-40 mx-1">•</span>{nowStr}
+          {process.env.NODE_ENV !== "production" && (
+            <>
+              <span className="opacity-40 mx-1">•</span>
+              <span className="text-white/50">env: {env}</span>
+            </>
+          )}
         </div>
 
-        {/* 直近メッセージ */}
+        {/* 直近メッセージ（daily最優先） */}
         <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
           <h2 className="text-base font-semibold mb-1">直近のメッセージ</h2>
           <p className="text-sm text-white/90">
-            {daily?.comment || profile?.fortune || "まだメッセージはありません。"}
+            {daily?.comment || daily?.quote || profile?.fortune || "まだメッセージはありません。"}
           </p>
+          {(daily?.updated_at || daily?.created_at) && (
+            <div className="mt-1 text-[11px] text-white/50">
+              更新: {fmt(daily?.updated_at || daily?.created_at)}{daily?.env ? `（env: ${daily.env}）` : ""}
+            </div>
+          )}
         </section>
-      
 
         {/* 構造チャート */}
         <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
@@ -252,31 +293,30 @@ export default function MyPageClient() {
             </div>
           </div>
         </section>
-          {/* 次の一歩（デイリー診断CTA 復活） */}
-<section className="rounded-2xl border border-white/12 bg-white/5 p-4">
-  <h2 className="text-base font-semibold mb-3">次の一歩</h2>
-  <div className="grid grid-cols-2 gap-3">
-    <button
-      onClick={goDaily}
-      className="rounded-xl border border-white/20 bg-white/10 px-3 py-3 hover:bg-white/15"
-      aria-label="デイリー診断を始める"
-    >
-      デイリー診断
-      <div className="text-[11px] text-white/60 mt-1">1問 / 今日のゆらぎ</div>
-    </button>
 
-    {/* 将来機能（そのまま維持 or 削除可） */}
-    <button
-      className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-white/50 cursor-not-allowed"
-      title="近日公開"
-      disabled
-    >
-      診断タイプを選ぶ
-      <div className="text-[11px] text-white/40 mt-1">Weekly / Monthly（予定）</div>
-    </button>
-  </div>
-</section>
+        {/* 次の一歩（デイリー診断CTA） */}
+        <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
+          <h2 className="text-base font-semibold mb-3">次の一歩</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={goDaily}
+              className="rounded-xl border border-white/20 bg-white/10 px-3 py-3 hover:bg-white/15"
+              aria-label="デイリー診断を始める"
+            >
+              デイリー診断
+              <div className="text-[11px] text-white/60 mt-1">1問 / 今日のゆらぎ</div>
+            </button>
 
+            <button
+              className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-white/50 cursor-not-allowed"
+              title="近日公開"
+              disabled
+            >
+              診断タイプを選ぶ
+              <div className="text-[11px] text-white/40 mt-1">Weekly / Monthly（予定）</div>
+            </button>
+          </div>
+        </section>
       </main>
     </div>
   )

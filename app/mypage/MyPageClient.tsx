@@ -2,7 +2,7 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import {
   RadarChart,
@@ -107,6 +107,7 @@ function AppHeader() {
 
 export default function MyPageClient() {
   const router = useRouter()
+  const search = useSearchParams()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -133,6 +134,14 @@ export default function MyPageClient() {
       }
     } catch {}
   }, [])
+   // ← 追加: ?env=dev|prod で上書き（iPhoneで /mypage?env=dev を開けばOK）
+ useEffect(() => {
+    const p = search?.get("env")
+    if (p === "dev" || p === "prod") {
+      setEnv(p)
+      try { localStorage.setItem("ev-env", p) } catch {}
+    }
+  }, [search])
 
   // env をクエリで渡しつつ取得。env 変更で再フェッチ
   useEffect(() => {
@@ -141,7 +150,12 @@ export default function MyPageClient() {
       try {
         setError(null); setLoading(true)
         const qs = `?env=${encodeURIComponent(env)}`
-        const [p, d] = await Promise.all([
+       let [p, d] = await Promise.all([ ...profile..., ...daily(env)... ])
+ // フォールバック：prod が空なら dev を1回だけ再取得
+ if (env === "prod" && d?.ok && !d?.item) {
+   const dDev = await fetch(`/api/mypage/daily-latest?env=dev`, { cache:"no-store" }).then(r=>r.json())
+   if (dDev?.ok && dDev?.item) d = dDev
+ }
           fetch("/api/mypage/profile-latest", { cache: "no-store" }).then((r) => r.json()),
           fetch(`/api/mypage/daily-latest${qs}`,  { cache: "no-store" }).then((r) => r.json()),
         ])
@@ -225,13 +239,10 @@ export default function MyPageClient() {
           </div>
 
           {/* envバッジ（開発時のみ表示） */}
-          {process.env.NODE_ENV !== "production" && (
-            <button
-              onClick={()=>{
-                const next = env === "prod" ? "dev" : "prod"
-                setEnv(next)
-                try { localStorage.setItem("ev-env", next) } catch {}
-              }}
+         - {process.env.NODE_ENV !== "production" && (
++ {true && ( // ← 一時的に常時表示。戻す時は false or 元コードへ
+   <button ...>env: {env}（切替）</button>
+ )}
               className="mt-1 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/15"
             >
               env: {env}（切替）

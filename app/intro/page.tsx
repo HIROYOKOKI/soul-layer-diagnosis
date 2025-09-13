@@ -2,7 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-
+import LoginIntro from "@/components/LoginIntro";
+export default function IntroPage() {
+  return <LoginIntro />;
+}
 type Phase = 'video' | 'still';
 
 export default function LoginIntro() {

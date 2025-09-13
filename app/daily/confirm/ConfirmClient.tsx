@@ -5,6 +5,10 @@ import type React from "react";
 import { useRouter } from "next/navigation";
 import LuneaBubble from "@/components/LuneaBubble";
 
+const CONFIRM_BUBBLE =
+  "あなたの回答を確認しました。内容に問題なければ「この内容で回答」を押してください。変更する場合は「戻る」を選んでください。";
+
+
 type EV = "E" | "V" | "Λ" | "Ǝ";
 type Option = { key: EV; label: string };
 
@@ -148,10 +152,10 @@ export default function ConfirmClient() {
         {new Date(pending.ts).toLocaleString()}
       </div>
 
-      {/* ルネア吹き出しで質問再掲（命令文は排除） */}
-      <div className="rounded-xl border p-4">
-        <LuneaBubble key={pending.id} text={toConfirmText(pending.text)} speed={18} />
-      </div>
+     // （中略）吹き出し表示ブロックを置き換え
+<div className="rounded-xl border p-4">
+  <LuneaBubble key={pending.id} text={CONFIRM_BUBBLE} speed={18} />
+</div>
 
       {/* 選んだ回答の“確認だけ”を表示 */}
       <div className="rounded-2xl border px-4 py-3">

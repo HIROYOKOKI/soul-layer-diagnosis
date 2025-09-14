@@ -93,11 +93,18 @@ function Inner() {
   );
 }
 
-export default function ConfirmClient() {
-  // useSearchParams の要件を満たすため Suspense でラップ
+export default function ClientChrome({ children }: { children: React.ReactNode }) {
+  const p = norm(usePathname());
+  const hide = p === "/intro";
+
   return (
-    <Suspense fallback={<div className="p-8 text-white/70">読み込み中…</div>}>
-      <Inner />
-    </Suspense>
+    <div className="flex min-h-dvh flex-col">
+      {!hide && <AppHeader />}
+      {/* ★ サブヘッダーは一旦OFF（必要なら p.startsWith("/theme") の時だけ表示） */}
+      {/* {!hide && p.startsWith("/theme") && <AppSubHeaderTheme />} */}
+      <main className={!hide ? "flex-1 pt-16 pb-10" : "flex-1"}>{children}</main>
+      {!hide && <AppFooter />}
+    </div>
   );
 }
+

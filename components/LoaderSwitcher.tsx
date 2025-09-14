@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 /**
- * LoaderSwitcher — サイバー／グリッチ系ローディングをランダムに切り替える
+ * LoaderSwitcher — サイバー／グリッチ系ローディングをランダム/固定で切り替える
+ * 追加: Enter(リターン)キーでその場切り替え（keyboardSwitch=true）
  * - MatrixRain: コードの雨
  * - SymbolGlitch: ネオンシンボル崩壊→再構築
  * - CRTNoise: 砂嵐＋スキャンライン
@@ -16,20 +17,41 @@ export default function LoaderSwitcher({
   mode = "random",
   showCaption = true,
   theme = "prod",
+  keyboardSwitch = true, // ← 追加: Enterで切替
 }: {
   duration?: number;
   onDone?: () => void;
   mode?: "random" | "matrix" | "glitch" | "crt";
   showCaption?: boolean;
   theme?: "dev" | "prod";
+  keyboardSwitch?: boolean;
 }) {
-  const index = useMemo(() => {
+  const initialIndex = useMemo(() => {
     if (mode === "matrix") return 0;
     if (mode === "glitch") return 1;
     if (mode === "crt") return 2;
-    if (theme === "dev") return 0;
+    if (theme === "dev") return 0; // devは検証しやすく固定
     return Math.floor(Math.random() * 3);
   }, [mode, theme]);
+
+  const [index, setIndex] = useState<number>(initialIndex);
+  // ページ遷移などでpropsだけ変わった場合も追従
+  useEffect(() => setIndex(initialIndex), [initialIndex]);
+
+  // Enterで切替（matrix → glitch → crt → …）
+  const onKey = useCallback((e: KeyboardEvent) => {
+    if (!keyboardSwitch) return;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      setIndex((i) => (i + 1) % 3);
+    }
+  }, [keyboardSwitch]);
+
+  useEffect(() => {
+    if (!keyboardSwitch) return;
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onKey, keyboardSwitch]);
 
   if (index === 0) return <MatrixRain duration={duration} onDone={onDone} showCaption={showCaption} theme={theme} />;
   if (index === 1) return <SymbolGlitch duration={duration} onDone={onDone} showCaption={showCaption} theme={theme} />;
@@ -124,6 +146,13 @@ function MatrixRain({ duration, onDone, showCaption, theme }: CommonProps) {
       />
       <Caption visible={showCaption} textByProgress={["コードを展開中…", "構造を解析中…", "観測を確定します…"]} progress={progress} colorClass="text-emerald-200" />
       {theme === "dev" && <ProgressBar progress={progress} />}
+
+      {/* ヒント（devのみ）*/}
+      {theme === "dev" && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs text-emerald-200/70">
+          Press <kbd className="rounded bg-white/10 px-1">Enter</kbd> to switch loader
+        </div>
+      )}
     </div>
   );
 }
@@ -162,7 +191,7 @@ function SymbolGlitch({ duration, onDone, showCaption, theme }: CommonProps) {
         }}
       />
       <div className="relative select-none">
-        {(["#0ff", "#f0f", "#fff"] as const).map((c, i) => (
+        {["#0ff", "#f0f", "#fff"].map((c, i) => (
           <motion.div
             key={i}
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
@@ -183,6 +212,11 @@ function SymbolGlitch({ duration, onDone, showCaption, theme }: CommonProps) {
       <NoiseOverlay variant="glitch" />
       <Caption visible={showCaption} textByProgress={["シンボルを展開…", "断片から再構成…", "同調完了…"]} progress={progress} colorClass="text-fuchsia-200" />
       {theme === "dev" && <ProgressBar progress={progress} />}
+      {theme === "dev" && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs text-fuchsia-200/70">
+          Press <kbd className="rounded bg-white/10 px-1">Enter</kbd> to switch loader
+        </div>
+      )}
     </div>
   );
 }
@@ -235,6 +269,11 @@ function CRTNoise({ duration, onDone, showCaption, theme }: CommonProps) {
       <NoiseOverlay variant="crt" />
       <Caption visible={showCaption} textByProgress={["信号を取得…", "同期中…", "観測プロトコル準備完了…"]} progress={progress} colorClass="text-emerald-200" />
       {theme === "dev" && <ProgressBar progress={progress} />}
+      {theme === "dev" && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs text-emerald-200/70">
+          Press <kbd className="rounded bg-white/10 px-1">Enter</kbd> to switch loader
+        </div>
+      )}
     </div>
   );
 }
@@ -320,3 +359,4 @@ function TypeLine({ text, speed, progress, delay = 0 }: { text: string; speed: n
     </div>
   );
 }
+

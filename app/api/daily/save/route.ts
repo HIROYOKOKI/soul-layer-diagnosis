@@ -10,48 +10,46 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
     const {
-      id,
-      slot,
+      id,                 // ← 論理ID。DBのidではなく question_id に入れる
+      slot,               // 'morning' | 'noon' | 'night'（列が無いなら無視OK）
       env = "dev",
       theme = "dev",
-      choice,             // optional（今は未使用）
+      choice,             // 'E' | 'V' | 'Λ' | 'Ǝ'（列があるので入れておく）
       result,
     } = body || {}
 
-    if (!id || !slot || !result?.code) {
+    if (!id || !result?.code) {
       return NextResponse.json({ ok:false, error:"bad_request_missing_fields" }, { status:400 })
     }
 
-    // 日付を id="daily-YYYY-MM-DD-<slot>" から抽出（列があれば保存用）
-    const m = String(id).match(/^daily-(\d{4}-\d{2}-\d{2})-(morning|noon|night)$/)
-    const day = m ? m[1] : null
+    // 連想IDを question_id に保存。日付抽出は任意
+    const dayMatch = String(id).match(/^daily-(\d{4}-\d{2}-\d{2})-/)
+    const day = dayMatch ? dayMatch[1] : null
 
     const payload: any = {
-      id,               // ← これを UNIQUE または PRIMARY KEY にするのが前提（B を参照）
-      slot,             // 'morning' | 'noon' | 'night'
-      env,              // 'dev' | 'prod'
-      theme,            // 'dev' | 'prod'
+      question_id: id,               // ← ここに論理ID
+      env,                           // ← 必ず指定（DBデフォルトprodを避ける）
+      theme,
+      choice: choice ?? result.code,  // choice列あり
       code: result.code,
       comment: result.comment ?? null,
       quote: result.quote ?? null,
     }
-    if (day) payload.day = day // もし daily_results に day 列があるなら使う
+    // slot列がテーブルに無いならこの2行は省いてOK
+    if (slot) payload.mode = slot      // 既存の列に合わせるなら mode に入れておく
+    if (day)  payload.created_at = new Date(`${day}T00:00:00Z`) // 任意（並び用に入れるなら）
 
-    // ★ 重要：
-    // - id に UNIQUE か PK がある前提なら upsert でOK
-    // - 無い場合は "ON CONFLICT specification requires a unique index" で落ちる
     const { data, error } = await sb
       .from("daily_results")
-      .upsert(payload, { onConflict: "id" }) // ← 必ず衝突対象を明示
-      .select("id")
+      .insert(payload)
+      .select("id, question_id")
       .maybeSingle()
 
     if (error) {
-      // エラーをそのまま返す（切り分け用）
       return NextResponse.json({ ok:false, error: error.message }, { status:500 })
     }
 
-    return NextResponse.json({ ok:true, id: data?.id ?? id })
+    return NextResponse.json({ ok:true, id: data?.id, question_id: data?.question_id ?? id })
   } catch (e:any) {
     return NextResponse.json({ ok:false, error: e?.message ?? "internal_error" }, { status:500 })
   }

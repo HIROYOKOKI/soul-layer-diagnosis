@@ -28,21 +28,20 @@ export default function LoginPage() {
         (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") as string) ||
         (typeof window !== "undefined" ? window.location.origin : "");
 
-      const normalizedEmail = email.trim().toLowerCase();
+      const mail = email.trim().toLowerCase();
 
+      // 既存ユーザーはログイン後に /mypage へ
       const { error } = await sb.auth.signInWithOtp({
-        email: normalizedEmail,
+        email: mail,
         options: {
-          // ✅ 既存ユーザーはログイン後にマイページへ
           emailRedirectTo: `${base}/auth/callback?next=/mypage`,
         },
       });
-
       if (error) throw error;
 
-      setMsg("ログイン用の確認メールを送信しました。受信箱をご確認ください。");
+      setMsg("ログイン用の確認メールを送信しました。受信箱のリンクから続行してください。");
     } catch (e: any) {
-      setErr(e?.message ?? "送信に失敗しました。時間をおいて再度お試しください。");
+      setErr(e?.message ?? "ログインに失敗しました。時間をおいて再度お試しください。");
     } finally {
       setSending(false);
     }

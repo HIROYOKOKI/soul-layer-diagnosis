@@ -24,24 +24,22 @@ export default function RegisterPage() {
     setErr(null);
 
     try {
-      // 可能なら NEXT_PUBLIC_SITE_URL（末尾スラなし）を優先、無ければ window.origin
       const base =
         (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") as string) ||
         (typeof window !== "undefined" ? window.location.origin : "");
 
       const normalizedEmail = email.trim().toLowerCase();
 
-      const { error } = await sb.auth.signInWithOtp({
+      // ✅ 新規登録は signUp() を使う → 「Confirm signup」メールが送られる
+      const { error } = await sb.auth.signUp({
         email: normalizedEmail,
         options: {
-          // ✅ 必ず /auth/callback を経由してから /welcome へ
           emailRedirectTo: `${base}/auth/callback?next=/welcome?intro=1`,
         },
       });
 
       if (error) throw error;
-
-      setMsg("確認メールを送信しました。受信箱のリンクから続行してください。");
+      setMsg("新規登録用の確認メールを送信しました。受信箱のリンクから続行してください。");
     } catch (e: any) {
       setErr(e?.message ?? "送信に失敗しました。時間をおいて再度お試しください。");
     } finally {

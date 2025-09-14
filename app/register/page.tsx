@@ -32,11 +32,12 @@ export default function RegisterPage() {
 
       // ✅ 新規登録は signUp() を使う → 「Confirm signup」メールが送られる
       const { error } = await sb.auth.signUp({
-        email: normalizedEmail,
-        options: {
-          emailRedirectTo: `${base}/auth/callback?next=/welcome?intro=1`,
-        },
-      });
+      const { error } = await sb.auth.signInWithOtp({
+  email: normalizedEmail,
+  options: {
+    emailRedirectTo: `${base}/auth/callback?next=/welcome?intro=1`,
+  },
+});
 
       if (error) throw error;
       setMsg("新規登録用の確認メールを送信しました。受信箱のリンクから続行してください。");

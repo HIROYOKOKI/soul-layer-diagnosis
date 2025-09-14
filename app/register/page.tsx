@@ -30,16 +30,16 @@ export default function RegisterPage() {
 
       const normalizedEmail = email.trim().toLowerCase();
 
-      // ✅ 新規登録は signUp() を使う → 「Confirm signup」メールが送られる
-      const { error } = await sb.auth.signUp({
+      // ✅ パスワードレス（Magic Link）で新規登録フロー
       const { error } = await sb.auth.signInWithOtp({
-  email: normalizedEmail,
-  options: {
-    emailRedirectTo: `${base}/auth/callback?next=/welcome?intro=1`,
-  },
-});
-
+        email: normalizedEmail,
+        options: {
+          // 新規登録は /welcome に導線固定
+          emailRedirectTo: `${base}/auth/callback?next=/welcome?intro=1`,
+        },
+      });
       if (error) throw error;
+
       setMsg("新規登録用の確認メールを送信しました。受信箱のリンクから続行してください。");
     } catch (e: any) {
       setErr(e?.message ?? "送信に失敗しました。時間をおいて再度お試しください。");
@@ -84,3 +84,4 @@ export default function RegisterPage() {
     </div>
   );
 }
+

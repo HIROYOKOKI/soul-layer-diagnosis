@@ -1,22 +1,19 @@
 "use client";
 
-export default function AppHeader() {
+import Link from "next/link";
+
+export default function AppFooter() {
   return (
-    <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-black/60 backdrop-blur supports-[backdrop-filter]:bg-black/40">
-      <div className="mx-auto flex h-16 max-w-6xl items-center px-4 sm:px-6">
-        <a href="/" className="flex items-center gap-3">
-          <img
-            src="/icon-512.png"
-            alt="App Icon"
-            className="h-8 w-8 rounded-full ring-4 ring-[#3399ff]/80 shadow-[0_0_20px_#3399ff99]"
-          />
-          <img
-            src="/soul-layer-diagnosis.png"
-            alt="Soul Layer Diagnosis"
-            className="h-7 sm:h-8"
-          />
-        </a>
+    <footer className="mt-auto border-t border-white/10 bg-black/60 backdrop-blur">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 text-sm text-white/70 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>© {new Date().getFullYear()} EVΛƎ Project. All rights reserved.</div>
+        <nav className="flex flex-wrap gap-3">
+          <Link href="/about" className="hover:text-white">About</Link>
+          <Link href="/terms" className="hover:text-white">利用規約</Link>
+          <Link href="/privacy" className="hover:text-white">プライバシー</Link>
+          <a href="https://note.com/heroy" target="_blank" className="hover:text-white">Note</a>
+        </nav>
       </div>
-    </header>
+    </footer>
   );
 }

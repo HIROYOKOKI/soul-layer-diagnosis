@@ -1,99 +1,90 @@
-// app/api/daily/question/route.ts
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { createClient } from "@supabase/supabase-js";
-import { getSlot } from "@/lib/daily";
-import { buildQuestionFromData, fallbackQuestion } from "@/lib/question-gen";
+import { NextResponse } from "next/server"
+import { getOpenAI } from "@/lib/openai"
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
+type EV = "E" | "V" | "Λ" | "Ǝ"
+type Choice = { key: EV; label: string }
 
-export async function GET(req: NextRequest) {
-  const slot = getSlot();
-  const noStore = { headers: { "cache-control": "no-store" } };
+const FALLBACK: Choice[] = [
+  { key: "E", label: "勢いで踏み出す" },
+  { key: "V", label: "理想を描いて進む" },
+  { key: "Λ", label: "条件を決めて選ぶ" },
+  { key: "Ǝ", label: "一拍置いて観測する" },
+]
 
-  let authedUser: { id: string } | null = null;
-  let helperAuthErr: Error | null = null;
+// --- 日本時間の現在時刻でスロットを決定 ---
+function getJstDate() {
+  const now = new Date()
+  // JST (UTC+9) に補正
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+  return jst
+}
+
+function getSlot() {
+  const h = getJstDate().getUTCHours() // JST基準の時
+  if (h < 11) return "morning"
+  if (h < 17) return "noon"
+  return "night"
+}
+
+function needCount(slot: "morning" | "noon" | "night") {
+  return slot === "morning" ? 4 : slot === "noon" ? 3 : 2
+}
+
+export async function GET() {
+  const slot = getSlot()
+  const n = needCount(slot)
+  const seed = Date.now()
+  let question = "今の流れを一歩進めるなら、どの感覚が近い？"
+  let choices: Choice[] = []
 
   try {
-    // 1) Cookie 経由の認証（あるなら使う）
-    const helper = createRouteHandlerClient({ cookies });
-    const { data, error } = await helper.auth.getUser();
-    helperAuthErr = (error as any) ?? null;
-    authedUser = (data?.user as any) ?? null;
+    const oa = getOpenAI()
+    const sys = `あなたはE/V/Λ/Ǝの4軸から短い選択肢を作る生成器です。
+- 必ず JSON で返す: {"question": "...", "choices":[{"key":"E","label":"..."},...]}
+- key は "E","V","Λ","Ǝ" のいずれか。label は12文字前後の日本語。重複禁止。`
+    const usr = `時間帯: ${slot}（必要な選択肢の数: ${n}）
+テーマ: デイリー診断の設問を1問だけ。
+制約:
+- questionは1文・20文字前後
+- 選択肢はE/V/Λ/Ǝから${n}個だけ選んで出す（不足分は除外して良い）
+- トーンは落ち着いた短文
+seed:${seed}`
 
-    // 2) Cookie が無ければ Bearer で補助（任意）
-    if (!authedUser) {
-      const auth = req.headers.get("authorization");
-      const token = auth?.startsWith("Bearer ") ? auth.slice(7) : undefined;
-      if (token && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        try {
-          const sb = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-          );
-          const r = await sb.auth.getUser(token);
-          authedUser = (r.data.user as any) ?? null;
-        } catch (e) {
-          // bearer 失敗は無視してゲストで続行
-          console.error("daily.question.bearer.fail", (e as any)?.message);
-        }
-      }
+    const res = await oa.responses.create({
+      model: "gpt-4.1-mini",
+      temperature: 0.6,
+      max_output_tokens: 300,
+      input: [
+        { role: "system", content: sys },
+        { role: "user", content: usr },
+      ],
+    })
+
+    const text = res.output_text || ""
+    const json = JSON.parse(text.match(/\{[\s\S]*\}$/)?.[0] || "{}")
+
+    const rawChoices: Choice[] = Array.isArray(json.choices) ? json.choices : []
+    const seen = new Set<string>()
+    choices = rawChoices
+      .filter(
+        (c) =>
+          c &&
+          (c.key === "E" || c.key === "V" || c.key === "Λ" || c.key === "Ǝ") &&
+          typeof c.label === "string",
+      )
+      .filter((c) => (seen.has(c.key) ? false : (seen.add(c.key), true)))
+      .slice(0, n)
+
+    if (choices.length < n) {
+      const add = FALLBACK.filter((f) => !seen.has(f.key)).slice(0, n - choices.length)
+      choices = [...choices, ...add]
     }
-
-    // 3) 認証あり → 個別データを使って設問生成 / なし → ゲスト用（公開）
-    if (authedUser) {
-      // recent rows
-      const { data: rows, error: rowsError } = await helper
-        .from("daily_results")
-        .select("code, scores, comment, created_at")
-        .eq("user_id", authedUser.id)
-        .eq("env", "prod")
-        .order("created_at", { ascending: false })
-        .limit(24);
-
-      if (rowsError) {
-        console.error("daily.question.rows.fail", {
-          userId: authedUser.id,
-          slot,
-          message: rowsError.message,
-        });
-      }
-
-      // theme（※カラム名は user_id。以前の id 指定はヒットしないので修正）
-      const { data: profile, error: profileError } = await helper
-        .from("profiles")
-        .select("theme")
-        .eq("user_id", authedUser.id) // ← 修正ポイント
-        .maybeSingle();
-
-      if (profileError) {
-        console.error("daily.question.profile.fail", {
-          userId: authedUser.id,
-          slot,
-          message: profileError.message,
-        });
-      }
-
-      const theme = (profile as any)?.theme ?? undefined;
-      const item = buildQuestionFromData(authedUser.id, slot, rows ?? [], theme);
-
-      // 常に ok: true を付与（クライアント互換）
-      return NextResponse.json({ ok: true, ...item, auth: "user" }, noStore);
-    } else {
-      // 未ログイン = 公開GET：ゲスト用の汎用設問を返す
-      const item = fallbackQuestion(slot);
-      return NextResponse.json({ ok: true, ...item, auth: "guest" }, noStore);
+    if (typeof json.question === "string" && json.question.trim()) {
+      question = json.question.trim()
     }
-  } catch (e: any) {
-    // 例外時も UI を止めない（フォールバック返却）
-    console.error("daily.question.fail", {
-      slot,
-      message: e?.message,
-      helperAuthErr: helperAuthErr ? (helperAuthErr as any).message : null,
-    });
-    const item = fallbackQuestion(slot);
-    return NextResponse.json({ ok: true, ...item, error: e?.message ?? "question_fallback" }, noStore);
+  } catch {
+    choices = FALLBACK.slice(0, n)
   }
+
+  return NextResponse.json({ ok: true, slot, question, choices, seed })
 }

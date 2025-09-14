@@ -4,20 +4,12 @@ import { usePathname } from "next/navigation";
 import AppHeader from "./AppHeader";
 import AppFooter from "./AppFooter";
 
-const EXCLUDE_EXACT = ["/", "/welcome"] as const;
-
-const normalizePath = (v: unknown) =>
-  typeof v === "string" && v.length > 0 ? v : "/";
-
-const shouldHideChrome = (pathname?: string | null) => {
-  const p = normalizePath(pathname);
-  return EXCLUDE_EXACT.includes(p as (typeof EXCLUDE_EXACT)[number]);
-};
+const HIDE = ["/", "/welcome"] as const;
+const norm = (v: unknown) => (typeof v === "string" && v.length ? v : "/");
 
 export default function ClientChrome({ children }: { children: React.ReactNode }) {
-  const pathname = normalizePath(usePathname());
-  const hide = shouldHideChrome(pathname);
-
+  const p = norm(usePathname());
+  const hide = (HIDE as readonly string[]).includes(p);
   return (
     <div className="flex min-h-dvh flex-col">
       {!hide && <AppHeader />}

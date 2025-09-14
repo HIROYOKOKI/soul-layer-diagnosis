@@ -27,13 +27,14 @@ export default function RegisterPage() {
         (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") as string) ||
         (typeof window !== "undefined" ? window.location.origin : "");
 
-      const { error } = await sb.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
-        options: {
-          // 新規登録者の到着ページ（Supabaseの Redirect URLs に /welcome を登録しておく）
-          emailRedirectTo: `${BASE_URL}/welcome?intro=1`,
-        },
-      });
+      // app/register/page.tsx  内の signInWithOtp
+await sb.auth.signInWithOtp({
+  email,
+  options: {
+    emailRedirectTo: `${window.location.origin}/auth/callback?next=/welcome?intro=1`,
+  },
+});
+
       if (error) throw error;
       setMsg("確認メールを送信しました。受信箱のリンクから続行してください。");
     } catch (e: any) {

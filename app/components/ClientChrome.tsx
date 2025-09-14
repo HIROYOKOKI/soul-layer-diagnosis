@@ -6,13 +6,13 @@ import AppFooter from "./AppFooter";
 
 const EXCLUDE_EXACT = ["/", "/welcome"] as const;
 
-function normalizePath(v: unknown): string {
-  return typeof v === "string" && v.length > 0 ? v : "/";
-}
-function shouldHideChrome(pathname?: string | null): boolean {
+const normalizePath = (v: unknown) =>
+  typeof v === "string" && v.length > 0 ? v : "/";
+
+const shouldHideChrome = (pathname?: string | null) => {
   const p = normalizePath(pathname);
   return EXCLUDE_EXACT.includes(p as (typeof EXCLUDE_EXACT)[number]);
-}
+};
 
 export default function ClientChrome({ children }: { children: React.ReactNode }) {
   const pathname = normalizePath(usePathname());

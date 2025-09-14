@@ -5,11 +5,16 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function MyPage() {
-  const sb = createServerComponentClient({ cookies });
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return <main className="p-6 text-white">ログインしてください</main>;
+  // 🔧 Next.js 15 では cookies() は await が必要
+  const jar = await cookies();
+  const sb = createServerComponentClient({ cookies: () => jar });
 
-  // 最新 daily_results を取得（updated_at 優先、なければ created_at）
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    return <main className="p-6 text-white">ログインしてください</main>;
+  }
+
+  // 最新 daily_results を取得
   let latest = await sb
     .from("daily_results")
     .select("question_id, comment, quote, created_at, updated_at")
@@ -20,6 +25,7 @@ export default async function MyPage() {
     .limit(1)
     .maybeSingle();
 
+  // updated_at が存在しない旧データに備えたフォールバック
   if (latest.error && /updated_at/i.test(latest.error.message)) {
     latest = await sb
       .from("daily_results")

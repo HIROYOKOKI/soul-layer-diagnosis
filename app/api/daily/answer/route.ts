@@ -1,5 +1,5 @@
 // app/api/daily/answer/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
@@ -37,15 +37,23 @@ function buildCopy(finalChoice: EV) {
   }
 }
 
-export async function POST(req: Request) {
-  const supabase = createRouteHandlerClient({ cookies });
+export async function POST(req: NextRequest) {
+  // ★ 共通パッチ：cookies() を await、関数で渡す
+  const jar = await cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => jar });
+
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 });
+  if (!user) {
+    return NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 });
+  }
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: "invalid_payload", issues: parsed.error.issues }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "invalid_payload", issues: parsed.error.issues },
+      { status: 400 }
+    );
   }
 
   const { id: clientId, first_choice, final_choice, changes, subset } = parsed.data;

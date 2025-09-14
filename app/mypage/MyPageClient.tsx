@@ -111,12 +111,7 @@ function hexToRgba(hex: string, alpha = 0.15) {
 
 /* ============== ブランドヘッダー ============== */
 function AppHeader() {
-  return (
-    <div className="mx-auto max-w-md px-5 pt-4 pb-2 flex items-center gap-3">
-      <Image src="/icon-512.png" alt="app icon" width={28} height={28} className="rounded-full" />
-      <div className="text-[13px] tracking-wide text-white/70">SOUL LAYER DIAGNOSIS</div>
-    </div>
-  )
+  retur nnull;
 }
 
 export default function MyPageClient() {

@@ -1,27 +1,27 @@
-// app/api/mypage/daily-latest/route.ts
+// app/api/mypage/daily-latest/route.ts（上書き）
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET(req: Request) {
   const sb = getSupabaseAdmin();
-  if (!sb) return NextResponse.json({ ok: false, error: "supabase_env_missing" }, { status: 500 });
+  if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 });
 
   const url = new URL(req.url);
-  const env = url.searchParams.get("env"); // "dev" | "prod" | null
+  const env = url.searchParams.get("env");
 
-  let query = sb
+  let q = sb
     .from("daily_results")
     .select("code, comment, advice, quote, created_at, env")
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending:false })
     .limit(1)
     .maybeSingle();
 
   if (env) {
-    // @ts-expect-error chained builder
-    query = query.eq("env", env);
+    // @ts-expect-error chain
+    q = q.eq("env", env);
   }
 
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, item: data ?? null });
+  const { data, error } = await q;
+  if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 });
+  return NextResponse.json({ ok:true, item: data ?? null });
 }

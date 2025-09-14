@@ -1,3 +1,5 @@
 // app/profile/confirm/page.tsx
-import ConfirmClient from "./ConfirmClient"
-export default function Page(){ return <ConfirmClient /> }
+import ConfirmClient from "./ConfirmClient";
+export default function Page() {
+  return <ConfirmClient />;
+}

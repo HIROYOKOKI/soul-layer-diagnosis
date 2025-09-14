@@ -24,7 +24,7 @@ export default function LuneaOpeningPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-black text-white px-4">
       {/* タイトル */}
-      <h1 className="mb-6 text-center text-xl font-semibold tracking-wide">
+      <h1 className="mb-5 text-center text-xl font-semibold tracking-wide">
         ソウルレイヤー診断ナビゲーター｜ルネア
       </h1>
 

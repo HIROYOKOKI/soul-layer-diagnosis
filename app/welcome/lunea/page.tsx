@@ -11,7 +11,6 @@ export default function LuneaOpeningPage() {
     const v = videoRef.current;
     if (!v) return;
 
-    // 再生終了したらプロフィール入力ページへ遷移
     const handleEnded = () => {
       router.replace("/profile");
     };
@@ -23,13 +22,19 @@ export default function LuneaOpeningPage() {
   }, [router]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-black">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-black text-white px-4">
+      {/* タイトル */}
+      <h1 className="mb-6 text-center text-xl font-semibold tracking-wide">
+        ソウルレイヤー診断ナビゲーター｜ルネア
+      </h1>
+
+      {/* 動画 */}
       <video
         ref={videoRef}
         src="/lunea-opening.mp4"
         autoPlay
         playsInline
-        className="w-full h-auto max-w-3xl"
+        className="w-full h-auto max-w-3xl rounded-lg shadow-lg"
       />
     </main>
   );

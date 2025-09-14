@@ -1,9 +1,9 @@
 // app/structure/quick/QuickClient.tsx
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
-import Image from "next/image"
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
 
 type EV = "E" | "V" | "Λ" | "Ǝ"
 

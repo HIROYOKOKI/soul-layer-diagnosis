@@ -15,7 +15,7 @@ export default function LuneaBubble({
   tone = "normal",
   onDone,
   speed = 18,
-  avatarSrc = "/lunea.png",
+  avatarSrc = "/public/lunea.png",
 }: Props) {
   const [shown, setShown] = useState("");
   const timerRef = useRef<number | null>(null);

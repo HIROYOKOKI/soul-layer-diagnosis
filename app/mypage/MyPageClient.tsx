@@ -111,7 +111,7 @@ function hexToRgba(hex: string, alpha = 0.15) {
 
 /* ============== ブランドヘッダー ============== */
 function AppHeader() {
-  retur nnull;
+  retur null;
 }
 
 export default function MyPageClient() {

@@ -3,17 +3,34 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getBrowserSupabase } from "@/lib/supabase-browser";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 export default function WelcomePage() {
   const router = useRouter();
+  const supabase = createClientComponentClient(); // ← cookieベースのセッションを扱える
 
   useEffect(() => {
-    const sb = getBrowserSupabase();
-    sb.auth.getSession().then(({ data }) => {
-      if (!data.session) router.replace("/login");
-    });
-  }, [router]);
+    let alive = true;
+
+    // cookie書き込みのレースに備えて少しだけ再試行
+    const check = async () => {
+      // getUser() だと cookie セッションを直接確認できる
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!alive) return;
+      if (!user) {
+        // もう一度だけ少し待って再チェック（emailリンク直後のレース対策）
+        setTimeout(async () => {
+          const { data: { user: u2 } } = await supabase.auth.getUser();
+          if (!alive) return;
+          if (!u2) router.replace("/login");
+        }, 600);
+      }
+    };
+
+    check();
+    return () => { alive = false; };
+  }, [router, supabase]);
 
   return (
     <main className="mx-auto max-w-lg px-6 py-12 text-white">

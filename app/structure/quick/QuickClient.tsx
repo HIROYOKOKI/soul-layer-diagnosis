@@ -5,33 +5,25 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 
-/* ========================
-   Types
-======================== */
 type EV = "E" | "V" | "Λ" | "Ǝ"
 
 type PendingV2 = {
-  order: EV[]                               // 押した順（第1位→第4位）
-  labels: Record<EV, string>                // 各コードの表示ラベル
-  points: Record<EV, number>                // 1位=3, 2位=2, 3位=1, 4位=0
+  order: EV[]
+  labels: Record<EV, string>
+  points: Record<EV, number>
   baseHints: Record<EV, { type: string; comment: string }>
   _meta: {
     ts: number
     v: "quick-v2"
-    presentModel: "EΛVƎ"                    // 確定した現在=顕在
-    futureModel: "EVΛƎ"                     // 未確定の未来=潜在
+    presentModel: "EΛVƎ"
+    futureModel: "EVΛƎ"
     question: string
   }
 }
 
-/* ========================
-   Consts
-======================== */
-// 固定出題（ベース診断）
 const QUESTION =
   "Q. あなたが人生で最も大切にしたいものはどれですか？（大切と思う順番に順位をつけてください。）"
 
-// 固定4択（E/V/Λ/Ǝ対応）
 const CHOICES: Array<{ code: EV; label: string; desc: string }> = [
   { code: "E", label: "E（衝動・情熱）", desc: "やりたいことを迷わず行動に移す力" },
   { code: "V", label: "V（可能性・夢）", desc: "まだ見ぬ未来や夢を追いかける心" },
@@ -39,7 +31,6 @@ const CHOICES: Array<{ code: EV; label: string; desc: string }> = [
   { code: "Ǝ", label: "Ǝ（観測・静寂）", desc: "ものごとを見つめ、意味を感じ取る時間" },
 ]
 
-// ベースヒント（結果ページ側の補助テキストに使用）
 const BASE_HINTS: PendingV2["baseHints"] = {
   E: { type: "E主導", comment: "衝動と行動で学びを回収する傾向。まず動いて掴むタイプ。" },
   V: { type: "V主導", comment: "可能性を広げてから意思決定する傾向。夢を具体化していくタイプ。" },
@@ -47,7 +38,6 @@ const BASE_HINTS: PendingV2["baseHints"] = {
   Ǝ: { type: "Ǝ主導", comment: "観測→小実験→選び直しの循環。状況把握が得意。" },
 }
 
-// 順位→点数（1位3, 2位2, 3位1, 4位0）
 const SCORE = [3, 2, 1, 0] as const
 
 function computePoints(order: EV[]): Record<EV, number> {
@@ -58,17 +48,13 @@ function computePoints(order: EV[]): Record<EV, number> {
   }, base)
 }
 
-/* ========================
-   Component
-======================== */
 export default function QuickClient() {
   const router = useRouter()
-  const [order, setOrder] = useState<EV[]>([])      // 押した順
-  const [locking, setLocking] = useState(false)     // 送信中
+  const [order, setOrder] = useState<EV[]>([])
+  const [locking, setLocking] = useState(false)
   const [ready, setReady] = useState(false)
   const [returnTo, setReturnTo] = useState<string>("/mypage")
 
-  // `return` クエリ取得（useSearchParamsは使わず安全に）
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search)
@@ -97,7 +83,6 @@ export default function QuickClient() {
     setOrder([])
   }
 
-  // 完了 → pending保存 → 確認ページへ
   function toConfirm() {
     if (!isDone || locking) return
     setLocking(true)
@@ -125,17 +110,14 @@ export default function QuickClient() {
       sessionStorage.setItem("structure_quick_pending", JSON.stringify(payload))
       router.push("/structure/quick/confirm")
     } catch {
-      // 失敗しても落とさず returnTo に退避
       router.replace(returnTo)
     } finally {
       setLocking(false)
     }
   }
 
-  // すぐに戻る（未完了でもクラッシュさせない）
   function backSafe() {
     try {
-      // 何も選んでなくても安全に戻す
       router.replace(returnTo)
     } catch {
       router.replace("/mypage")
@@ -159,21 +141,18 @@ export default function QuickClient() {
 
       <main className="flex-1 flex items-start justify-center px-5">
         <div className="w-full max-w-md pt-2 pb-10">
-          {/* タイトル */}
           <h2 className="text-center text-lg font-bold mb-2">
             クイック判定（1問・順位付け）
           </h2>
 
-          {/* 出題 */}
           <p className="text-sm text-white/80 mb-5 text-center leading-relaxed">
             {QUESTION}
           </p>
           <div className="h-px bg-white/10 mb-5" />
 
-          {/* 選択肢（押した順で順位表示） */}
           <div className="grid gap-3">
             {CHOICES.map((c) => {
-              const rank = order.indexOf(c.code) // -1:未選択
+              const rank = order.indexOf(c.code)
               const picked = rank >= 0
               return (
                 <button
@@ -184,12 +163,11 @@ export default function QuickClient() {
                   className={`group w-full text-left rounded-2xl border px-4 py-4 transition
                     ${picked
                       ? "bg-blue-600/80 border-white/20 text-white"
-                      : "bg-white/5 border-white/12 hover:bg-white/8 hover:border-white/20"
+                      : "bg-white/10 border-white/15 hover:bg-white/15 hover:border-white/25"
                     } active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/20`}
                 >
                   <div className="flex items-start gap-3">
-                    <span className="mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full
-                                     border border-white/25 text-xs text-white/80 px-2 py-0.5">
+                    <span className="mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-white/25 text-xs text-white/80 px-2 py-0.5">
                       {picked ? `第${rank + 1}位` : "未選択"}
                     </span>
                     <div className="flex-1">
@@ -202,7 +180,6 @@ export default function QuickClient() {
             })}
           </div>
 
-          {/* 操作 */}
           <div className="mt-4 flex items-center justify-between gap-3">
             <button
               type="button"
@@ -222,7 +199,6 @@ export default function QuickClient() {
             </button>
           </div>
 
-          {/* 確認ブロック */}
           <div className="mt-6">
             <h3 className="text-sm font-bold mb-2">現在の順位</h3>
             <ol className="list-decimal list-inside text-left text-sm space-y-1">
@@ -250,9 +226,20 @@ export default function QuickClient() {
             </button>
 
             {locking && (
-              <p className="mt-3 text-center text-xs text-white/60">
-                次の画面へ移動中…
-              </p>
+              <div className="mt-4 grid place-items-center">
+                <div className="relative">
+                  <div className="text-xl font-bold tracking-widest [text-shadow:0_0_20px_#0033ff]">EVΛƎ</div>
+                  <div className="absolute inset-0 animate-pulse blur-sm opacity-70 text-xl font-bold [color:#0033ff]">EVΛƎ</div>
+                  <div className="mt-2 h-[2px] w-32 mx-auto bg-gradient-to-r from-transparent via-[#0033ff] to-transparent animate-[scan_1.6s_ease-in-out_infinite]" />
+                  <style jsx>{`
+                    @keyframes scan {
+                      0%,100% { transform: translateX(-10%); opacity:.4 }
+                      50% { transform: translateX(10%); opacity:1 }
+                    }
+                  `}</style>
+                </div>
+                <p className="mt-2 text-center text-xs text-white/70">次の画面へ移動中…</p>
+              </div>
             )}
           </div>
         </div>

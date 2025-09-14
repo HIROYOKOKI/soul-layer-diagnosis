@@ -1,5 +1,5 @@
 // app/api/structure/quick/save/route.ts
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 import { cookies } from "next/headers"
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { getSupabaseAdmin } from "@/lib/supabase-admin"
@@ -24,13 +24,14 @@ function json(data: unknown, init?: ResponseInit) {
   })
 }
 
-export async function POST(req: Request): Promise<Response> {
+export async function POST(req: NextRequest): Promise<Response> {
   // 0) Adminクライアント確保
   const sb = getSupabaseAdmin()
   if (!sb) return json({ ok: false, error: "supabase_env_missing" }, { status: 500 })
 
   // 1) ログイン中ユーザー（クッキーから）
-  const sv = createRouteHandlerClient({ cookies })
+  const jar = await cookies()                                // ★ await 必須
+  const sv = createRouteHandlerClient({ cookies: () => jar }) // ★ 関数で渡す
   const { data: userResp, error: userErr } = await sv.auth.getUser()
   if (userErr) {
     if (!ALLOW_ANON) return json({ ok: false, error: "unauthorized" }, { status: 401 })

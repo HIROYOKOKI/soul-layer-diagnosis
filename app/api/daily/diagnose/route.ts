@@ -1,76 +1,111 @@
 import { NextResponse } from "next/server"
-import { getOpenAI } from "../../../../lib/openai"
-
-export const runtime = "nodejs"
-export const dynamic = "force-dynamic"
+import { getOpenAI } from "@/lib/openai"
 
 type EV = "E" | "V" | "Λ" | "Ǝ"
+type Slot = "morning" | "noon" | "night"
 
-function normalizeCode(x?: string | null): EV {
-  const s = String(x ?? "").trim()
-  if (s === "A") return "Λ"
-  if (s === "∃" || s === "ヨ") return "Ǝ"
-  return (["E","V","Λ","Ǝ"].includes(s) ? (s as EV) : "E")
+type Body = {
+  id: string
+  slot: Slot
+  choice: EV
+  env?: "dev" | "prod"
+  theme?: "dev" | "prod"
+  ts?: string
 }
 
-function fallbackComment(code: EV) {
-  if (code === "E") return "勢いが生む熱が、周囲を動かす合図。小さく速く着手して、火が広がる方向を観測しよう。"
-  if (code === "V") return "まだ形にならない可能性に光を当てるタイミング。仮説を3つ出し、最短で試せる案を選ぼう。"
-  if (code === "Λ") return "迷いは選択の兆し。基準を1行で決めて、可否を即断。次の一歩で流れが変わる。"
-  return "静けさは精度を上げる資源。いまは広げず、ひとつを小さく検証して事実を積み上げよう。"
+// --- フォールバック文言（AI失敗時に必ず返す） ---
+const FB_COMMENT: Record<EV, string> = {
+  E: "意志を一点に。小さな確定が今日を動かす。",
+  V: "理想の輪郭をもう一筆。届く距離まで寄せよう。",
+  Λ: "迷いは選択の材料。条件を一つだけ決める。",
+  Ǝ: "一拍おいて観測を。沈黙が次の手を澄ませる。",
+}
+const FB_QUOTE: Record<EV, string> = {
+  E: "選んだ一歩が、次の地図になる。",
+  V: "見える未来は、近づけば現実になる。",
+  Λ: "決めるとは、捨てる勇気。",
+  Ǝ: "静けさの中で、答えは輪郭を得る。",
 }
 
-function fallbackAffirmation(code: EV) {
-  if (code === "E") return "私は最初の一歩を選ぶ"
-  if (code === "V") return "私は可能性を見つける"
-  if (code === "Λ") return "私は基準を決めて進む"
-  return "私は小さく観測して整える"
+async function genWithAI(code: EV, slot: Slot) {
+  const oa = getOpenAI()
+  const sys =
+    "あなたはE/V/Λ/Ǝの4軸診断の短い結果テキストを作るライターです。常にJSONだけを返してください。"
+  const usr = `以下の仕様でJSONを返してください:
+{
+  "comment": "<20〜40字の短文（丁寧語）>",
+  "quote": "<12〜24字のアファメーション風の一文>"
 }
+制約:
+- トーン: 静かで肯定的。断定的すぎない。
+- 禁止: 絵文字・顔文字・英語
+- テーマ: デイリー診断結果（時間帯: ${slot} / コード: ${code}）
+- 用語: ${code} の性質を示唆（E=衝動, V=可能性, Λ=選択, Ǝ=観測）しつつ直接の単語多用は避ける
+- 返答はJSONのみ`
 
-function tidyAffirmation(s: string) {
-  return (s || "")
-    .replace(/[“”"『』「」]/g, "")
-    .trim()
-    .slice(0, 30) // 長すぎ防止（短い一言のまま）
+  const res = await oa.responses.create({
+    model: "gpt-4.1-mini",
+    temperature: 0.5,
+    max_output_tokens: 200,
+    input: [
+      { role: "system", content: sys },
+      { role: "user", content: usr },
+    ],
+  })
+  const text = res.output_text || ""
+  const json = JSON.parse(text.match(/\{[\s\S]*\}$/)?.[0] || "{}")
+  const comment =
+    typeof json.comment === "string" && json.comment.trim()
+      ? json.comment.trim()
+      : null
+  const quote =
+    typeof json.quote === "string" && json.quote.trim()
+      ? json.quote.trim()
+      : null
+  return { comment, quote }
 }
 
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => null) as { choice?: string; env?: string; theme?: string } | null
-  if (!body) return NextResponse.json({ ok:false, error:"invalid_json" }, { status:400 })
-
-  const code = normalizeCode(body.choice)
-  const env = String(body.env ?? body.theme ?? "prod").toLowerCase() === "dev" ? "dev" : "prod"
-
-  let aiComment = ""
-  let aiAff = ""
   try {
-    const openai = getOpenAI()
-    const sys =
-`あなたはEVΛƎ診断のAI「ルネア」。口調は落ち着いた優しさ、断定は避けつつ背中を押す。
-コード: E=衝動/情熱, V=可能性/夢, Λ=選択/設計, Ǝ=観測/静寂。
-出力はJSONのみ。`
-    const usr =
-`対象コード="${code}"。
-要件:
-- comment: 90〜140字/日本語。今日の行動が1つ選べるように短く具体化。
-- affirmation: 10〜20字/日本語。現在形の一人称（「私は…」/「今日の私は…」など）。句読点や引用符は不要。
-出力:
-{"comment":"...","affirmation":"..."}`
+    const b = (await req.json()) as Body | null
+    if (!b?.id || !b.slot || !b.choice) {
+      return NextResponse.json({ ok: false, error: "bad_request" }, { status: 400 })
+    }
 
-    const resp = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.6,
-      messages: [{ role:"system", content: sys }, { role:"user", content: usr }],
-    })
-    const text = resp.choices?.[0]?.message?.content?.trim() ?? ""
-    const json = JSON.parse(text)
-    aiComment = (json?.comment || "").toString().trim()
-    aiAff     = tidyAffirmation((json?.affirmation || "").toString())
-  } catch {}
+    const env = b.env ?? "dev"     // ← デフォルト dev
+    const theme = b.theme ?? "dev" // ← デフォルト dev
+    const code = b.choice
 
-  const comment = aiComment || fallbackComment(code)
-  const affirmation = aiAff || fallbackAffirmation(code)
+    // まずAI生成を試す → 失敗/欠損ならフォールバック
+    let comment: string | null = null
+    let quote: string | null = null
+    try {
+      const ai = await genWithAI(code, b.slot)
+      comment = ai.comment
+      quote = ai.quote
+    } catch {
+      /* noop （フォールバックに任せる） */
+    }
+    if (!comment) comment = FB_COMMENT[code]
+    if (!quote) quote = FB_QUOTE[code]
 
-  // 互換のため quote にも同じ内容を入れて返す（保存APIはquoteを受け取っているため）
-  return NextResponse.json({ ok:true, code, comment, affirmation, quote: affirmation, env })
+    // クライアントに返す item（ここでは保存はしない）
+    const item = {
+      id: b.id,
+      slot: b.slot,
+      code,
+      comment,
+      quote,
+      env,
+      theme,
+      created_at: new Date().toISOString(),
+    }
+
+    return NextResponse.json({ ok: true, item })
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: e?.message ?? "internal_error" },
+      { status: 500 },
+    )
+  }
 }

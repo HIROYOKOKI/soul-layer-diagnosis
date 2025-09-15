@@ -1,7 +1,7 @@
-// app/layout.tsx  ← サーバーコンポーネント（"use client" は付けない）
+// app/layout.tsx
 import "./globals.css";
 import AuthSync from "@/components/AuthSync";
-import ClientChrome from "@/components/ClientChrome"; // ★ パス修正（app配下ではなく共通components）
+import ClientChrome from "./components/ClientChrome"; // ← 相対パスでOK
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ja">
       <body>
         <AuthSync />
-        {/* ★ ClientChrome で children をラップ */}
         <ClientChrome>{children}</ClientChrome>
       </body>
     </html>

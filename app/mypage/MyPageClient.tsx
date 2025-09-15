@@ -2,7 +2,7 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
-import RadarEVAE from "@/components/RadarEVAE";
+import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import {
   RadarChart,

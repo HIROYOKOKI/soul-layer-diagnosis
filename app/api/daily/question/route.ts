@@ -59,4 +59,4 @@ export async function GET(_req: NextRequest) {
 seed:${seed}`;
 
     const res = await oa.responses.create({
-      model: "gpt-5-mini
+      model: "gpt-5-mini",

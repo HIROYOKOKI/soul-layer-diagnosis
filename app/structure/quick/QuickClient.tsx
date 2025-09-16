@@ -48,22 +48,22 @@ function computePoints(order: EV[]): Record<EV, number> {
   }, base)
 }
 
+import { useSearchParams } from "next/navigation";
+
 export default function QuickClient() {
-  const router = useRouter()
-  const [order, setOrder] = useState<EV[]>([])
-  const [locking, setLocking] = useState(false)
-  const [ready, setReady] = useState(false)
-  const [returnTo, setReturnTo] = useState<string>("/mypage")
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [order, setOrder] = useState<EV[]>([]);
+  const [locking, setLocking] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [returnTo, setReturnTo] = useState("/mypage");
 
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search)
-      const ret = params.get("return") || "/mypage"
-      setReturnTo(ret)
-    } finally {
-      setReady(true)
-    }
-  }, [])
+    const ret = searchParams.get("return") || "/mypage";
+    setReturnTo(ret);
+    setReady(true);
+  }, [searchParams]);
 
   const chosen = useMemo(() => new Set(order), [order])
   const isDone = order.length === CHOICES.length

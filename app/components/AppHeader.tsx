@@ -1,8 +1,14 @@
 "use client";
 
+import { usePathname } from "next/navigation";
+
 export default function AppHeader() {
+  const pathname = usePathname() || "/";
+  const hide = pathname === "/" || pathname.startsWith("/intro");
+  if (hide) return null; // ← ホームと/introでは出さない
+
   return (
-    <header className="sticky top-0 z-40 h-16 border-b border-white/10 
+    <header className="sticky top-0 z-40 h-16 border-b border-white/10
                        bg-black/60 backdrop-blur supports-[backdrop-filter]:bg-black/40">
       <div className="mx-auto flex h-full max-w-6xl items-center px-4 sm:px-6">
         <a href="/" className="flex items-center gap-3">

@@ -1,7 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import ConfirmClient from "./ConfirmClient";
+export default function Page() {
+  return <ConfirmClient />;
+}
+
 
 type EV = "E" | "V" | "Λ" | "Ǝ"
 

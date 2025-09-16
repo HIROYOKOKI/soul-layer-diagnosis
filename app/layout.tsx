@@ -1,8 +1,8 @@
 // app/layout.tsx
 import "./globals.css"
-import AuthSync from "@/components/AuthSync";        // ← これはそのまま（@/components 側）
-import AppHeader from "./components/AppHeader";      // ← 相対に変更
-import AppFooter from "./components/AppFooter";      // ← 相対に変更
+import AuthSync from "@/components/AuthSync"
+import AppHeader from "./components/AppHeader"
+import AppFooter from "./components/AppFooter"
 
 export const dynamic = "force-dynamic"
 
@@ -12,9 +12,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AuthSync />
         <AppHeader />
-        <main className="min-h-dvh">{children}</main>
+        {/* ← ヘッダー高に合わせて上余白を追加 */}
+        <main className="min-h-dvh pt-16 md:pt-20">
+          {children}
+        </main>
         <AppFooter />
       </body>
     </html>
   )
 }
+

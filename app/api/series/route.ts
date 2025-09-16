@@ -1,31 +1,27 @@
-// /app/api/series/route.ts
+// app/api/series/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-/* ================== 型 ================== */
+/* 動的API（毎回計算） */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+/* ===== 型 ===== */
 type ScoreJson = Partial<Record<"E" | "V" | "L" | "Λ" | "Eexists" | "Ǝ", number>>;
 type SeriesRow = { created_at: string; structure_score: ScoreJson | null };
 type SeriesPoint = { date: string; E: number; V: number; L: number; Eexists: number };
 
-/* ================== ユーティリティ ================== */
-// 数値なら 0..1 にクランプ、未定義は未定義のまま返す
-const clamp01Opt = (v: unknown): number | undefined => {
-  if (typeof v !== "number" || !Number.isFinite(v)) return undefined;
-  return Math.max(0, Math.min(1, v));
-};
-
-// フォールバック用（必ず数値を返す）
-const clamp01 = (v: unknown): number => {
+/* ===== util ===== */
+const clamp01 = (v: unknown) => {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0;
 };
+const clamp01Opt = (v: unknown): number | undefined =>
+  typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : undefined;
 
-function clampDays(d: number): number {
-  if (Number.isNaN(d)) return 30;
-  return Math.max(1, Math.min(365, Math.floor(d)));
-}
+const dateKey = (d: Date) => d.toISOString().slice(0, 10);
+const daysClamp = (d: number) => (Number.isNaN(d) ? 30 : Math.max(7, Math.min(90, Math.floor(d))));
 
-// 未定義は未定義のまま返す（ここで 0 に落とさない！）
 function normalizeScores(j: ScoreJson | null | undefined) {
   return {
     E: clamp01Opt(j?.E),
@@ -35,13 +31,6 @@ function normalizeScores(j: ScoreJson | null | undefined) {
   } as { E?: number; V?: number; L?: number; Eexists?: number };
 }
 
-const dateKey = (d: Date) => d.toISOString().slice(0, 10);
-
-/**
- * 欠損日を days 件に埋める。
- * - キーごとに「未定義なら前日の定義済み値」を使う
- * - それでも未定義なら 0 で初期化
- */
 function fillDays(
   days: number,
   rows: { date: string; E?: number; V?: number; L?: number; Eexists?: number }[]
@@ -65,7 +54,6 @@ function fillDays(
     const Eexists = clamp01Opt(cur.Eexists ?? last.Eexists) ?? 0;
 
     out.push({ date: key, E, V, L, Eexists });
-    // 次日のために「定義済みだけ」更新
     last = {
       E: cur.E ?? last.E ?? 0,
       V: cur.V ?? last.V ?? 0,
@@ -76,49 +64,60 @@ function fillDays(
   return out;
 }
 
-// days 件返すフォールバック
 function fallbackRows(days: number): SeriesPoint[] {
   const today = new Date();
   const out: SeriesPoint[] = [];
   let last: SeriesPoint | null = null;
-
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
-    const gen = {
+    const gen: SeriesPoint = {
       date: dateKey(d),
       E: clamp01(Math.random()),
       V: clamp01(Math.random()),
       L: clamp01(Math.random()),
       Eexists: clamp01(Math.random()),
     };
-    const smooth = last
-      ? {
-          date: gen.date,
-          E: clamp01((gen.E + last.E) / 2),
-          V: clamp01((gen.V + last.V) / 2),
-          L: clamp01((gen.L + last.L) / 2),
-          Eexists: clamp01((gen.Eexists + last.Eexists) / 2),
-        }
-      : gen;
-    out.push(smooth);
-    last = smooth;
+    out.push(
+      last
+        ? {
+            date: gen.date,
+            E: clamp01((gen.E + last.E) / 2),
+            V: clamp01((gen.V + last.V) / 2),
+            L: clamp01((gen.L + last.L) / 2),
+            Eexists: clamp01((gen.Eexists + last.Eexists) / 2),
+          }
+        : gen
+    );
+    last = out[out.length - 1];
   }
   return out;
 }
 
-/* ================== Handler ================== */
+/* ===== Handler ===== */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const days = clampDays(parseInt(searchParams.get("days") ?? "30", 10));
+  const days = daysClamp(parseInt(searchParams.get("days") ?? "30", 10));
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY;
+  // env を冗長に解決（本番/ローカルで名前差があっても拾う）
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    "";
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || // サーバ専用（使えればRLSを跨げる）
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    "";
 
-  // env 未設定時：必ず days 件返す
-  if (!url || !key) return NextResponse.json(fallbackRows(days));
+  // env 未設定 or 一時障害でも “必ず days 件” 返す
+  if (!url || !key) {
+    return NextResponse.json(fallbackRows(days), {
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
 
-  const supabase = createClient(url, key);
+  const supabase = createClient(url, key, { auth: { persistSession: false } });
 
   try {
     const since = new Date();
@@ -130,18 +129,18 @@ export async function GET(req: Request) {
       .gte("created_at", since.toISOString())
       .order("created_at", { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      return NextResponse.json(fallbackRows(days), { headers: { "Cache-Control": "no-store" } });
+    }
 
-    // 生データ → 未定義保持の正規化
     const normRows = ((data ?? []) as SeriesRow[]).map((d) => ({
       date: d.created_at.slice(0, 10),
       ...normalizeScores(d.structure_score),
     }));
 
-    // days 件に埋めて返す（FFill → 0）
     const filled = fillDays(days, normRows);
-    return NextResponse.json(filled);
-  } catch (_err) {
-    return NextResponse.json(fallbackRows(days));
+    return NextResponse.json(filled, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return NextResponse.json(fallbackRows(days), { headers: { "Cache-Control": "no-store" } });
   }
 }

@@ -1,7 +1,9 @@
 // app/mypage/MyPageClient.tsx
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+"use client";  // ← 1行目にこれだけ。前に何も置かない！
+
+import React, { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import {
@@ -10,6 +12,8 @@ import {
   type EVAEVector,
   type SeriesPoint,
 } from "@/components/charts/Charts"
+import { modelMeta } from "@/app/_utils/modelMeta"   // ← 追加（下にユーティリティを作る）
+
 
 type EV = "E" | "V" | "Λ" | "Ǝ"
 type ThemeKey = "work" | "love" | "future" | "self"

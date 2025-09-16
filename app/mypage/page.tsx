@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import ThemeCardClient from "./ThemeCardClient"; // ← 追記：テーマ表示はクライアントで
+import ThemeCardClient from "./theme/ThemeCardClient"; // ← 追記：テーマ表示はクライアントで
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

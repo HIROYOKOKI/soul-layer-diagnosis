@@ -1,139 +1,72 @@
-'use client'
+// app/structure/quick/confirm/ConfirmClient.tsx
+"use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from 'next/navigation'
+import { useRouter } from "next/navigation";
 
-type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
+type EV = "E" | "V" | "Λ" | "Ǝ";
 
-type PendingV2 = {
-  order: EV[]
-  labels: Record<EV, string>
-  points: Record<EV, number>
-  baseHints: Record<EV, { type: string; comment: string }>
-  _meta: {
-    ts: number
-    v: 'quick-v2'
-    presentModel: 'EΛVƎ'
-    futureModel: 'EVΛƎ'
-    question: string
-  }
-}
+const CHOICES: Array<{ code: EV; label: string; desc: string }> = [
+  { code: "E", label: "E（衝動・情熱）", desc: "やりたいことを迷わず行動に移す力" },
+  { code: "V", label: "V（可能性・夢）", desc: "まだ見ぬ未来や夢を追いかける心" },
+  { code: "Λ", label: "Λ（選択・葛藤）", desc: "悩みながらも自分で選び取る自由" },
+  { code: "Ǝ", label: "Ǝ（観測・静寂）", desc: "ものごとを見つめ、意味を感じ取る時間" },
+];
 
 export default function ConfirmClient() {
-  const [raw, setRaw] = useState<string | null>(null);
+  const router = useRouter();
+  const [order, setOrder] = useState<EV[]>([]);
 
   useEffect(() => {
     try {
-      const v = sessionStorage.getItem("structure_quick_pending");
-      setRaw(v);
-    } catch {}
-    return () => {
-      try { sessionStorage.removeItem("structure_quick_pending"); } catch {}
-    };
-  }, []);
+      const raw = typeof window !== "undefined"
+        ? sessionStorage.getItem("structure_quick_pending")
+        : null;
+      const p = raw ? JSON.parse(raw) : null;
+      if (!p?.order || !Array.isArray(p.order) || p.order.length !== 4) {
+        router.replace("/structure/quick");
+      } else {
+        setOrder(p.order as EV[]);
+      }
+    } catch {
+      router.replace("/structure/quick");
+    }
+  }, [router]);
 
-  const isReady = !!data
-  const ranks = useMemo(() => {
-    if (!data) return []
-    return data.order.map((code, i) => ({
-      idx: i + 1,
-      code,
-      label: data.labels[code],
-      point: data.points[code],
-      hint: data.baseHints[code],
-    }))
-  }, [data])
-
-  function goBackToEdit() {
-    router.back()
-  }
-
-  function resetAndRestart() {
-    sessionStorage.removeItem('structure_quick_pending')
-    router.push('/structure/quick')
-  }
-
-  function goResult() {
-    // そのまま result へ
-    router.push('/structure/quick/result')
-  }
-
-  if (!isReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-white">
-        <div className="max-w-md px-6 text-center">
-          <h1 className="text-lg font-bold mb-3">確認ページ</h1>
-          <p className="text-sm text-white/70">
-            一時データが見つかりませんでした。もう一度はじめからお願いします。
-          </p>
-          <button
-            onClick={() => router.push('/structure/quick')}
-            className="mt-5 w-full rounded-lg bg-pink-600 py-2 font-bold hover:bg-pink-500"
-          >
-            クイック診断に戻る
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const getChoice = (code: EV) => CHOICES.find((c) => c.code === code)!;
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="max-w-md mx-auto px-5 py-8">
-        <h1 className="text-xl font-bold text-center mb-2">確認</h1>
-        <p className="text-sm text-white/80 text-center mb-6 leading-relaxed">
-          {data?._meta.question}
-        </p>
+    <div className="min-h-screen grid place-items-center bg-black text-white px-5">
+      <div className="w-full max-w-md py-10">
+        <h1 className="text-center text-xl font-bold mb-6">確認</h1>
 
-        <div className="rounded-2xl border border-white/12 bg-white/5 p-4">
-          <h2 className="text-sm font-semibold mb-3">あなたが選んだ順番</h2>
-          <ol className="list-decimal list-inside space-y-2 text-sm">
-            {ranks.map((r) => (
-              <li key={r.code} className="flex items-start gap-2">
-                <span className="inline-flex shrink-0 rounded-full border border-white/25 px-2 py-0.5 text-[11px] text-white/80">
-                  第{r.idx}位
-                </span>
-                <div className="flex-1">
-                  <div className="font-medium">{r.label}</div>
-                  <div className="text-xs text-white/70 mt-0.5">
-                    {r.hint?.type}／{r.hint?.comment}（{r.point}点）
-                  </div>
-                </div>
-                <span className="text-xs opacity-70">{r.code}</span>
+        <ol className="space-y-3 mb-8">
+          {order.map((code, i) => {
+            const c = getChoice(code);
+            return (
+              <li key={`${code}-${i}`} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <div className="font-semibold">{`第${i + 1}位：${c.label}`}</div>
+                <p className="text-sm text-white/80 mt-1">{c.desc}</p>
               </li>
-            ))}
-          </ol>
-        </div>
+            );
+          })}
+        </ol>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="grid gap-3">
           <button
-            type="button"
-            onClick={goBackToEdit}
-            className="rounded-lg border border-white/20 px-4 py-2 text-sm hover:bg-white/10"
+            className="w-full rounded-lg bg-pink-600 py-2 font-bold hover:bg-pink-500"
+            onClick={() => router.push("/structure/quick/result")}
+          >
+            この内容で診断
+          </button>
+          <button
+            className="w-full rounded-lg border border-white/20 py-2 text-white/90 hover:bg-white/10"
+            onClick={() => router.replace("/structure/quick")}
           >
             修正する（戻る）
           </button>
-          <button
-            type="button"
-            onClick={resetAndRestart}
-            className="rounded-lg border border-white/20 px-4 py-2 text-sm hover:bg-white/10"
-          >
-            リセットしてやり直す
-          </button>
         </div>
-
-        <button
-          type="button"
-          onClick={goResult}
-          className="mt-4 w-full rounded-lg bg-pink-600 py-2 font-bold hover:bg-pink-500"
-        >
-          この内容で診断
-        </button>
-
-        <p className="mt-3 text-center text-[11px] text-white/60">
-          ※ このクイック診断は「基礎層（ベース）」として保存され、以後の診断に補正として反映されます。
-        </p>
       </div>
     </div>
-  )
+  );
 }

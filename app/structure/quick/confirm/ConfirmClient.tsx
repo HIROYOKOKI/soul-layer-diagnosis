@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from "react";
 import { useRouter } from 'next/navigation'
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
@@ -20,22 +20,17 @@ type PendingV2 = {
 }
 
 export default function ConfirmClient() {
-  const router = useRouter()
-  const [data, setData] = useState<PendingV2 | null>(null)
+  const [raw, setRaw] = useState<string | null>(null);
 
-  // 初期ロード：pending 取得
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem('structure_quick_pending')
-      if (!raw) return
-      const parsed = JSON.parse(raw) as PendingV2
-      // 最低限のバリデーション
-      if (!parsed?.order || parsed.order.length !== 4) return
-      setData(parsed)
-    } catch {
-      // 破損時は無視
-    }
-  }, [])
+      const v = sessionStorage.getItem("structure_quick_pending");
+      setRaw(v);
+    } catch {}
+    return () => {
+      try { sessionStorage.removeItem("structure_quick_pending"); } catch {}
+    };
+  }, []);
 
   const isReady = !!data
   const ranks = useMemo(() => {

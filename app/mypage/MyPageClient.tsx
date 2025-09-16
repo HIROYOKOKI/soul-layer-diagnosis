@@ -1,7 +1,7 @@
 // app/mypage/MyPageClient.tsx
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import {
@@ -101,27 +101,7 @@ function normalizeSeries(list: any[]): SeriesPointLocal[] {
   })
 }
 
-/* ====== 型バッジ用 ====== */
-function modelMeta(model: "EΛVƎ" | "EVΛƎ" | null) {
-  if (model === "EΛVƎ") return { color: "#B833F5", label: "EΛVƎ:現実思考型" } // 紫
-  if (model === "EVΛƎ") return { color: "#FF4500", label: "EVΛƎ:未来志向型" } // オレンジ
-  return { color: "#888888", label: "" }
-}
-/** #RRGGBB → rgba(r,g,b,alpha) */
-function hexToRgba(hex: string, alpha = 0.15) {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  if (!m) return `rgba(255,255,255,${alpha})`
-  const r = parseInt(m[1], 16),
-    g = parseInt(m[2], 16),
-    b = parseInt(m[3], 16)
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
-}
-
-/* ============== ブランドヘッダー（このページでは使わないので空） ============== */
-function AppHeader() {
-  return null
-}
-
+/* ======================= Component ======================= */
 export default function MyPageClient() {
   const router = useRouter()
   const search = useSearchParams()
@@ -132,11 +112,11 @@ export default function MyPageClient() {
   const [profile, setProfile] = useState<ProfileLatest | null>(null)
   const [daily, setDaily] = useState<DailyLatest | null>(null)
 
-  // ✅ 追加：/theme/confirm で保存したテーマ（ローカル保存値）
+  // /theme/confirm で保存したテーマ（ローカル）
   const [localTheme, setLocalTheme] = useState<ThemeKey | null>(null)
   const [localThemeAppliedAt, setLocalThemeAppliedAt] = useState<number | null>(null)
 
-  // チャート関連
+  // チャート
   const [range, setRange] = useState<7 | 30 | 90>(30)
   const [today, setToday] = useState<EVAEVectorLocal | null>(null)
   const [series, setSeries] = useState<SeriesPointLocal[] | null>(null)
@@ -150,7 +130,7 @@ export default function MyPageClient() {
     try {
       const t = sessionStorage.getItem("evae_theme_selected") as ThemeKey | null
       const at = Number(sessionStorage.getItem("evae_theme_applied_at") || "") || null
-      if (t === "work" || t === "love" || t === "future" || t === "self") setLocalTheme(t)
+      if (t && (["work", "love", "future", "self"] as string[]).includes(t)) setLocalTheme(t as ThemeKey)
       if (at) setLocalThemeAppliedAt(at)
     } catch {}
   }, [])
@@ -169,11 +149,12 @@ export default function MyPageClient() {
       setEnv(p)
       try { localStorage.setItem("ev-env", p) } catch {}
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search])
 
   /* ---------- 最新データ取得（env フォールバックあり） ---------- */
   useEffect(() => {
-    let alive = true
+    const ac = new AbortController()
     ;(async () => {
       try {
         setError(null)
@@ -181,8 +162,8 @@ export default function MyPageClient() {
 
         const qs = `?env=${encodeURIComponent(env)}`
         const [pRes, dRes] = await Promise.all([
-          fetch("/api/mypage/profile-latest", { cache: "no-store" }),
-          fetch(`/api/mypage/daily-latest${qs}`, { cache: "no-store" }),
+          fetch("/api/mypage/profile-latest", { cache: "no-store", signal: ac.signal }),
+          fetch(`/api/mypage/daily-latest${qs}`, { cache: "no-store", signal: ac.signal }),
         ])
         if (!pRes.ok) throw new Error("profile_latest_failed")
         if (!dRes.ok) throw new Error("daily_latest_failed")
@@ -190,10 +171,11 @@ export default function MyPageClient() {
         const p = await pRes.json()
         let d = await dRes.json()
 
+        // itemが空なら反対envを試す
         if (!d?.item) {
           const other = env === "prod" ? "dev" : "prod"
           try {
-            const dOther = await fetch(`/api/mypage/daily-latest?env=${other}`, { cache: "no-store" }).then((r) => r.json())
+            const dOther = await fetch(`/api/mypage/daily-latest?env=${other}`, { cache: "no-store", signal: ac.signal }).then((r) => r.json())
             if (dOther?.ok && dOther?.item) {
               d = dOther
               setEnv(other)
@@ -202,44 +184,41 @@ export default function MyPageClient() {
           } catch {}
         }
 
-        if (!alive) return
         if (!p?.ok) throw new Error(p?.error || "profile_latest_failed")
         if (!d?.ok) throw new Error(d?.error || "daily_latest_failed")
 
         setProfile(p.item ?? null)
         setDaily(d.item ?? null)
       } catch (e: any) {
-        if (alive) setError(e?.message || "failed")
+        if (e?.name !== "AbortError") setError(e?.message || "failed")
       } finally {
-        if (alive) setLoading(false)
+        setLoading(false)
       }
     })()
-    return () => { alive = false }
+    return () => ac.abort()
   }, [env])
 
   /* ---------- チャート取得 ---------- */
   useEffect(() => {
-    let alive = true
+    const ac = new AbortController()
     ;(async () => {
       try {
         setChartsErr(null)
         const [tRes, sRes] = await Promise.all([
-          fetch("/api/today", { cache: "no-store" }),
-          fetch(`/api/series?days=${range}`, { cache: "no-store" }),
+          fetch("/api/today", { cache: "no-store", signal: ac.signal }),
+          fetch(`/api/series?days=${range}`, { cache: "no-store", signal: ac.signal }),
         ])
         if (!tRes.ok) throw new Error("/api/today failed")
         if (!sRes.ok) throw new Error("/api/series failed")
         const tJson = await tRes.json()
         const sJson = await sRes.json()
-        if (!alive) return
         setToday(tJson?.scores ? normalizeToday(tJson.scores) : normalizeToday(tJson))
         setSeries(normalizeSeries(sJson))
       } catch (e: any) {
-        if (!alive) return
-        setChartsErr(e?.message ?? "charts fetch error")
+        if (e?.name !== "AbortError") setChartsErr(e?.message ?? "charts fetch error")
       }
     })()
-    return () => { alive = false }
+    return () => ac.abort()
   }, [range])
 
   // 型推定：base_model → daily.code → base_order(top)
@@ -256,8 +235,9 @@ export default function MyPageClient() {
   /* ---------- 表示用テーマ（ローカル保存を最優先） ---------- */
   const displayThemeLabel = useMemo(() => {
     if (localTheme) return THEME_LABEL[localTheme]
-    const db = (daily?.theme || "").toLowerCase()
-    const cast = ["work", "love", "future", "self"].includes(db) ? (db as ThemeKey) : null
+    const raw = daily?.theme
+    const dbLower = typeof raw === "string" ? raw.toLowerCase() : ""
+    const cast = (["work", "love", "future", "self"] as string[]).includes(dbLower) ? (dbLower as ThemeKey) : null
     return cast ? THEME_LABEL[cast] : "未設定"
   }, [localTheme, daily?.theme])
 
@@ -266,9 +246,6 @@ export default function MyPageClient() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* ブランドヘッダー（このページでは別で出しているなら不要） */}
-      <AppHeader />
-
       <main className="mx-auto max-w-md space-y-6 px-5 pb-10">
         {/* H1＋サブコピー */}
         <div className="flex items-start justify-between">
@@ -329,19 +306,19 @@ export default function MyPageClient() {
           </button>
         </div>
 
-        {/* ✅ テーマ表示（ローカル保存を反映） */}
+        {/* テーマ表示（ローカル保存を反映） */}
         <div className="text-[13px] text-white/60">
           現在のテーマ{" "}
           <span className="mx-1 font-medium text-white/80">{displayThemeLabel}</span>
           {localThemeAppliedAt && (
             <>
-              <span className="opacity-40 mx-1">•</span>
+              <span className="mx-1 opacity-40">•</span>
               反映: {fmt(localThemeAppliedAt)}
             </>
           )}
-          <span className="opacity-40 mx-1">•</span>
+          <span className="mx-1 opacity-40">•</span>
           {nowStr}
-          <span className="opacity-40 mx-1"> • </span>
+          <span className="mx-1 opacity-40"> • </span>
           <span className="text-white/50">env: {daily?.env ?? env}</span>
         </div>
 
@@ -405,16 +382,16 @@ export default function MyPageClient() {
               aria-label="デイリー診断を始める"
             >
               デイリー診断
-              <div className="mt-1 text-[11px] text-white/60">1問 / 今日のゆらぎ</div>
+              <div className="mt-1 text-[11px] text白/60">1問 / 今日のゆらぎ</div>
             </button>
 
             <button
-              className="cursor-not-allowed rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-white/50"
+              className="cursor-not-allowed rounded-xl border border白/10 bg白/5 px-3 py-3 text白/50"
               title="近日公開"
               disabled
             >
               診断タイプを選ぶ
-              <div className="mt-1 text-[11px] text-white/40">Weekly / Monthly（予定）</div>
+              <div className="mt-1 text-[11px] text白/40">Weekly / Monthly（予定）</div>
             </button>
           </div>
         </section>

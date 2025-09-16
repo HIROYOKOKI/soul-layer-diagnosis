@@ -1,8 +1,7 @@
 // app/mypage/MyPageClient.tsx
 "use client"
 
-"use client";  // ← 1行目にこれだけ。前に何も置かない！
-
+import { hexToRgba } from "@/app/_utils/color";
 import React, { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"

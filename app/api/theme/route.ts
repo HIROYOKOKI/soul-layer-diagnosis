@@ -1,31 +1,47 @@
 // app/api/theme/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 
-type Env = "dev" | "prod";
+// 既存ファイルがある想定。置き換え or 追記でOK。
+export async function GET(req: NextRequest) {
+const supabase = createRouteHandlerClient({ cookies });
+const { data: { user } } = await supabase.auth.getUser();
+if (!user) return NextResponse.json({ ok:false, error:"not_authenticated" }, { status: 401 });
 
-export async function POST(req: Request) {
-  try {
-    const body = await req.json().catch(() => ({} as any));
-    const to: Env | undefined = body?.to;
-    if (to !== "dev" && to !== "prod") {
-      return NextResponse.json(
-        { ok: false, error: "invalid_to_param", hint: 'to must be "dev" or "prod"' },
-        { status: 400 }
-      );
-    }
+// env=dev/prod をクエリから許可（デフォルトはdev）
+const env = (new URL(req.url).searchParams.get("env") ?? "dev").toLowerCase();
 
-    // ← 認証チェックは一切しない。Cookie を書くだけ
-    cookies().set("theme", to, {
-      path: "/",
-      sameSite: "lax",
-      httpOnly: false,   // フロントからも読めるように
-      maxAge: 60 * 60 * 24 * 365,
-    });
+const { data, error } = await supabase
+.from("evae_theme_selected")
+.select("theme, env, created_at")
+.eq("user_id", user.id)
+.eq("env", env)
+.order("created_at", { ascending: false })
+.limit(1)
+.maybeSingle();
 
-    return NextResponse.json({ ok: true, theme: to });
-  } catch (e: any) {
-    console.error("[/api/theme] error:", e?.message || e);
-    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
-  }
+if (error) return NextResponse.json({ ok:false, error: error.message }, { status: 500 });
+return NextResponse.json({ ok:true, item: data ?? null });
 }
+
+export async function POST(req: NextRequest) {
+const supabase = createRouteHandlerClient({ cookies });
+const { data: { user } } = await supabase.auth.getUser();
+if (!user) return NextResponse.json({ ok:false, error:"not_authenticated" }, { status: 401 });
+
+const body = await req.json().catch(() => null);
+const theme = body?.theme as 'E'|'V'|'Λ'|'Ǝ' | undefined;
+const env = (body?.env ?? 'dev') as 'dev'|'prod';
+if (!theme || !['E','V','Λ','Ǝ'].includes(theme))
+return NextResponse.json({ ok:false, error:"invalid_theme" }, { status: 400 });
+
+const { error } = await supabase
+.from("evae_theme_selected")
+.insert({ user_id: user.id, theme, env });
+
+if (error) return NextResponse.json({ ok:false, error: error.message }, { status: 500 });
+return NextResponse.json({ ok:true });
+}
+
+

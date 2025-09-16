@@ -1,18 +1,16 @@
 "use client";
 
-import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function AppFooter() {
+  const pathname = usePathname() || "/";
+  const hide = pathname === "/" || pathname.startsWith("/intro");
+  if (hide) return null; // ← ホームと/introでは出さない
+
   return (
-    <footer className="mt-auto border-t border-white/10 bg-black/60 backdrop-blur">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 text-sm text-white/70 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>© {new Date().getFullYear()} EVΛƎ Project. All rights reserved.</div>
-        <nav className="flex flex-wrap gap-3">
-          <Link href="/about" className="hover:text-white">About</Link>
-          <Link href="/terms" className="hover:text-white">利用規約</Link>
-          <Link href="/privacy" className="hover:text-white">プライバシー</Link>
-          <a href="https://note.com/heroy" target="_blank" className="hover:text-white">Note</a>
-        </nav>
+    <footer className="border-t border-white/10 bg-black/50">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        {/* 既存のフッター内容 */}
       </div>
     </footer>
   );

@@ -1,8 +1,8 @@
 // app/layout.tsx
 import "./globals.css"
-import AuthSync from "@/components/AuthSync"
-import AppHeader from "@/components/AppHeader"
-import AppFooter from "@/components/AppFooter"
+import AuthSync from "@/components/AuthSync";        // ← これはそのまま（@/components 側）
+import AppHeader from "./components/AppHeader";      // ← 相対に変更
+import AppFooter from "./components/AppFooter";      // ← 相対に変更
 
 export const dynamic = "force-dynamic"
 

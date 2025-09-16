@@ -14,19 +14,16 @@ function fmt(ts?: string | null) {
 }
 
 export default async function MyPage() {
-  // cookies() は同期返却でOK
-  const jar = cookies();
+  // ✅ Next.js 15 は await 必須
+  const jar = await cookies();
   const supabase = createServerComponentClient({ cookies: () => jar });
 
-  // env は Cookie "theme" を参照（なければ "prod"）
+  // Cookie "theme" が dev のときだけ dev、無ければ prod
   const env = (jar.get("theme")?.value === "dev" ? "dev" : "prod") as "dev" | "prod";
 
-  // 認証チェック
-  const { data: userResp, error: userErr } = await supabase.auth.getUser();
+  // 認証チェック（未ログインでも 500 にしない）
+  const { data: userResp } = await supabase.auth.getUser();
   const user = userResp?.user ?? null;
-  if (userErr) {
-    console.error("[/mypage] getUser error:", userErr.message);
-  }
   if (!user) {
     return (
       <main className="p-6 text-white">
@@ -35,7 +32,7 @@ export default async function MyPage() {
     );
   }
 
-  // 最新 daily_results を取得（updated_at → created_at フォールバック）
+  // 最新 daily_results を取得（旧スキーマ互換あり）
   let row:
     | {
         question_id?: string | null;
@@ -62,9 +59,8 @@ export default async function MyPage() {
     if (error) throw error;
     row = data ?? null;
 
-    // updated_at が存在しない古いスキーマへのフォールバック
     if (!row) {
-      const { data: data2, error: error2 } = await supabase
+      const { data: data2 } = await supabase
         .from("daily_results")
         .select("question_id, code, comment, quote, created_at, env")
         .eq("user_id", user.id)
@@ -72,11 +68,11 @@ export default async function MyPage() {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (error2) throw error2;
       row = data2 ?? null;
     }
-  } catch (e: any) {
-    console.error("[/mypage] fetch latest daily_results error:", e?.message || e);
+  } catch (e) {
+    // サーバーは落とさず空表示に
+    row = row ?? null;
   }
 
   const ts = (row?.updated_at || row?.created_at) ?? null;
@@ -88,10 +84,10 @@ export default async function MyPage() {
         <p className="mt-1 text-sm text-white/60">あなたの軌跡と、いまを映す</p>
       </header>
 
-      {/* 現在のテーマ（/theme/confirm で sessionStorage に保存した値をクライアントで表示） */}
+      {/* /theme/confirm で保存したテーマをクライアントで表示 */}
       <ThemeCardClient />
 
-      {/* 直近のメッセージ（Supabaseの最新デイリー） */}
+      {/* 直近メッセージ */}
       <section className="space-y-3 rounded-xl border border-white/15 bg-white/5 p-4">
         <div className="text-sm text-white/60">直近のメッセージ（env: {env}）</div>
         <div className="text-xs text-white/50">

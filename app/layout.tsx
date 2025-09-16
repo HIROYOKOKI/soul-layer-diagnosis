@@ -1,11 +1,10 @@
 // app/layout.tsx
-import "./globals.css";
-import AuthSync from "@/components/AuthSync";
-import AppHeader from "@/components/AppHeader";
-import AppFooter from "@/components/AppFooter";
-import ClientChrome from "@/components/ClientChrome";
+import "./globals.css"
+import AuthSync from "@/components/AuthSync"
+import AppHeader from "@/components/AppHeader"
+import AppFooter from "@/components/AppFooter"
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,9 +12,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AuthSync />
         <AppHeader />
-        <ClientChrome>{children}</ClientChrome>
+        <main className="min-h-dvh">{children}</main>
         <AppFooter />
       </body>
     </html>
-  );
+  )
 }

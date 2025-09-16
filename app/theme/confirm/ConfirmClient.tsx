@@ -1,7 +1,7 @@
 // app/theme/confirm/ConfirmClient.tsx
 "use client";
 
-import { Suspense, useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type ThemeKey = "work" | "love" | "future" | "self";
@@ -20,66 +20,61 @@ const DESC: Record<ThemeKey, string> = {
   self: "自分の傾向を言語化し、日常の選択に活かしたい人へ",
 };
 
-function Inner() {
+export default function ConfirmClient() {
   const router = useRouter();
   const qs = useSearchParams();
 
   // /theme/confirm?to=love&redirect=/mypage を想定
   const fromQuery = (qs.get("to") || "").trim() as ThemeKey | "";
-  // クエリが無い場合は直前の選択をフォールバック
-  const prev = (typeof window !== "undefined"
-    ? (sessionStorage.getItem("evae_theme_selected") as ThemeKey | null)
-    : null) || null;
+  const prev =
+    typeof window !== "undefined"
+      ? ((sessionStorage.getItem("evae_theme_selected") as ThemeKey | null) ?? null)
+      : null;
 
-  const selected: ThemeKey = THEMES.includes(fromQuery)
-    ? fromQuery
-    : (prev ?? "self");
+  const selected: ThemeKey = useMemo(
+    () => (THEMES.includes(fromQuery) ? fromQuery : (prev ?? "self")),
+    [fromQuery, prev]
+  );
 
-  const redirect = qs.get("redirect") || "/mypage";
+  const redirect = (qs.get("redirect") || "/mypage").toString();
 
   const handleConfirmSave = useCallback(() => {
     try {
-      // ✅ ここで保存（「確認した」タイミング）
       sessionStorage.setItem("evae_theme_selected", selected);
       sessionStorage.setItem("evae_theme_applied_at", String(Date.now()));
-      // ※ UI配色テーマなど別キー（ev-theme）を使っているなら、ここでは触らない
-      // document.documentElement.setAttribute("data-theme", selected) // ←不要なら外す
     } catch {
       // no-op
     }
-    // 保存後、マイページへ
     router.push(redirect);
     router.refresh();
   }, [selected, redirect, router]);
 
   return (
     <main className="mx-auto max-w-md px-5 py-10 text-white">
-      <h1 className="text-xl font-semibold mb-4">テーマを変更しますか？</h1>
-      <p className="text-white/70 mb-6">
+      <h1 className="mb-4 text-xl font-semibold">テーマを変更しますか？</h1>
+      <p className="mb-6 text-white/70">
         テーマを変更すると、保存済みの一部履歴がリセットされる場合があります。
       </p>
 
-      {/* 確認用プレビュー（任意） */}
-      <section className="rounded-2xl bg-white/5 border border-white/10 p-4 mb-6">
+      <section className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
         <div className="text-sm text-white/60">選択中のテーマ</div>
         <div className="mt-1 text-lg font-medium">{LABEL[selected]}</div>
-        <p className="text-sm text-white/60 mt-1">{DESC[selected]}</p>
+        <p className="mt-1 text-sm text-white/60">{DESC[selected]}</p>
       </section>
 
       <div className="flex gap-3">
         <button
           type="button"
           onClick={() => router.push("/theme")}
-          className="rounded-md px-4 py-2 bg-white/10 border border-white/15 hover:bg-white/15"
+          className="rounded-md border border-white/15 bg-white/10 px-4 py-2 hover:bg-white/15"
         >
           いいえ（戻る）
         </button>
 
-        {/* ✅ ラベルを「確認した（保存してマイページへ）」に変更 */}
         <button
           type="button"
           onClick={handleConfirmSave}
-          className="rounded-md px-4 py-2 bg-white text-black border border-white/10 active:opacity-90"
+          className="rounded-md border border-white/10 bg-white px-4 py-2 font-semibold text-black active:opacity-90"
         >
           確認した（保存してマイページへ）
         </button>
@@ -92,19 +87,3 @@ function Inner() {
     </main>
   );
 }
-
-export default function ClientChrome({ children }: { children: React.ReactNode }) {
-  const p = norm(usePathname());
-  const hide = p === "/intro";
-
-  return (
-    <div className="flex min-h-dvh flex-col">
-      {!hide && <AppHeader />}
-      {/* ★ サブヘッダーは一旦OFF（必要なら p.startsWith("/theme") の時だけ表示） */}
-      {/* {!hide && p.startsWith("/theme") && <AppSubHeaderTheme />} */}
-      <main className={!hide ? "flex-1 pt-16 pb-10" : "flex-1"}>{children}</main>
-      {!hide && <AppFooter />}
-    </div>
-  );
-}
-

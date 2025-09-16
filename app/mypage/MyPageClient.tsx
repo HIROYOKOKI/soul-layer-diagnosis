@@ -1,7 +1,7 @@
 // app/mypage/MyPageClient.tsx
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import {
@@ -12,6 +12,7 @@ import {
 } from "@/components/charts/Charts"
 
 type EV = "E" | "V" | "Λ" | "Ǝ"
+type ThemeKey = "work" | "love" | "future" | "self"
 
 type ProfileLatest = {
   fortune?: string | null
@@ -37,6 +38,13 @@ type SeriesPointLocal = SeriesPoint
 
 const FALLBACK_USER = { name: "Hiro", idNo: "0001", avatar: "/icon-512.png" }
 
+const THEME_LABEL: Record<ThemeKey, string> = {
+  work: "仕事",
+  love: "恋愛・結婚",
+  future: "未来・進路",
+  self: "自己理解・性格",
+}
+
 const clamp01 = (v: unknown) => {
   const n = typeof v === "number" ? v : Number(v)
   return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0
@@ -60,9 +68,9 @@ function decideModelFromOrder(order?: EV[] | null): "EΛVƎ" | "EVΛƎ" | null {
   return top === "E" || top === "Λ" ? "EΛVƎ" : top === "V" || top === "Ǝ" ? "EVΛƎ" : null
 }
 
-function fmt(dt?: string | null) {
+function fmt(dt?: string | number | null) {
   try {
-    const d = dt ? new Date(dt) : new Date()
+    const d = typeof dt === "number" ? new Date(dt) : dt ? new Date(dt) : new Date()
     return new Intl.DateTimeFormat("ja-JP", {
       year: "numeric",
       month: "2-digit",
@@ -109,9 +117,9 @@ function hexToRgba(hex: string, alpha = 0.15) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
-/* ============== ブランドヘッダー ============== */
+/* ============== ブランドヘッダー（このページでは使わないので空） ============== */
 function AppHeader() {
-  return null;
+  return null
 }
 
 export default function MyPageClient() {
@@ -124,6 +132,11 @@ export default function MyPageClient() {
   const [profile, setProfile] = useState<ProfileLatest | null>(null)
   const [daily, setDaily] = useState<DailyLatest | null>(null)
 
+  // ✅ 追加：/theme/confirm で保存したテーマ（ローカル保存値）
+  const [localTheme, setLocalTheme] = useState<ThemeKey | null>(null)
+  const [localThemeAppliedAt, setLocalThemeAppliedAt] = useState<number | null>(null)
+
+  // チャート関連
   const [range, setRange] = useState<7 | 30 | 90>(30)
   const [today, setToday] = useState<EVAEVectorLocal | null>(null)
   const [series, setSeries] = useState<SeriesPointLocal[] | null>(null)
@@ -132,30 +145,33 @@ export default function MyPageClient() {
   // env（dev/prod）
   const [env, setEnv] = useState<"dev" | "prod">("prod")
 
-  // 初回：localStorage から env 復元
+  /* ---------- ローカル保存テーマの読込 ---------- */
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("ev-env")
-      if (saved === "dev" || saved === "prod") {
-        setEnv(saved)
-      } else {
-        localStorage.setItem("ev-env", "prod")
-      }
+      const t = sessionStorage.getItem("evae_theme_selected") as ThemeKey | null
+      const at = Number(sessionStorage.getItem("evae_theme_applied_at") || "") || null
+      if (t === "work" || t === "love" || t === "future" || t === "self") setLocalTheme(t)
+      if (at) setLocalThemeAppliedAt(at)
     } catch {}
   }, [])
 
-  // URLクエリ ?env=dev|prod で上書き
+  /* ---------- env 初期化/上書き ---------- */
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ev-env")
+      if (saved === "dev" || saved === "prod") setEnv(saved)
+      else localStorage.setItem("ev-env", "prod")
+    } catch {}
+  }, [])
   useEffect(() => {
     const p = search?.get("env")
     if (p === "dev" || p === "prod") {
       setEnv(p)
-      try {
-        localStorage.setItem("ev-env", p)
-      } catch {}
+      try { localStorage.setItem("ev-env", p) } catch {}
     }
   }, [search])
 
-  // 取得：今の env が空なら反対 env を自動フォールバック（双方向）
+  /* ---------- 最新データ取得（env フォールバックあり） ---------- */
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -174,14 +190,12 @@ export default function MyPageClient() {
         const p = await pRes.json()
         let d = await dRes.json()
 
-        // どちらのenvでも、itemが空なら反対envを試す
         if (!d?.item) {
           const other = env === "prod" ? "dev" : "prod"
           try {
             const dOther = await fetch(`/api/mypage/daily-latest?env=${other}`, { cache: "no-store" }).then((r) => r.json())
             if (dOther?.ok && dOther?.item) {
               d = dOther
-              // 実際に表示した環境をこの端末の既定に
               setEnv(other)
               try { localStorage.setItem("ev-env", other) } catch {}
             }
@@ -203,7 +217,7 @@ export default function MyPageClient() {
     return () => { alive = false }
   }, [env])
 
-  // チャート系
+  /* ---------- チャート取得 ---------- */
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -239,15 +253,23 @@ export default function MyPageClient() {
   const goDaily = () => router.push("/daily/question")
   const goSettings = () => router.push("/settings")
 
+  /* ---------- 表示用テーマ（ローカル保存を最優先） ---------- */
+  const displayThemeLabel = useMemo(() => {
+    if (localTheme) return THEME_LABEL[localTheme]
+    const db = (daily?.theme || "").toLowerCase()
+    const cast = ["work", "love", "future", "self"].includes(db) ? (db as ThemeKey) : null
+    return cast ? THEME_LABEL[cast] : "未設定"
+  }, [localTheme, daily?.theme])
+
   if (loading) return <div className="p-6 text-white/70">読み込み中…</div>
   if (error) return <div className="p-6 text-red-400">エラー: {error}</div>
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* ブランドヘッダー */}
+      {/* ブランドヘッダー（このページでは別で出しているなら不要） */}
       <AppHeader />
 
-      <main className="mx-auto max-w-md px-5 pb-10 space-y-6">
+      <main className="mx-auto max-w-md space-y-6 px-5 pb-10">
         {/* H1＋サブコピー */}
         <div className="flex items-start justify-between">
           <div>
@@ -307,20 +329,25 @@ export default function MyPageClient() {
           </button>
         </div>
 
-        {/* テーマ＆日時（DB値） */}
+        {/* ✅ テーマ表示（ローカル保存を反映） */}
         <div className="text-[13px] text-white/60">
           現在のテーマ{" "}
-          <span className="mx-1 text-white/80 font-medium">{daily?.theme ?? "—"}</span>
+          <span className="mx-1 font-medium text-white/80">{displayThemeLabel}</span>
+          {localThemeAppliedAt && (
+            <>
+              <span className="opacity-40 mx-1">•</span>
+              反映: {fmt(localThemeAppliedAt)}
+            </>
+          )}
           <span className="opacity-40 mx-1">•</span>
           {nowStr}
           <span className="opacity-40 mx-1"> • </span>
-          {/* 実際に表示中のレコードのenvを優先表示 */}
           <span className="text-white/50">env: {daily?.env ?? env}</span>
         </div>
 
         {/* 直近メッセージ（daily最優先） */}
         <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
-          <h2 className="text-base font-semibold mb-1">直近のメッセージ</h2>
+          <h2 className="mb-1 text-base font-semibold">直近のメッセージ</h2>
           <p className="text-sm text-white/90">
             {daily?.comment || daily?.quote || profile?.fortune || "まだメッセージはありません。"}
           </p>
@@ -334,7 +361,7 @@ export default function MyPageClient() {
 
         {/* 構造チャート */}
         <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
-          <h2 className="text-base font-semibold mb-2">構造バランス</h2>
+          <h2 className="mb-2 text-base font-semibold">構造バランス</h2>
           <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2">
             <div className="min-w-full snap-center flex justify-center">
               <div className="w-full max-w-xs">
@@ -342,14 +369,14 @@ export default function MyPageClient() {
               </div>
             </div>
             <div className="min-w-full snap-center">
-              <div className="flex justify-between items-center mb-2">
+              <div className="mb-2 flex items-center justify-between">
                 <div className="text-sm text-white/80">Line（{range}日推移）</div>
                 <div className="flex gap-2 text-xs">
                   {[7, 30, 90].map((n) => (
                     <button
                       key={n}
                       onClick={() => setRange(n as 7 | 30 | 90)}
-                      className={`px-3 py-1 rounded border ${
+                      className={`rounded px-3 py-1 border ${
                         range === n ? "bg-white/15 border-white/30" : "bg-white/5 border-white/10 hover:bg-white/10"
                       }`}
                     >
@@ -361,7 +388,7 @@ export default function MyPageClient() {
               {series ? (
                 <TimeSeriesChart data={series} />
               ) : (
-                <div className="h-56 grid place-items-center text-white/60">読み込み中…</div>
+                <div className="grid h-56 place-items-center text-white/60">読み込み中…</div>
               )}
               {chartsErr && <div className="mt-2 text-xs text-red-300">[{chartsErr}] フォールバック表示中</div>}
             </div>
@@ -370,7 +397,7 @@ export default function MyPageClient() {
 
         {/* 次の一歩（デイリー診断CTA） */}
         <section className="rounded-2xl border border-white/12 bg-white/5 p-4">
-          <h2 className="text-base font-semibold mb-3">次の一歩</h2>
+          <h2 className="mb-3 text-base font-semibold">次の一歩</h2>
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={goDaily}
@@ -378,16 +405,16 @@ export default function MyPageClient() {
               aria-label="デイリー診断を始める"
             >
               デイリー診断
-              <div className="text-[11px] text-white/60 mt-1">1問 / 今日のゆらぎ</div>
+              <div className="mt-1 text-[11px] text-white/60">1問 / 今日のゆらぎ</div>
             </button>
 
             <button
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-white/50 cursor-not-allowed"
+              className="cursor-not-allowed rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-white/50"
               title="近日公開"
               disabled
             >
               診断タイプを選ぶ
-              <div className="text-[11px] text-white/40 mt-1">Weekly / Monthly（予定）</div>
+              <div className="mt-1 text-[11px] text-white/40">Weekly / Monthly（予定）</div>
             </button>
           </div>
         </section>

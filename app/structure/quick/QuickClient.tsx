@@ -60,10 +60,17 @@ export default function QuickClient() {
   const [returnTo, setReturnTo] = useState("/mypage");
 
   useEffect(() => {
-    const ret = searchParams.get("return") || "/mypage";
-    setReturnTo(ret);
+  try {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const ret = params.get("return") || "/mypage";
+      setReturnTo(ret);
+    }
+  } finally {
     setReady(true);
-  }, [searchParams]);
+  }
+}, []);
+
 
   const chosen = useMemo(() => new Set(order), [order])
   const isDone = order.length === CHOICES.length

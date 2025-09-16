@@ -1,15 +1,17 @@
-// app/page.tsx
-import type { Metadata } from "next";
+// app/layout.tsx
+import "./globals.css";
+import AuthSync from "@/components/AuthSync";
+import ClientChrome from "@/components/ClientChrome"; // ← これだけでOK
 
-export const metadata: Metadata = {
-  title: "EVΛƎ — Soul Layer Diagnosis",
-  description: "EVΛƎ: ソウルレイヤー診断アプリ",
-};
+export const dynamic = "force-dynamic";
 
-export default function Page() {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div>
-      {/* ページ内容 */}
-    </div>
+    <html lang="ja">
+      <body>
+        <AuthSync />
+        <ClientChrome>{children}</ClientChrome>
+      </body>
+    </html>
   );
 }

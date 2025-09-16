@@ -1,7 +1,7 @@
 // app/layout.tsx
 import "./globals.css";
 import AuthSync from "@/components/AuthSync";
-import ClientChrome from "@/components/ClientChrome"; // ← これだけでOK
+import ClientChrome from "./components/ClientChrome"; // ← これだけでOK
 
 export const dynamic = "force-dynamic";
 

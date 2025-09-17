@@ -1,39 +1,35 @@
- // app/api/me/route.ts
- import { NextResponse } from "next/server";
- import { cookies } from "next/headers";
- import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+// app/api/me/route.ts
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 
- export async function GET() {
-   const supabase = createRouteHandlerClient({ cookies });
+export async function GET() {
+  const supabase = createRouteHandlerClient({ cookies });
 
-   // セッションの本人
-   const {
-     data: { user },
-     error: userError,
-   } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
 
-   if (userError || !user) {
-     return NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 });
-   }
+  if (userError || !user) {
+    return NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 });
+  }
 
-
- // 本人の profiles 行を取得（id ベース）
+  // 👇 DBの実カラムが user_id ならこちらに合わせる
   const { data, error } = await supabase
     .from("profiles")
     .select("id_no, id_no_str")
-    .eq("id", user.id)
+    .eq("user_id", user.id)   // ← id ではなく user_id を使う
     .maybeSingle();
 
-   if (error) {
-     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-   }
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
 
-   // プロフィール未作成でも安全に返す
-   return NextResponse.json({
-     ok: true,
-     id: user.id,                               // 内部 UUID（auth.users.id）
-     idNo: data?.id_no ?? null,                 // 連番
-     idNoStr: data?.id_no_str ?? null,          // "0001" 形式
-   // UIでは使わないため email/name/plan は返さない（必要になったらDBに列を追加してから）
-   });
- }
+  return NextResponse.json({
+    ok: true,
+    id: user.id,
+    idNo: data?.id_no ?? null,
+    idNoStr: data?.id_no_str ?? null,
+  });
+}

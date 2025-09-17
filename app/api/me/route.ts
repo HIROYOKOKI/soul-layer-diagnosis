@@ -15,11 +15,11 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 });
   }
 
-  // 👇 DBの実カラムが user_id ならこちらに合わせる
+  // 👇 profiles.user_id で参照する
   const { data, error } = await supabase
     .from("profiles")
     .select("id_no, id_no_str")
-    .eq("user_id", user.id)   // ← id ではなく user_id を使う
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (error) {
@@ -28,8 +28,8 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
-    id: user.id,
-    idNo: data?.id_no ?? null,
-    idNoStr: data?.id_no_str ?? null,
+    id: user.id,                 // auth.users.id
+    idNo: data?.id_no ?? null,   // 連番
+    idNoStr: data?.id_no_str ?? null, // "0001" 形式
   });
 }

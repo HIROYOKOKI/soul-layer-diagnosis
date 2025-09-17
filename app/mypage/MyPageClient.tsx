@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 
-// ※ Charts がある前提（無い場合はコメントアウト）
+// Charts を使う前提（未導入なら下の <RadarChart> / <TimeSeriesChart> 部分をコメントアウト）
 import {
   RadarChart,
   TimeSeriesChart,
@@ -45,12 +45,9 @@ type SeriesPointLocal = SeriesPoint;
 
 type Me = {
   ok: boolean;
-  id: string;            // UUID
-  idNo: number | null;   // 連番
-  idNoStr: string | null;// "0001" 形式
-  name: string | null;
-  email?: string | null;
-  plan?: string;
+  id: string;             // UUID
+  idNo: number | null;    // 連番
+  idNoStr: string | null; // "0001" 形式
 } | null;
 
 /* =========================
@@ -120,7 +117,7 @@ const hexToRgba = (hex: string, alpha = 0.15) => {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!m) return `rgba(255,255,255,${alpha})`;
   const [r, g, b] = [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  return `rgba(${r}, ${b}, ${g}, ${alpha})`.replace(`${b}, ${g}`, `${g}, ${b}`); // 保険
 };
 
 /* =========================
@@ -137,7 +134,7 @@ export default function MyPageClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [me, setMe] = useState<Me>(null);                    // 👈 追加：/api/me
+  const [me, setMe] = useState<Me>(null);                    // /api/me
   const [profile, setProfile] = useState<ProfileLatest>(null);
   const [daily, setDaily] = useState<DailyLatest>(null);
   const [theme, setTheme] = useState<ThemeLatest>(null);
@@ -168,7 +165,7 @@ export default function MyPageClient() {
     }
   }, [search]);
 
-  // 👇 追加：/api/me を 1 回だけ取得（表示用ID・名前）
+  // /api/me を 1 回だけ取得（表示用ID）
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -275,7 +272,6 @@ export default function MyPageClient() {
     decideModelFromOrder(profile?.base_order ?? null);
   const meta = modelMeta(normalizedModel);
 
-  const nowStr = fmt();
   const goDaily = () => router.push("/daily/question");
   const goTheme = () => router.push("/theme");
   const goSettings = () => router.push("/settings");
@@ -286,7 +282,7 @@ export default function MyPageClient() {
   if (error) return <div className="p-6 text-red-400">エラー: {String(error)}</div>;
 
   // 表示名とID（なければフォールバック）
-  const displayName = me?.name || FALLBACK_USER.name;
+  const displayName = FALLBACK_USER.name; // name は現状 API 未返却のため固定
   const displayIdNoStr = me?.idNoStr || FALLBACK_USER.idNoStr;
 
   return (
@@ -349,7 +345,7 @@ export default function MyPageClient() {
               </div>
               <button
                 onClick={goTheme}
-                className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-sm hover:bg白/15"
+                className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15"
               >
                 変更する
               </button>
@@ -361,7 +357,7 @@ export default function MyPageClient() {
         <section className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-semibold">直近のメッセージ</h3>
-            <span className="text-xs text白/50">
+            <span className="text-xs text-white/50">
               {fmt(daily?.updated_at || daily?.created_at || profile?.created_at)}
             </span>
           </div>
@@ -374,7 +370,7 @@ export default function MyPageClient() {
         </section>
 
         {/* 4) 構造バランス（Radar / Line） */}
-        <section className="rounded-2xl border border白/10 bg白/[0.03] p-6">
+        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-base font-semibold">構造バランス</h3>
             <span className="text-xs text-white/50">Radar / Line（横スワイプ）</span>

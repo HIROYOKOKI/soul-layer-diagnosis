@@ -14,42 +14,18 @@ export default function AuthCallbackPage() {
     (async () => {
       const supabase = createClientComponentClient();
 
-      // Supabaseが付けた ?error=... があれば可視化
-      const errParam = sp.get("error");
-      if (errParam) {
-        setMsg(`エラー: ${decodeURIComponent(errParam)}`);
-        return;
-      }
-
-      // 新API（PKCE対応）。ブラウザの code_verifier を使ってセッション交換
-      let error = null as any;
-      try {
-        const res = await supabase.auth.exchangeCodeForSession();
-        error = res?.error ?? null;
-      } catch (e) {
-        error = e;
-      }
-
-      // 旧APIフォールバック（環境差異対策）
-      if (error) {
-        try {
-          const res2 = await supabase.auth.getSessionFromUrl({ storeSession: true });
-          error = res2?.error ?? null;
-        } catch (e2) {
-          error = e2;
-        }
-      }
+      // Magic Link / OAuth 共通：PKCE付きセッション交換（これだけでOK）
+      const { error } = await supabase.auth.exchangeCodeForSession();
 
       if (error) {
-        setMsg(`ログインに失敗しました: ${String(error?.message || error)}`);
+        setMsg(`ログインに失敗しました: ${error.message}`);
+        // 必要なら ↓ を有効にしてログインへ戻す
+        // router.replace(`/login?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`);
         return;
       }
-
-      // 成功 → 次へ
       router.replace(next);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router, next]);
 
   return (
     <main className="min-h-[60vh] grid place-items-center text-white">

@@ -1,8 +1,9 @@
 import MyPageClient from "./MyPageClient";
-</div>
-);
-})()
-) : (
+
+export default function MyPagePage() {
+  // Server Component（ラッパーだけ）
+  return <MyPageClient />;
+}
 <div className="flex w-full items-center justify-between rounded-2xl bg-gray-100 p-4">
 <div>
 <div className="text-sm text-gray-600">選択中のテーマ</div>

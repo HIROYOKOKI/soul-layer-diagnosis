@@ -1,7 +1,5 @@
-// app/auth/callback/page.tsx
 "use client";
-
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
@@ -9,45 +7,30 @@ export default function AuthCallbackPage() {
   const router = useRouter();
   const sp = useSearchParams();
   const next = sp.get("next") || "/mypage";
-  const [msg, setMsg] = useState("ログイン処理中…");
 
   useEffect(() => {
     (async () => {
       const supabase = createClientComponentClient();
-
-      // 1) OAuth/PKCE: ?code=... があれば exchange
       const code = sp.get("code");
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession();
         if (!error) return router.replace(next);
         console.error("exchange error:", error.message);
-        setMsg(`ログインに失敗しました: ${error.message}`);
         return;
       }
-
-      // 2) Magic Link: ハッシュ(#)に access_token / refresh_token が来るケースへ対応
+      // Magic Link の #access_token 形式にも対応（保険）
       const hash = typeof window !== "undefined" ? window.location.hash : "";
       if (hash.includes("access_token") && hash.includes("refresh_token")) {
         const params = new URLSearchParams(hash.replace(/^#/, ""));
-        const access_token = params.get("access_token")!;
-        const refresh_token = params.get("refresh_token")!;
-        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-        if (!error) return router.replace(next);
-        console.error("setSession error:", error?.message);
-        setMsg(`ログインに失敗しました: ${error?.message ?? "setSession 失敗"}`);
-        return;
+        await supabase.auth.setSession({
+          access_token: params.get("access_token")!,
+          refresh_token: params.get("refresh_token")!,
+        });
+        return router.replace(next);
       }
-
-      // 3) どちらも無い → たぶん古いリンク or 別ウィンドウ
-      setMsg("ログインリンクの有効期限切れ、または別ウィンドウで開かれました。もう一度ログインしてください。");
-      router.replace(`/login?next=${encodeURIComponent(next)}&error=no_code`);
+      router.replace(`/login?error=no_code&next=${encodeURIComponent(next)}`);
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router, sp, next]);
 
-  return (
-    <main className="min-h-[60vh] grid place-items-center text-white">
-      <p className="text-sm opacity-80">{msg}</p>
-    </main>
-  );
+  return <main className="min-h-[60vh] grid place-items-center text-white">ログイン処理中…</main>;
 }

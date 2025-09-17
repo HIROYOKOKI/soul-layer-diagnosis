@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
@@ -93,10 +93,21 @@ function IntroView() {
       {/* 下部ボタン（静止画フェーズでフェードイン） */}
       <div style={styles.bottomBlock}>
         <div style={{ ...styles.buttonRow, opacity: buttonsOpacity }}>
-          <GlowButton href="/register" variant="pink" ariaLabel="新規登録へ">
+          {/* 新規登録 → 完了後は /welcome?intro=1 へ */}
+          <GlowButton
+            href="/register?next=/welcome?intro=1"
+            variant="pink"
+            ariaLabel="新規登録へ"
+          >
             新規登録
           </GlowButton>
-          <GlowButton href="/login" variant="blue" ariaLabel="ログインへ">
+
+          {/* 既存ログイン → 完了後は /mypage へ */}
+          <GlowButton
+            href="/login?next=/mypage"
+            variant="blue"
+            ariaLabel="ログインへ"
+          >
             ログイン
           </GlowButton>
         </div>

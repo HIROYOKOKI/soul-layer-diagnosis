@@ -76,10 +76,10 @@ export default function ThemeClient() {
 
       if (!res?.ok) {
         if (res?.error === "not_authenticated") {
-          alert("ログインが必要です。ログイン画面へ移動します。");
-          router.push("/login?next=/theme");
-          return;
-        }
+  alert("ログインが必要です。ログイン画面へ移動します。");
+  router.push("/login?next=/mypage");
+   return;
+ }
         alert("保存に失敗しました");
         return;
       }

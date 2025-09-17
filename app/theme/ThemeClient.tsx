@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+type EV = "E" | "V" | "Λ" | "Ǝ";
 type ThemeKey = "work" | "love" | "future" | "self";
 const THEMES: ThemeKey[] = ["work", "love", "future", "self"];
 
@@ -21,9 +22,22 @@ const DESC: Record<ThemeKey, string> = {
   self: "自分の傾向を言語化し、日常の選択に活かしたい人へ",
 };
 
+// テーマ表示 → EV コードの保存用マッピング
+const THEME_TO_EV: Record<ThemeKey, EV> = {
+  work: "Λ",     // 選択
+  love: "V",     // 可能性
+  future: "E",   // 衝動/一歩
+  self: "Ǝ",     // 観測
+};
+
+// env 分離（デフォルト dev）
+const ENV: "dev" | "prod" =
+  (process.env.NEXT_PUBLIC_APP_ENV as "dev" | "prod") || "dev";
+
 export default function ThemeClient() {
   const router = useRouter();
   const [selected, setSelected] = useState<ThemeKey | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // 直前の選択を復元（任意）
   useEffect(() => {
@@ -46,13 +60,34 @@ export default function ThemeClient() {
     nav?.vibrate?.(10);
   };
 
-  const goConfirm = () => {
-    if (!selected) return;
-    // ✅ 404回避：/theme/apply ではなく /theme/confirm に
-    //    選択テーマをクエリで渡す（確認ページで to を参照して適用or遷移）
-    const redirect = "/mypage"; // 必要に応じて変更可
-    router.push(`/theme/confirm?to=${encodeURIComponent(selected)}&redirect=${encodeURIComponent(redirect)}`);
-  };
+  // ✅ ここで /api/theme へ保存して /mypage に遷移
+  async function onSaveTheme() {
+    if (!selected || saving) return;
+    setSaving(true);
+    try {
+      const ev: EV = THEME_TO_EV[selected];
+      const res = await fetch("/api/theme", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme: ev, env: ENV }),
+      })
+        .then((r) => r.json())
+        .catch(() => ({ ok: false, error: "network_error" }));
+
+      if (!res?.ok) {
+        if (res?.error === "not_authenticated") {
+          alert("ログインが必要です。ログイン画面へ移動します。");
+          router.push("/login?next=/theme");
+          return;
+        }
+        alert("保存に失敗しました");
+        return;
+      }
+      router.push("/mypage");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="min-h-[100svh] bg-black text-white">
@@ -107,20 +142,20 @@ export default function ThemeClient() {
         </section>
       </main>
 
-      {/* 下部：確認へ */}
+      {/* 下部：保存してマイページへ */}
       <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 border-t border-white/10">
         <button
           type="button"
-          onClick={goConfirm}
-          disabled={!selected}
+          onClick={onSaveTheme}
+          disabled={!selected || saving}
           className={[
             "w-full h-12 rounded-xl font-medium border border-white/10",
-            !selected
+            !selected || saving
               ? "bg-white/10 text-white/50"
               : "bg-white text-black active:opacity-90",
           ].join(" ")}
         >
-          確認へ進む
+          {saving ? "保存中…" : "保存してマイページへ"}
         </button>
       </div>
     </div>

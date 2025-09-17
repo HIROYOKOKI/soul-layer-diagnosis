@@ -10,10 +10,13 @@ export const revalidate = 0;
 export default async function MyPagePage() {
   // 1) 認証チェック（Server）
   const sb = createServerComponentClient({ cookies });
-  const { data: { user } } = await sb.auth.getUser();
+  const {
+    data: { user },
+    error,
+  } = await sb.auth.getUser();
 
   // 2) 未ログインなら /login へ（next=/mypage を付与）
-  if (!user) {
+  if (error || !user) {
     redirect(`/login?next=${encodeURIComponent("/mypage")}`);
   }
 

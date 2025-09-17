@@ -43,10 +43,20 @@ type ThemeLatest = { theme: EV; env: "dev" | "prod"; created_at: string } | null
 type EVAEVectorLocal = EVAEVector;
 type SeriesPointLocal = SeriesPoint;
 
+type Me = {
+  ok: boolean;
+  id: string;            // UUID
+  idNo: number | null;   // 連番
+  idNoStr: string | null;// "0001" 形式
+  name: string | null;
+  email?: string | null;
+  plan?: string;
+} | null;
+
 /* =========================
    Utils
 ========================= */
-const FALLBACK_USER = { name: "Hiro", idNo: "0001", avatar: "/icon-512.png" };
+const FALLBACK_USER = { name: "Hiro", idNoStr: "0001", avatar: "/icon-512.png" };
 
 const clamp01 = (v: unknown) => {
   const n = typeof v === "number" ? v : Number(v);
@@ -127,6 +137,7 @@ export default function MyPageClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [me, setMe] = useState<Me>(null);                    // 👈 追加：/api/me
   const [profile, setProfile] = useState<ProfileLatest>(null);
   const [daily, setDaily] = useState<DailyLatest>(null);
   const [theme, setTheme] = useState<ThemeLatest>(null);
@@ -156,6 +167,24 @@ export default function MyPageClient() {
       } catch {}
     }
   }, [search]);
+
+  // 👇 追加：/api/me を 1 回だけ取得（表示用ID・名前）
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch("/api/me", { cache: "no-store" });
+        const j = await r.json();
+        if (!alive) return;
+        if (j?.ok) setMe(j);
+      } catch {
+        /* noop: FALLBACK を使う */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // 最新データ（テーマ / プロフィール / デイリー）
   useEffect(() => {
@@ -256,6 +285,10 @@ export default function MyPageClient() {
   if (loading) return <div className="p-6 text-white/70">読み込み中…</div>;
   if (error) return <div className="p-6 text-red-400">エラー: {String(error)}</div>;
 
+  // 表示名とID（なければフォールバック）
+  const displayName = me?.name || FALLBACK_USER.name;
+  const displayIdNoStr = me?.idNoStr || FALLBACK_USER.idNoStr;
+
   return (
     <div className="min-h-[100svh] bg-black text-white">
       <main className="mx-auto w-full max-w-3xl px-5 py-8 space-y-6">
@@ -290,8 +323,8 @@ export default function MyPageClient() {
               className="h-14 w-14 rounded-full border border-white/20 bg-black/20"
             />
             <div>
-              <div className="text-xl font-semibold">{FALLBACK_USER.name}</div>
-              <div className="text-sm text-white/70">ID: {FALLBACK_USER.idNo}</div>
+              <div className="text-xl font-semibold">{displayName}</div>
+              <div className="text-sm text-white/70">ID: {displayIdNoStr}</div>
             </div>
           </div>
         </section>
@@ -316,7 +349,7 @@ export default function MyPageClient() {
               </div>
               <button
                 onClick={goTheme}
-                className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15"
+                className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-sm hover:bg白/15"
               >
                 変更する
               </button>
@@ -328,7 +361,7 @@ export default function MyPageClient() {
         <section className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-semibold">直近のメッセージ</h3>
-            <span className="text-xs text-white/50">
+            <span className="text-xs text白/50">
               {fmt(daily?.updated_at || daily?.created_at || profile?.created_at)}
             </span>
           </div>
@@ -341,7 +374,7 @@ export default function MyPageClient() {
         </section>
 
         {/* 4) 構造バランス（Radar / Line） */}
-        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+        <section className="rounded-2xl border border白/10 bg白/[0.03] p-6">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-base font-semibold">構造バランス</h3>
             <span className="text-xs text-white/50">Radar / Line（横スワイプ）</span>

@@ -1,87 +1,57 @@
 // app/register/page.tsx
 "use client";
-
 import { useMemo, useState } from "react";
-import { getBrowserSupabase } from "@/lib/supabase-browser";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 export default function RegisterPage() {
-  const sb = getBrowserSupabase();
+  const sb = createClientComponentClient();
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const canSubmit = useMemo(() => {
-    const v = email.trim().toLowerCase();
-    return /\S+@\S+\.\S+/.test(v) && !sending;
-  }, [email, sending]);
+  const site = useMemo(
+    () => (typeof window !== "undefined" ? location.origin : "https://soul-layer-diagnosis.vercel.app"),
+    []
+  );
+  // 新規登録は /welcome に飛ばす（intro=1 は任意）
+  const redirectTo = `${site}/auth/callback?next=${encodeURIComponent("/welcome?intro=1")}`;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
-    setSending(true);
-    setMsg(null);
-    setErr(null);
+    if (sending) return;
+    setSending(true); setMsg(null); setErr(null);
 
     try {
-      const base =
-        (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") as string) ||
-        (typeof window !== "undefined" ? window.location.origin : "");
-
-      const normalizedEmail = email.trim().toLowerCase();
-
-      // ✅ パスワードレス（Magic Link）で新規登録フロー
       const { error } = await sb.auth.signInWithOtp({
-        email: normalizedEmail,
-        options: {
-          // 新規登録は /welcome に導線固定
-          emailRedirectTo: `${base}/auth/callback?next=/welcome?intro=1`,
-        },
+        email,
+        options: { emailRedirectTo: redirectTo },   // 👈 ここが重要
       });
       if (error) throw error;
-
-      setMsg("新規登録用の確認メールを送信しました。受信箱のリンクから続行してください。");
-    } catch (e: any) {
-      setErr(e?.message ?? "送信に失敗しました。時間をおいて再度お試しください。");
+      setMsg("確認メールを送信しました。メール内のボタンから登録を完了してください。");
+    } catch (e:any) {
+      setErr(e?.message ?? "送信に失敗しました");
     } finally {
       setSending(false);
     }
   }
 
   return (
-    <div className="mx-auto max-w-md px-6 py-10">
-      <h1 className="text-2xl font-semibold mb-6">新規登録</h1>
+    <main className="p-6 text-white">
+      <h1 className="text-2xl font-semibold">新規登録</h1>
+      <p className="text-sm text-white/70 mt-1">登録完了後は /welcome に移動します。</p>
 
-      <form onSubmit={onSubmit} className="space-y-4">
-        <label className="block text-sm opacity-80 mb-1">メールアドレス</label>
-        <input
-          type="email"
-          required
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-md border px-3 py-2 bg-transparent"
-          autoComplete="email"
-          inputMode="email"
-        />
-
-        <button
-          type="submit"
-          disabled={!canSubmit}
-          className="w-full rounded-md bg-white text-black py-2 font-medium disabled:opacity-50"
-        >
-          {sending ? "送信中…" : "登録用リンクを送る"}
+      <form onSubmit={onSubmit} className="mt-4 space-y-2">
+        <input className="w-full rounded border border-white/20 bg-transparent p-2"
+               type="email" value={email} onChange={(e)=>setEmail(e.target.value)}
+               placeholder="you@example.com" required />
+        <button className="rounded bg-white text-black px-3 py-2" disabled={sending || !email}>
+          {sending ? "送信中…" : "登録用メールを送信"}
         </button>
       </form>
 
-      {msg && <p className="mt-4 text-sm text-emerald-500">{msg}</p>}
-      {err && <p className="mt-4 text-sm text-rose-500">{err}</p>}
-
-      <p className="mt-6 text-sm opacity-80">
-        すでにアカウントをお持ちの方は{" "}
-        <a href="/login" className="underline">ログイン</a>
-      </p>
-    </div>
+      {msg && <p className="mt-2 text-emerald-300 text-sm">{msg}</p>}
+      {err && <p className="mt-2 text-red-300 text-sm">{err}</p>}
+    </main>
   );
 }
-

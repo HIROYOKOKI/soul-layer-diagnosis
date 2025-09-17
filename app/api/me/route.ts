@@ -1,28 +1,39 @@
 // app/api/me/route.ts
 import { NextResponse } from "next/server"
-import { getSupabaseAdmin } from "@/lib/supabase-admin"
+import { cookies } from "next/headers"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 
 export async function GET() {
-  const sb = getSupabaseAdmin()
-  if (!sb) return NextResponse.json({ ok: false, error: "supabase_env_missing" }, { status: 500 })
+  const supabase = createRouteHandlerClient({ cookies })
 
-  // ここでは“とりあえず動かす”前提で先頭1件を返す
-  const { data, error } = await sb
+  // 認証ユーザーを取得
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    return NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 })
+  }
+
+  // profiles から本人のレコードを取得
+  const { data, error } = await supabase
     .from("profiles")
-    .select("*")
-    .limit(1)
+    .select("id, email, id_no, id_no_str, name, plan")
+    .eq("id", user.id) // 👈 本人だけ
     .maybeSingle()
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
 
-  // 互換レスポンス（任意の表示があれば合わせてください）
   return NextResponse.json({
     ok: true,
-    data,
+    id: user.id,                          // 内部 UUID
+    idNo: data?.id_no ?? null,            // 連番
+    idNoStr: data?.id_no_str ?? null,     // 表示用 0001 形式
+    email: data?.email ?? user.email,     // email（保険で auth.users からも）
+    name: data?.name ?? null,
     plan: String(data?.plan ?? "FREE").toUpperCase(),
-    name: data?.name ?? "Hiro",
-    id: String(data?.id ?? "0001"),
   })
 }

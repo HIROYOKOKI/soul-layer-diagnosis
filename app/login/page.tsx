@@ -10,7 +10,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
 
   // /login?next=/mypage のようにクエリで遷移先を指定（既定は /theme）
-  const nextPath = searchParams.get("next") || "/theme";
+  const nextPath = searchParams.get("next") || "/mypage";
 
   // 本番/ローカルのどちらでも安全に絶対URLを作る
   const site = useMemo(() => {

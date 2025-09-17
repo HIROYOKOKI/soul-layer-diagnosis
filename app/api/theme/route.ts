@@ -21,8 +21,11 @@ const { data, error } = await supabase
 .limit(1)
 .maybeSingle();
 
-if (error) return NextResponse.json({ ok:false, error: error.message }, { status: 500 });
-return NextResponse.json({ ok:true, item: data ?? null });
+if (!user) {
+  return NextResponse.json(
+    { ok:false, error:"not_authenticated", hint:"/auth/callback を経由していないか、Cookieが付きませんでした" },
+    { status: 401 }
+  );
 }
 
 export async function POST(req: NextRequest) {

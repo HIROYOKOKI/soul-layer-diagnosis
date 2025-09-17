@@ -19,13 +19,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // 👇 ここを追加：profiles に保険で upsert
+    // 👇 保険の upsert（id のみ）
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       await supabase
         .from("profiles")
-        .insert({ id: user.id, email: user.email ?? null })
-        .onConflict("id") // 既にある場合は何もしない
+        .insert({ id: user.id }) // ← email は渡さない
+        .onConflict("id")        // 既にある場合は無視
         .ignore();
     }
   }

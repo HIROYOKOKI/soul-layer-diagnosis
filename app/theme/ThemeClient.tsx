@@ -75,14 +75,15 @@ export default function ThemeClient() {
         .catch(() => ({ ok: false, error: "network_error" }));
 
       if (!res?.ok) {
-        if (res?.error === "not_authenticated") {
-  alert("ログインが必要です。ログイン画面へ移動します。");
-  router.push("/login?next=/mypage");
-   return;
- }
-        alert("保存に失敗しました");
-        return;
-      }
+  if (res?.error === "not_authenticated") {
+    alert("ログインが必要です。ログイン画面へ移動します。");
+    router.push("/login?next=/mypage");
+    return;
+  }
+  alert("保存に失敗しました");
+  return;
+}
+
       router.push("/mypage");
     } finally {
       setSaving(false);

@@ -1,3 +1,4 @@
+// app/welcome/page.tsx
 "use client";
 
 import { useEffect } from "react";
@@ -11,36 +12,24 @@ export default function WelcomePage() {
   useEffect(() => {
     let alive = true;
 
-    const run = async () => {
+    (async () => {
       try {
-        // 1) code / access_token がある場合はセッション交換
-        if (typeof window !== "undefined") {
-          const url = new URL(window.location.href);
-          if (url.searchParams.get("code") || url.hash.includes("access_token")) {
-            await supabase.auth.exchangeCodeForSession(window.location.href).catch(() => {});
-            // URLをクリーンに
-            window.history.replaceState({}, "", "/welcome");
-          }
+        // /auth/callback で Cookie は確定済みの想定。
+        // ここではセッションがあるかだけを確認する。
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!alive) return;
+
+        if (!session) {
+          // 未ログインなら login へ（ハッシュ/クエリの有無は見ない）
+          router.replace("/login?e=nologin");
         }
-
-        // 2) ユーザーセッション確認
-        const check = async () => {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!alive) return;
-          if (!user) {
-            await new Promise(r => setTimeout(r, 500));
-            const { data: { user: u2 } } = await supabase.auth.getUser();
-            if (!alive) return;
-            if (!u2) router.replace("/login");
-          }
-        };
-        await check();
+        // session があれば何もしない（画面表示を続行）
       } catch {
-        router.replace("/login");
+        if (alive) router.replace("/login?e=welcome_check_failed");
       }
-    };
+    })();
 
-    run();
     return () => { alive = false; };
   }, [router, supabase]);
 
@@ -48,12 +37,14 @@ export default function WelcomePage() {
     <main className="mx-auto max-w-lg px-6 py-12 text-white">
       <h1 className="text-2xl font-semibold mb-2">ようこそ！</h1>
       <p className="text-white/70 mb-6">登録が完了しました。</p>
+
       <div className="grid gap-3 sm:grid-cols-2">
-        {/* 🔽 プロフィール入力をルネア動画ページに変更 */}
-        <a href="/welcome/lunea" className="text-center rounded-md bg-white text-black py-2 font-medium">
+        <a
+          href="/welcome/lunea"
+          className="text-center rounded-md bg-white text-black py-2 font-medium"
+        >
           診断スタート
         </a>
-       
       </div>
     </main>
   );

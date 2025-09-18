@@ -1,75 +1,84 @@
 // app/api/structure/quick/diagnose/route.ts
-import { NextResponse, NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from "next/server";
 
-export const runtime = 'nodejs'
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-type Choice = 'A' | 'B' | 'C' | 'D'
-type QuickResultType = 'EVΛƎ型' | 'EΛVƎ型' | 'ΛƎEΛ型' | '中立'
+type EV = "E" | "V" | "Λ" | "Ǝ";
+type QuickTypeKey = "EVΛƎ" | "EΛVƎ"; // 未来志向 or 現実思考
 
-type Result = {
-  type: QuickResultType
-  weight: number
-  comment: string
-  advice: string
+// 表示ラベル
+const TYPE_LABEL: Record<QuickTypeKey, string> = {
+  EVΛƎ: "EVΛƎ型（未来志向型）",
+  EΛVƎ: "EΛVƎ型（現実思考型）",
+};
+
+// 公式カラー（確定値）
+const TYPE_COLOR_HEX: Record<QuickTypeKey, string> = {
+  EVΛƎ: "#FF4500", // 未来志向
+  EΛVƎ: "#B833F5", // 現実思考
+};
+
+// 各コードの基本カラー（参照用）
+const CODE_COLORS: Record<EV, string> = {
+  E: "#FF4500",
+  V: "#1E3A8A",
+  "Λ": "#84CC16",
+  "Ǝ": "#B833F5",
+};
+
+// ★ 公式判定ルール（最終版）
+// トップ2に E か V が1つでも入っていれば 未来志向（EVΛƎ）
+// どちらも入っていなければ 現実思考（EΛVƎ）
+function judgeType(order: EV[]): QuickTypeKey {
+  const top2 = new Set(order.slice(0, 2));
+  return (top2.has("E") || top2.has("V")) ? "EVΛƎ" : "EΛVƎ";
 }
 
-// A/B/C/D → タイプ・コメントなどを返す
-function mapChoice(choice: Choice): Result {
-  switch (choice) {
-    case 'A':
-      return {
-        type: 'EVΛƎ型',
-        weight: 0.8,
-        comment: '衝動と行動で流れを作る傾向。まず動いて学びを回収するタイプ。',
-        advice: '小さく始めて10分だけ着手。後で整える前提で前へ。'
-      }
-    case 'B':
-      return {
-        type: 'ΛƎEΛ型',
-        weight: 0.8,
-        comment: '制約と目的から最短を選ぶ傾向。判断の速さが強み。',
-        advice: '目的→制約→手順の3点をメモに落としてからGO。'
-      }
-    case 'C':
-      return {
-        type: 'EΛVƎ型',
-        weight: 0.8,
-        comment: '観測→小実験→選び直しの循環。状況把握が得意。',
-        advice: 'まず1回だけ試す。結果を観て次の一手を更新。'
-      }
-    case 'D':
-    default:
-      return {
-        type: '中立',
-        weight: 0.3,
-        comment: '状況適応型。どの構造にも寄り過ぎない柔軟さ。',
-        advice: '今は「やらない」も選択。時間を区切って再判断。'
-      }
-  }
-}
+const COMMENT: Record<QuickTypeKey, string> = {
+  EVΛƎ:
+    "衝動（E）や可能性（V）を起点に未来へ踏み出す型。まず小さく動き、学びを回収しながら視野を広げていく。",
+  EΛVƎ:
+    "選択（Λ）や観測（Ǝ）を上位に置く現実思考型。目的と制約を把握し、最短で前に進む判断が得意。",
+};
+
+const ADVICE: Record<QuickTypeKey, string> = {
+  EVΛƎ: "まず10分だけ着手→手応えを観測→次の一手を更新。動きながら整えよう。",
+  EΛVƎ: "目的→制約→手順の3点をメモ→最短の一手を実行→結果で微修正。",
+};
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as { choice?: Choice }
-    const choice = body?.choice
-    if (!choice || !['A', 'B', 'C', 'D'].includes(choice)) {
-      return NextResponse.json({ error: 'Invalid choice' }, { status: 400 })
+    const { order } = (await req.json()) as { order?: EV[]; theme?: "dev" | "prod" };
+
+    // 入力バリデーション（4つの並び、許容コードのみ）
+    const ALLOWED: EV[] = ["E", "V", "Λ", "Ǝ"];
+    if (!Array.isArray(order) || order.length !== 4 || !order.every((k) => ALLOWED.includes(k))) {
+      return NextResponse.json(
+        { ok: false, error: "invalid_order", hint: "order は 4件の並び（E,V,Λ,Ǝ）で送ってください。" },
+        { status: 400 }
+      );
     }
 
-    const mapped = mapChoice(choice as Choice)
+    // 1位=3, 2位=2, 3位=1, 4位=0
+    const points: Record<EV, number> = { E: 0, V: 0, "Λ": 0, "Ǝ": 0 };
+    order.forEach((k, i) => { points[k] = (3 - i) as 0 | 1 | 2 | 3 });
 
-    // 保存せず、診断結果だけ返す
-    return NextResponse.json(
-      {
-        type: mapped.type,
-        weight: mapped.weight,
-        comment: mapped.comment,
-        advice: mapped.advice,
-      },
-      { status: 200 }
-    )
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'unknown error'
-    return NextResponse.json({ error: `unexpected: ${msg}` }, { status: 500 })
+    const typeKey = judgeType(order);
+    const typeLabel = TYPE_LABEL[typeKey];
+
+    return NextResponse.json({
+      ok: true,
+      typeKey,                 // "EVΛƎ" | "EΛVƎ"
+      typeLabel,               // 表示用ラベル
+      colorHex: TYPE_COLOR_HEX[typeKey],
+      order,
+      points,
+      codeColors: CODE_COLORS, // 参考：各コード色
+      comment: COMMENT[typeKey],
+      advice: ADVICE[typeKey],
+    });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? "unknown_error" }, { status: 500 });
   }
 }

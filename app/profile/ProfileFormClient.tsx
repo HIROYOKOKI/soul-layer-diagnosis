@@ -64,7 +64,7 @@ export default function ProfileFormClient() {
               <input name="birthTime" type="time" className={inputCls} />
             </Field>
             <Field label="出生地（任意）" icon={<MapPin className="h-4 w-4" />}>
-              <input name="birthPlace" type="text" placeholder="日本、東京/Tokyo, JP  など" className={inputCls} />
+              <input name="birthPlace" type="text" placeholder="日本、東京都/Tokyo, JP  など" className={inputCls} />
             </Field>
           </div>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">

@@ -1,34 +1,25 @@
 // app/auth/callback/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+
+export const runtime = "nodejs"; // ← 重要：EdgeだとCookie確定が不安定
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") || "/mypage";
+  const next = url.searchParams.get("next") || "/welcome?intro=1";
 
-  const supabase = createRouteHandlerClient({ cookies });
-
-  if (code) {
-    // セッション確立
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) {
-      return NextResponse.redirect(
-        new URL(`/login?reason=${encodeURIComponent(error.message)}`, url),
-      );
-    }
-
-    // 👇 保険の upsert（id のみ）
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase
-        .from("profiles")
-        .insert({ id: user.id }) // ← email は渡さない
-        .onConflict("id")        // 既にある場合は無視
-        .ignore();
-    }
+  if (!code) {
+    return NextResponse.redirect(new URL("/login?e=no_code", url.origin));
   }
 
-  return NextResponse.redirect(new URL(next, url));
+  const supabase = createRouteHandlerClient({ cookies });
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    return NextResponse.redirect(new URL("/login?e=callback_failed", url.origin));
+  }
+
+  // 成功：/welcomeへ
+  return NextResponse.redirect(new URL(next, url.origin));
 }

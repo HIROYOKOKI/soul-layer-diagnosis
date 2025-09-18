@@ -1,13 +1,15 @@
 // app/welcome/page.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 export default function WelcomePage() {
   const router = useRouter();
   const supabase = createClientComponentClient();
+
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
@@ -16,22 +18,36 @@ export default function WelcomePage() {
       try {
         // /auth/callback で Cookie は確定済みの想定。
         // ここではセッションがあるかだけを確認する。
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
         if (!alive) return;
 
         if (!session) {
-          // 未ログインなら login へ（ハッシュ/クエリの有無は見ない）
+          // 未ログインなら login へ
           router.replace("/login?e=nologin");
+        } else {
+          setLoading(false);
         }
-        // session があれば何もしない（画面表示を続行）
       } catch {
         if (alive) router.replace("/login?e=welcome_check_failed");
       }
     })();
 
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [router, supabase]);
+
+  if (loading) {
+    // セッション確認中のローディング表示
+    return (
+      <main className="flex items-center justify-center min-h-dvh text-white">
+        <p className="animate-pulse">確認中...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-lg px-6 py-12 text-white">

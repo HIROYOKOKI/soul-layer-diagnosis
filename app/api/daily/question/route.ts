@@ -15,10 +15,8 @@ const FALLBACK: Choice[] = [
   { key: "Ǝ", label: "一拍置いて観測する" },
 ];
 
-// 日本時間スロット判定（朝/昼/夜）
 function getSlot(): "morning" | "noon" | "night" {
-  const now = new Date();
-  const jstHour = (now.getUTCHours() + 9) % 24;
+  const jstHour = (new Date().getUTCHours() + 9) % 24;
   if (jstHour < 11) return "morning";
   if (jstHour < 17) return "noon";
   return "night";
@@ -27,29 +25,31 @@ function needCount(slot: "morning" | "noon" | "night") {
   return slot === "morning" ? 4 : slot === "noon" ? 3 : 2;
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const slot = getSlot();
   const n = needCount(slot);
   const seed = Date.now();
+  const debug = req.nextUrl.searchParams.get("debug") === "1";
 
   let question = "今の流れを一歩進めるなら、どの感覚が近い？";
   let choices: Choice[] = [];
+  let source: "ai" | "fallback" = "fallback";
 
   try {
     const oa = getOpenAI();
     const sys = `あなたはE/V/Λ/Ǝの4軸から短い選択肢を作る生成器です。
 必ず JSON で返す: {"question":"...","choices":[{"key":"E","label":"..."},...]}
-key は "E","V","Λ","Ǝ"。label は12〜18文字程度の自然な日本語。重複禁止。`;
-    const usr = `時間帯: ${slot}（必要な選択肢の数: ${n}）
+keyは"E","V","Λ","Ǝ"。labelは12〜18文字の自然な日本語。重複禁止。`;
+    const usr = `時間帯:${slot}（必要な選択肢:${n}）
 テーマ: デイリー診断の設問を1問だけ。
 制約:
 - questionは1文・20文字前後
-- 選択肢はE/V/Λ/Ǝから${n}個だけ出す（不足分は除外して良い）
+- 選択肢はE/V/Λ/Ǝから${n}個だけ
 - トーンは落ち着いた短文
 seed:${seed}`;
 
     const res = await oa.responses.create({
-      model: "gpt-5-mini",
+      model: "gpt-4o-mini",            // ★ まずは通りやすいモデルで確認
       temperature: 0.6,
       max_output_tokens: 300,
       input: [
@@ -58,12 +58,10 @@ seed:${seed}`;
       ],
     });
 
-    // —— 応答のテキストを頑丈に取り出す
+    // --- 応答の取り出し ---
     let raw = "";
-    // SDKの output_text
     // @ts-ignore
     if (typeof (res as any)?.output_text === "string") raw = (res as any).output_text;
-    // content[].text 形式
     // @ts-ignore
     else if ((res as any)?.output?.[0]?.content?.[0]?.text) {
       // @ts-ignore
@@ -72,7 +70,6 @@ seed:${seed}`;
       raw = JSON.stringify(res);
     }
 
-    // 余分な前後文字を除いて JSON を抽出
     const m = raw.match(/\{[\s\S]*\}$/);
     const jsonText = m ? m[0] : raw;
     const parsed = JSON.parse(jsonText);
@@ -82,37 +79,39 @@ seed:${seed}`;
       choices = parsed.choices
         .filter((c: any) => c && typeof c.key === "string" && typeof c.label === "string")
         .map((c: any) => ({ key: c.key as EV, label: c.label as string }))
-        // n個に整形・重複除去
-        .filter(
-          (c, i, arr) =>
-            ["E", "V", "Λ", "Ǝ"].includes(c.key) &&
-            arr.findIndex((x) => x.key === c.key) === i
+        .filter((c, i, arr) =>
+          ["E", "V", "Λ", "Ǝ"].includes(c.key) &&
+          arr.findIndex((x) => x.key === c.key) === i
         )
         .slice(0, n);
+
+      if (choices.length) source = "ai";
     }
   } catch (e: any) {
-    // 生成失敗時は後段のフォールバックに任せる
-    // ここでログを仕込みたい場合は console.error(e) 程度でOK（VercelのFunctionsログに出ます）
+    console.error("[/api/daily/question] OpenAI error:", e?.message ?? e);
   }
 
-  // フォールバック（不足分はFALLBACKから補完）
   if (!choices.length) {
-    choices = FALLBACK.slice(0, n);
-  } else if (choices.length < n) {
-    const used = new Set(choices.map((c) => c.key));
+    const used = new Set<string>();
     for (const c of FALLBACK) {
       if (choices.length >= n) break;
-      if (!used.has(c.key)) choices.push(c);
+      if (!used.has(c.key)) {
+        used.add(c.key);
+        choices.push(c);
+      }
     }
+    source = "fallback";
   }
 
   return NextResponse.json({
     ok: true,
     question,
     choices,
-    subset: choices.map((c) => c.key), // その回で出したコード
+    subset: choices.map((c) => c.key),
     slot,
     seed,
+    source,                                // ★ 追加：UIで確認しやすく
     question_id: `daily-${new Date().toISOString().slice(0, 10)}-${slot}`,
+    ...(debug ? { debug: { envHasKey: !!process.env.OPENAI_API_KEY } } : {}),
   });
 }

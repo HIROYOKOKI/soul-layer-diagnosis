@@ -1,28 +1,37 @@
 // app/api/mypage/daily-latest/route.ts
-import { NextResponse } from "next/server"
-import { getSupabaseAdmin } from "@/lib/supabase-admin"
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-export async function GET(req: Request) {
-  const sb = getSupabaseAdmin()
-  if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 })
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-  const url = new URL(req.url)
-  const env = url.searchParams.get("env")
+type Env = "dev" | "prod";
 
-  let q = sb
-    .from("daily_results")
-    // ← ここに question_id, mode を追加
-    .select("question_id, mode, code, comment, advice, quote, created_at, env")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (env) {
-    // @ts-expect-error chain
-    q = q.eq("env", env)
+export async function GET(req: NextRequest) {
+  const sb = getSupabaseAdmin();
+  if (!sb) {
+    return NextResponse.json({ ok: false, error: "supabase_env_missing" }, { status: 500 });
   }
 
-  const { data, error } = await q
-  if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 })
-  return NextResponse.json({ ok:true, item: data ?? null })
+  try {
+    const envParam = req.nextUrl.searchParams.get("env");
+    const env = ((envParam ?? "dev").toLowerCase() as Env) || "dev";
+
+    const { data, error } = await sb
+      .from("daily_results")
+      // ★ scope と mode と env を含めて返す
+      .select("code, comment, advice, quote, scope, mode, env, created_at, question_id")
+      .eq("env", env)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, item: data ?? null });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? "internal_error" }, { status: 500 });
+  }
 }

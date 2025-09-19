@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Charts を使う前提（未導入なら下の <RadarChart> / <TimeSeriesChart> 部分をコメントアウト）
+// Charts を使う前提（未導入なら RadarChart / TimeSeriesChart 部分をコメントアウト）
 import {
   RadarChart,
   TimeSeriesChart,
@@ -18,6 +18,7 @@ import {
    Types
 ========================= */
 type EV = "E" | "V" | "Λ" | "Ǝ";
+type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 
 type ProfileLatest = {
   fortune?: string | null;
@@ -32,13 +33,14 @@ type DailyLatest = {
   code?: EV | null;
   comment?: string | null;
   quote?: string | null;
-  theme?: string | null;
+  theme?: string | null;               // 互換用（旧実装）
   env?: "dev" | "prod" | null;
   created_at?: string | null;
   updated_at?: string | null;
 } | null;
 
-type ThemeLatest = { theme: EV; env: "dev" | "prod"; created_at: string } | null;
+type ThemeLatest = { theme: EV; env: "dev" | "prod"; created_at: string } | null; // EVΛƎ テーマ（履歴の最新1件）
+type ThemeAPI = { ok: boolean; scope?: Scope; item?: ThemeLatest } | null;
 
 type EVAEVectorLocal = EVAEVector;
 type SeriesPointLocal = SeriesPoint;
@@ -50,7 +52,6 @@ type Me = {
   idNoStr: string | null; // "0001" 形式
 } | null;
 
-// ★ Quick 最新（/api/mypage/quick-latest の返却想定）
 type QuickLatest = {
   type_key?: "EVΛƎ" | "EΛVƎ" | null;
   type_label?: string | null;
@@ -126,7 +127,7 @@ const hexToRgba = (hex: string, alpha = 0.15) => {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!m) return `rgba(255,255,255,${alpha})`;
   const [r, g, b] = [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
-  return `rgba(${r}, ${b}, ${g}, ${alpha})`.replace(`${b}, ${g}`, `${g}, ${b}`); // 保険
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
 /* =========================
@@ -146,8 +147,9 @@ export default function MyPageClient() {
   const [me, setMe] = useState<Me>(null);                    // /api/me
   const [profile, setProfile] = useState<ProfileLatest>(null);
   const [daily, setDaily] = useState<DailyLatest>(null);
-  const [theme, setTheme] = useState<ThemeLatest>(null);
-  const [quick, setQuick] = useState<QuickLatest>(null);      // ★ Quick 最新
+  const [theme, setTheme] = useState<ThemeLatest>(null);      // EVΛƎ テーマ（履歴）
+  const [scope, setScope] = useState<Scope>("LIFE");          // ★ 追加：デイリーテーマ（WORK/LOVE/FUTURE/LIFE）
+  const [quick, setQuick] = useState<QuickLatest>(null);
 
   // charts
   const [range, setRange] = useState<7 | 30 | 90>(30);
@@ -188,9 +190,7 @@ export default function MyPageClient() {
         /* noop: FALLBACK を使う */
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, []);
 
   // 最新データ（テーマ / プロフィール / デイリー / Quick）
@@ -206,26 +206,23 @@ export default function MyPageClient() {
         const [pRes, dRes, tRes, qRes] = await Promise.all([
           fetch("/api/mypage/profile-latest", { cache: "no-store" }),
           fetch(`/api/mypage/daily-latest${qs}`, { cache: "no-store" }),
-          fetch(`/api/theme${qs}`, { cache: "no-store" }),
-          fetch("/api/mypage/quick-latest", { cache: "no-store" }), // ★ Quick
+          fetch(`/api/theme${qs}`, { cache: "no-store" }),        // ★ scope を含む
+          fetch("/api/mypage/quick-latest", { cache: "no-store" }),
         ]);
 
-        const [p, d, t, q] = await Promise.all([pRes.json(), dRes.json(), tRes.json(), qRes.json()]);
+        const [p, d, t, q]: [any, any, ThemeAPI, any] =
+          await Promise.all([pRes.json(), dRes.json(), tRes.json(), qRes.json()]);
 
         // daily は env 片方に無い場合フォールバック（dev⇄prod）
         let dailyJson = d;
         if (!dailyJson?.item) {
           const other = env === "prod" ? "dev" : "prod";
           try {
-            const dOther = await fetch(`/api/mypage/daily-latest?env=${other}`, { cache: "no-store" }).then((r) =>
-              r.json()
-            );
+            const dOther = await fetch(`/api/mypage/daily-latest?env=${other}`, { cache: "no-store" }).then((r) => r.json());
             if (dOther?.ok && dOther?.item) {
               dailyJson = dOther;
               setEnv(other);
-              try {
-                localStorage.setItem("ev-env", other);
-              } catch {}
+              try { localStorage.setItem("ev-env", other); } catch {}
             }
           } catch {}
         }
@@ -236,17 +233,23 @@ export default function MyPageClient() {
 
         setProfile(p.item ?? null);
         setDaily(dailyJson.item ?? null);
-        setTheme(t?.ok ? t.item ?? null : null);
-        setQuick(q?.ok ? (q.item ?? null) : null); // ★ Quick 最新
+
+        // ★ /api/theme の新仕様に対応
+        if (t?.ok) {
+          if (t.scope) setScope(t.scope);
+          setTheme(t.item ?? null); // EVΛƎ テーマ（ユーザーが選んだ履歴の最新1件）
+        } else {
+          setTheme(null);
+        }
+
+        setQuick(q?.ok ? (q.item ?? null) : null);
       } catch (e: any) {
         if (alive) setError(e?.message || "fetch_failed");
       } finally {
         if (alive) setLoading(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [env]);
 
   // チャート
@@ -272,9 +275,7 @@ export default function MyPageClient() {
         setChartsErr(e?.message ?? "charts fetch error");
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [range]);
 
   // 型推定：base_model → daily.code → base_order(top)
@@ -340,7 +341,7 @@ export default function MyPageClient() {
           </div>
         </section>
 
-        {/* 2) テーマカード */}
+        {/* 2) テーマカード（scope と EVΛƎ テーマの最新） */}
         <AnimatePresence>
           <motion.section
             key="theme"
@@ -351,17 +352,25 @@ export default function MyPageClient() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm text-white/70">
-                  選択中のテーマ（{theme?.env ?? daily?.env ?? env ?? "—"}）
+                  選択中のテーマ（{theme?.env ?? daily?.env ?? env}）
                 </div>
-                <div className="text-lg font-medium">{theme?.theme ?? (daily?.theme as string) ?? "—"}</div>
-                <div className="text-xs text-white/50">
-                  {(theme?.created_at && fmt(theme.created_at)) || "—"}
+                <div className="text-lg font-medium">
+                  {scope ?? "—"} {/* ★ WORK/LOVE/FUTURE/LIFE を表示 */}
                 </div>
+
+                {/* 参考: EVΛƎ テーマ（履歴の最新1件） */}
+                {theme?.theme ? (
+                  <div className="mt-1 text-xs text-white/60">
+                    EVΛƎテーマ: {theme.theme} / {fmt(theme.created_at)}
+                  </div>
+                ) : (
+                  <div className="text-xs text-white/50">EVΛƎテーマ: —</div>
+                )}
               </div>
+
               <button
                 onClick={goTheme}
-                className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-sm hover:bg白/15"
-                // ↑ tailwindの"白"タイポ防止 → もしエラーなら "hover:bg-white/15" に戻してください
+                className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15"
               >
                 変更する
               </button>
@@ -381,12 +390,11 @@ export default function MyPageClient() {
             {daily?.comment || daily?.quote || profile?.fortune || "まだメッセージはありません。"}
           </p>
           {daily?.quote ? (
-            <blockquote className="mt-3 italic text白/90">“{daily.quote}”</blockquote>
-            // ↑ 同様に "text白/90" が残っていたら "text-white/90" に戻してください
+            <blockquote className="mt-3 italic text-white/90">“{daily.quote}”</blockquote>
           ) : null}
         </section>
 
-        {/* 3.5) Quick 診断（最新） ★追加 */}
+        {/* 3.5) Quick 診断（最新） */}
         <section className="rounded-2xl border border-white/10 bg-white/[0.05] p-5">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-base font-semibold">Quick 診断（最新）</h3>
@@ -397,15 +405,11 @@ export default function MyPageClient() {
             <div
               className="rounded-xl p-4 ring-1 border border-white/10 bg-white/[0.04]"
               style={{
-                // 型カラーに合わせて枠と淡いグロー
                 borderColor: hexToRgba(quickColor, 0.35),
                 boxShadow: `0 0 14px ${hexToRgba(quickColor, 0.28)}`,
               }}
             >
-              <div
-                className="text-sm font-bold"
-                style={{ color: quickColor }}
-              >
+              <div className="text-sm font-bold" style={{ color: quickColor }}>
                 {quick.type_label}
               </div>
               {quick.comment && <p className="mt-2 text-white/80">{quick.comment}</p>}
@@ -433,7 +437,7 @@ export default function MyPageClient() {
                 {today ? (
                   <RadarChart values={today} size={260} />
                 ) : (
-                  <div className="text-xs text白/50">No Data</div>
+                  <div className="text-xs text-white/50">No Data</div>
                 )}
               </div>
             </div>
@@ -470,7 +474,7 @@ export default function MyPageClient() {
           <div className="text-base font-semibold">次の一歩を選んでください</div>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
-              onClick={() => router.push("/daily/question")}
+              onClick={goDaily}
               className="rounded-xl bg-white px-4 py-3 text-black font-medium hover:opacity-90"
             >
               デイリー診断

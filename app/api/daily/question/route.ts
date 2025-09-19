@@ -1,6 +1,6 @@
 // app/api/daily/question/route.ts
 import { NextResponse, type NextRequest } from "next/server";
-import { cookies } from "next/headers";  
+import { cookies } from "next/headers";
 import { getOpenAI } from "@/lib/openai";
 
 export const runtime = "nodejs";
@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 type EV = "E" | "V" | "Λ" | "Ǝ";
 type Choice = { key: EV; label: string };
 type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
+
+const SCOPE_COOKIE = "sl_scope"; // ★ 追加
 
 const SCOPE_HINT: Record<Scope, string> = {
   WORK:   "仕事・学び・成果・チーム連携・自己効率",
@@ -34,6 +36,12 @@ function needCount(slot: "morning" | "noon" | "night") {
   return slot === "morning" ? 4 : slot === "noon" ? 3 : 2;
 }
 
+const VALID_SCOPES: Scope[] = ["WORK", "LOVE", "FUTURE", "LIFE"];
+function normalizeScope(v?: string | null): Scope | null {
+  const s = (v || "").toUpperCase();
+  return (VALID_SCOPES as string[]).includes(s) ? (s as Scope) : null;
+}
+
 export async function GET(req: NextRequest) {
   const url = req.nextUrl;
   const slot = getSlot();
@@ -41,15 +49,12 @@ export async function GET(req: NextRequest) {
   const seed = Date.now();
   const debug = url.searchParams.get("debug") === "1";
 
-  // ★ 新: scope（テーマ）を受け取る。未指定は LIFE
-  const qScope = url.searchParams.get("scope")?.toUpperCase();
-  const cScope = cookies().get(SCOPE_COOKIE)?.value?.toUpperCase();
-  const scope = (["WORK","LOVE","FUTURE","LIFE"] as const).includes(qScope as Scope)
-    ? (qScope as Scope)
-    : (["WORK","LOVE","FUTURE","LIFE"] as const).includes(cScope as Scope)
-      ? (cScope as Scope)
-      : "LIFE";
-  const scopeHint = SCOPE_HINT[scope] ?? SCOPE_HINT.LIFE;
+  // ★ ?scope → cookie → LIFE の順で決定
+  const scope =
+    normalizeScope(url.searchParams.get("scope")) ??
+    normalizeScope(cookies().get(SCOPE_COOKIE)?.value) ??
+    "LIFE";
+  const scopeHint = SCOPE_HINT[scope];
 
   let question = "今の流れを一歩進めるなら、どの感覚が近い？";
   let choices: Choice[] = [];
@@ -122,6 +127,7 @@ seed:${seed}`;
     console.error("[/api/daily/question] OpenAI error:", e?.message ?? e);
   }
 
+  // フォールバック
   if (!choices.length) {
     const used = new Set<string>();
     for (const c of FALLBACK) {
@@ -140,7 +146,7 @@ seed:${seed}`;
     choices,
     subset: choices.map((c) => c.key),
     slot,
-    scope,                 // ★ 追加
+    scope, // ★ 返却
     seed,
     source,
     question_id: `daily-${new Date().toISOString().slice(0, 10)}-${slot}-${scope}`,

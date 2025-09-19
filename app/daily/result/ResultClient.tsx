@@ -1,32 +1,41 @@
 // app/daily/result/ResultClient.tsx
 "use client";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import LuneaBubble from "@/components/LuneaBubble";
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
+type Slot = "morning" | "noon" | "night";
+type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
+
 type Item = {
-  question_id?: string;               // 追加
-  mode?: "morning" | "noon" | "night";// 追加（= slot）
+  question_id?: string;
+  mode?: Slot;                          // = slot
+  scope?: Scope;                        // ★ 追加
   code: EV;
   comment: string;
-  advice?: string;
-  quote?: string;
+  advice?: string | null;
+  quote?: string | null;
   created_at?: string;
   env?: "dev" | "prod";
 };
 
 export default function ResultClient() {
   const [item, setItem] = useState<Item | null>(null);
-  const [step, setStep] = useState<0|1|2|3>(0);
+  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
+  // 最新のデイリー結果を取得
   useEffect(() => {
     (async () => {
       const r = await fetch("/api/mypage/daily-latest?env=dev", { cache: "no-store" });
       const j = await r.json();
-      if (j?.ok && j.item) { setItem(j.item); setStep(1); }
+      if (j?.ok && j.item) {
+        setItem(j.item as Item);
+        setStep(1);
+      }
     })();
   }, []);
 
@@ -56,21 +65,25 @@ export default function ResultClient() {
     setSaving(true);
     setSaveMsg(null);
     try {
-      // question_id が無い場合のフォールバック
+      const slot: Slot = item.mode || "night";
+      const scope: Scope = (item.scope as Scope) || "LIFE";
+
+      // question_id が無い場合のフォールバック（scope まで含めて生成）
       const fallbackId =
-        "daily-" + new Date().toISOString().slice(0, 10) + "-" + (item.mode || "night");
+        `daily-${new Date().toISOString().slice(0, 10)}-${slot}-${scope}`;
 
       const payload = {
         id: item.question_id || fallbackId,
-        slot: item.mode || "night",
+        slot,
+        scope,                                  // ★ 保存に含める
         env: item.env || "dev",
         theme: "dev",
         choice: item.code,
         result: {
           code: item.code,
           comment: item.comment,
-          advice: item.advice,
-          quote: item.quote,
+          advice: item.advice ?? undefined,
+          quote: item.quote ?? undefined,
         },
       };
 
@@ -81,6 +94,7 @@ export default function ResultClient() {
       });
       const j = await r.json();
       if (!j?.ok) throw new Error(j?.error || "save_failed");
+
       setSaved(true);
       setSaveMsg("保存しました。");
     } catch (e: any) {
@@ -91,14 +105,25 @@ export default function ResultClient() {
   }
 
   if (!item) {
-    return <div className="min-h-[60vh] grid place-items-center bg-black text-white">Loading…</div>;
+    return (
+      <div className="min-h-[60vh] grid place-items-center bg-black text-white">
+        Loading…
+      </div>
+    );
   }
 
   return (
     <div className="min-h-[70vh] bg-black text-white px-5 sm:px-6 py-10 grid place-items-center">
       <div className="w-full max-w-2xl space-y-6">
-        <div className="text-xs opacity-60">
-          {item.created_at && new Date(item.created_at).toLocaleString("ja-JP")}
+        {/* 日付＆テーマ表示 */}
+        <div className="flex items-center justify-between text-xs opacity-70">
+          <span>
+            {item.created_at &&
+              new Date(item.created_at).toLocaleString("ja-JP")}
+          </span>
+          <span>
+            テーマ: {item.scope ?? "—"} / スロット: {item.mode ?? "—"}
+          </span>
         </div>
 
         {/* コメント（ゆっくり表示） */}
@@ -114,7 +139,11 @@ export default function ResultClient() {
         {/* アドバイス（ゆっくり表示） */}
         {step >= 2 && hasAdvice && (
           <div className="translate-y-1 opacity-95">
-            <LuneaBubble text={`《アドバイス》\n${item.advice}`} onDone={handleAdviceDone} speed={110} />
+            <LuneaBubble
+              text={`《アドバイス》\n${item.advice}`}
+              onDone={handleAdviceDone}
+              speed={110}
+            />
           </div>
         )}
 

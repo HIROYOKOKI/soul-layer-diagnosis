@@ -285,7 +285,7 @@ export default function MyPageClient() {
     decideModelFromOrder(profile?.base_order ?? null);
   const meta = modelMeta(normalizedModel);
 
-  const goDaily = () => router.push("/daily/question");
+  const goDaily = () => router.push(`/daily/question?scope=${encodeURIComponent(scope)}`);
   const goTheme = () => router.push("/theme");
   const goSettings = () => router.push("/settings");
 

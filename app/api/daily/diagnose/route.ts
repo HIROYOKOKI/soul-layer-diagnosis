@@ -116,7 +116,7 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
 - テーマの状況に寄り添い、日常で使える実践的な言葉にすること`
 
   const res = await oa.responses.create({
-    model: "gpt-4.1-mini",
+    model: "gpt-5-mini",
     temperature: 0.7,
     max_output_tokens: 400,
     input: [

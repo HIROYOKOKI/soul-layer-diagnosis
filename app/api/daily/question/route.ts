@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
 seed:${seed}`;
 
     const res = await oa.responses.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini",
       temperature: 0.6,
       max_output_tokens: 300,
       input: [{ role: "system", content: sys }, { role: "user", content: usr }],

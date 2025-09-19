@@ -7,6 +7,14 @@ export const dynamic = "force-dynamic";
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
 type Choice = { key: EV; label: string };
+type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
+
+const SCOPE_HINT: Record<Scope, string> = {
+  WORK:   "仕事・学び・成果・チーム連携・自己効率",
+  LOVE:   "恋愛・対人関係・信頼・距離感・感情のやり取り",
+  FUTURE: "将来・目標・計画・成長・可能性の可視化",
+  LIFE:   "生活全般・習慣・健康・心身の整え・日々の選択",
+};
 
 const FALLBACK: Choice[] = [
   { key: "E", label: "勢いで踏み出す" },
@@ -25,23 +33,16 @@ function needCount(slot: "morning" | "noon" | "night") {
   return slot === "morning" ? 4 : slot === "noon" ? 3 : 2;
 }
 
-/** keyごとの意味に沿っているかをざっくり検査（最低限の保険） */
-const MEANING_PATTERNS: Record<EV, RegExp[]> = {
-  E: [/(衝動|勢い|行動|一歩|踏み出|動き|エネルギー)/],
-  V: [/(可能性|理想|夢|未来|ビジョン|想像|描い)/],
-  "Λ": [/(選択|決断|迷い|条件|取捨|葛藤|絞り)/],
-  "Ǝ": [/(観測|静寂|落ち着|観察|見つめ|一拍|整える|受容)/],
-};
-function matchesMeaning(key: EV, label: string) {
-  const pats = MEANING_PATTERNS[key];
-  return pats.some((re) => re.test(label));
-}
-
 export async function GET(req: NextRequest) {
+  const url = req.nextUrl;
   const slot = getSlot();
   const n = needCount(slot);
   const seed = Date.now();
-  const debug = req.nextUrl.searchParams.get("debug") === "1";
+  const debug = url.searchParams.get("debug") === "1";
+
+  // ★ 新: scope（テーマ）を受け取る。未指定は LIFE
+  const scope = (url.searchParams.get("scope")?.toUpperCase() as Scope) || "LIFE";
+  const scopeHint = SCOPE_HINT[scope] ?? SCOPE_HINT.LIFE;
 
   let question = "今の流れを一歩進めるなら、どの感覚が近い？";
   let choices: Choice[] = [];
@@ -50,30 +51,29 @@ export async function GET(req: NextRequest) {
   try {
     const oa = getOpenAI();
 
-    // ★★★ 強化した system prompt（意味付けを厳密化） ★★★
     const sys = `あなたはE/V/Λ/Ǝの4軸に対応する短い選択肢を生成する役割です。
 必ず 次のJSONだけ を返す: {"question":"...","choices":[{"key":"E","label":"..."}, ...]}
 厳守事項:
 - key は "E","V","Λ","Ǝ" のいずれか
-- label は12〜18文字の自然な日本語。体言止めや短文OK。重複禁止
-- 各keyのlabelは必ず次の意味領域に一致させる:
-  - E = 衝動・情熱・行動（例: 勢い/一歩/踏み出す/動き出す）
-  - V = 可能性・夢・理想（例: 未来/ビジョン/想像/描く）
-  - Λ = 選択・葛藤・決断（例: 迷い/取捨/条件/絞る/決める）
-  - Ǝ = 観測・静寂・受容（例: 落ち着く/観察/一拍/見つめる）
-- keyとlabelの意味が一致しない出力をしないこと
-- 日本語のみで出力。JSON以外の文字を前後に付けない`;
+- label は12〜18文字の自然な日本語。重複禁止
+- 各keyのlabelは必ず次の意味領域に一致:
+  - E = 衝動・情熱・行動
+  - V = 可能性・夢・理想
+  - Λ = 選択・葛藤・決断
+  - Ǝ = 観測・静寂・受容
+- 日本語のみ。JSON以外の文字は出さない`;
 
-    const usr = `時間帯:${slot}（必要な選択肢:${n}）
-テーマ: ソウルレイヤー診断のデイリー設問を1問だけ作る。
+    const usr = `デイリー診断の設問を1問だけ生成する。
+前提テーマ(scope): ${scope}（文脈: ${scopeHint}）
+時間帯: ${slot}（必要な選択肢:${n}）
 制約:
 - questionは1文・20文字前後・落ち着いた短文
-- 選択肢はE/V/Λ/Ǝから${n}個だけ採用（不足分は除外して良い）
-- ユーザーの気分や行動方針を軽く自己観測できる内容にする
+- 選択肢はE/V/Λ/Ǝから${n}個だけ（テーマの文脈に寄せた表現にする）
+- keyとlabelの意味は一致させる
 seed:${seed}`;
 
     const res = await oa.responses.create({
-      model: "gpt-4o-mini", // まずは通りやすいモデルで確認。OKになったら必要に応じて変更
+      model: "gpt-4o-mini",
       temperature: 0.6,
       max_output_tokens: 300,
       input: [
@@ -82,7 +82,6 @@ seed:${seed}`;
       ],
     });
 
-    // --- 応答の取り出し ---
     let raw = "";
     // @ts-ignore
     if (typeof (res as any)?.output_text === "string") raw = (res as any).output_text;
@@ -94,43 +93,36 @@ seed:${seed}`;
       raw = JSON.stringify(res);
     }
 
-    // JSON抽出
     const m = raw.match(/\{[\s\S]*\}$/);
     const jsonText = m ? m[0] : raw;
     const parsed = JSON.parse(jsonText);
 
     if (parsed?.question && Array.isArray(parsed?.choices)) {
       question = String(parsed.question);
-      // 整形 + 重複除去
-      const picked: Choice[] = [];
-      const seen = new Set<EV>();
-      for (const c of parsed.choices as any[]) {
-        if (!c || typeof c.key !== "string" || typeof c.label !== "string") continue;
-        const key = c.key as EV;
-        const label = c.label.trim();
-        if (!["E", "V", "Λ", "Ǝ"].includes(key)) continue;
-        if (seen.has(key)) continue;
-        // ★ 最低限の意味一致チェック
-        if (!matchesMeaning(key, label)) continue;
-        // 長さをざっくり調整
-        const norm = label.length > 20 ? label.slice(0, 18) + "…" : label;
-        picked.push({ key, label: norm });
-        seen.add(key);
-        if (picked.length >= n) break;
-      }
-      choices = picked;
+      choices = parsed.choices
+        .filter((c: any) => c && typeof c.key === "string" && typeof c.label === "string")
+        .map((c: any) => ({ key: c.key as EV, label: (c.label as string).trim() }))
+        .filter(
+          (c, i, arr) =>
+            ["E", "V", "Λ", "Ǝ"].includes(c.key) &&
+            arr.findIndex((x) => x.key === c.key) === i
+        )
+        .slice(0, n);
+
       if (choices.length) source = "ai";
     }
   } catch (e: any) {
     console.error("[/api/daily/question] OpenAI error:", e?.message ?? e);
   }
 
-  // フォールバック（不足分を補完）
   if (!choices.length) {
-    const used = new Set(choices.map((c) => c.key));
+    const used = new Set<string>();
     for (const c of FALLBACK) {
       if (choices.length >= n) break;
-      if (!used.has(c.key)) choices.push(c);
+      if (!used.has(c.key)) {
+        used.add(c.key);
+        choices.push(c);
+      }
     }
     source = "fallback";
   }
@@ -141,9 +133,10 @@ seed:${seed}`;
     choices,
     subset: choices.map((c) => c.key),
     slot,
+    scope,                 // ★ 追加
     seed,
     source,
-    question_id: `daily-${new Date().toISOString().slice(0, 10)}-${slot}`,
+    question_id: `daily-${new Date().toISOString().slice(0, 10)}-${slot}-${scope}`,
     ...(debug ? { debug: { envHasKey: !!process.env.OPENAI_API_KEY } } : {}),
   });
 }

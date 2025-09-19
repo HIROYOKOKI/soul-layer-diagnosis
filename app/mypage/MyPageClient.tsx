@@ -354,9 +354,10 @@ export default function MyPageClient() {
                 <div className="text-sm text-white/70">
                   選択中のテーマ（{theme?.env ?? daily?.env ?? env}）
                 </div>
-                <div className="text-lg font-medium">
-                  {scope ?? "—"} {/* ★ WORK/LOVE/FUTURE/LIFE を表示 */}
-                </div>
+            <div className="text-lg font-medium">
+  現在のテーマ: {scope}
+</div>
+
 
                 {/* 参考: EVΛƎ テーマ（履歴の最新1件） */}
                 {theme?.theme ? (

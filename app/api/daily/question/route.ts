@@ -12,10 +12,10 @@ type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 
 const SCOPE_COOKIE = "sl_scope";
 const SCOPE_HINT: Record<Scope, string> = {
-  WORK:   "仕事・学び・成果・チーム連携・自己効率",
-  LOVE:   "恋愛・対人関係・信頼・距離感・感情のやり取り",
-  FUTURE: "将来・目標・計画・成長・可能性の可視化",
-  LIFE:   "生活全般・習慣・健康・心身の整え・日々の選択",
+  WORK:   "仕事・学び・成果・チーム連携・自己効率に関する文脈で書く",
+  LOVE:   "恋愛・信頼・距離感・関係性の深め方に関する文脈で書く",
+  FUTURE: "将来・目標・計画・進路の意思決定に関する文脈で書く",
+  LIFE:   "生活リズム・習慣・心身の整え・日々の選択に関する文脈で書く",
 };
 
 const FALLBACK: Choice[] = [
@@ -42,12 +42,12 @@ export async function GET(req: NextRequest) {
   const seed = Date.now();
   const debug = url.searchParams.get("debug") === "1";
 
-  // ★ クエリ > cookie > LIFE の優先順で scope を決定
+  // 1) scopeの決定: クエリ > Cookie > LIFE
   const qScope = url.searchParams.get("scope")?.toUpperCase();
   const cScope = cookies().get(SCOPE_COOKIE)?.value?.toUpperCase();
-  const scope = (["WORK","LOVE","FUTURE","LIFE"] as const).includes(qScope as Scope)
+  const scope = (["WORK","LOVE","FUTURE","LIFE"] as const).includes(qScope as any)
     ? (qScope as Scope)
-    : (["WORK","LOVE","FUTURE","LIFE"] as const).includes(cScope as Scope)
+    : (["WORK","LOVE","FUTURE","LIFE"] as const).includes(cScope as any)
       ? (cScope as Scope)
       : "LIFE";
 
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
   try {
     const oa = getOpenAI();
     const sys = `あなたはE/V/Λ/Ǝの4軸に対応する短い選択肢を生成する役割です。
-必ず次のJSONだけを返す: {"question":"...","choices":[{"key":"E","label":"..."}, ...]}
+必ず 次のJSONだけ を返す: {"question":"...","choices":[{"key":"E","label":"..."}, ...]}
 厳守:
 - key は "E","V","Λ","Ǝ"
 - label は12〜18文字の自然な日本語、重複禁止
@@ -67,25 +67,25 @@ export async function GET(req: NextRequest) {
   - V=可能性・夢・理想
   - Λ=選択・葛藤・決断
   - Ǝ=観測・静寂・受容
-- JSON以外の文字を出さない`;
+- JSON以外の文字は出さない`;
 
     const usr = `デイリー診断の設問を1問だけ生成する。
-テーマ(scope): ${scope}（文脈: ${SCOPE_HINT[scope]})
+前提テーマ(scope): ${scope}
+テーマ文脈: ${SCOPE_HINT[scope]}
 時間帯: ${slot}（必要な選択肢:${n}）
 制約:
 - questionは1文・20文字前後・落ち着いた短文
-- 選択肢はE/V/Λ/Ǝから${n}個だけ（テーマ文脈に寄せる）
+- 選択肢はE/V/Λ/Ǝから${n}個だけ（テーマ文脈に寄せた表現にする）
 seed:${seed}`;
 
     const res = await oa.responses.create({
-      model: "gpt-5-mini",
+      model: "gpt-4o-mini",
       temperature: 0.6,
       max_output_tokens: 300,
       input: [{ role: "system", content: sys }, { role: "user", content: usr }],
     });
 
     let raw = (res as any).output_text || "";
-    // 予備ルート
     if (!raw && (res as any)?.output?.[0]?.content?.[0]?.text) {
       raw = (res as any).output[0].content[0].text;
     }
@@ -118,10 +118,14 @@ seed:${seed}`;
 
   return NextResponse.json({
     ok: true,
-    question, choices,
+    question,
+    choices,
     subset: choices.map(c => c.key),
-    slot, scope, seed, source,
-    question_id: `daily-${new Date().toISOString().slice(0,10)}-${slot}-${scope}`,
+    slot,
+    scope,                                            // ← 明示的に返す
+    seed,
+    source,
+    question_id: `daily-${new Date().toISOString().slice(0,10)}-${slot}-${scope}`, // ← idにもscope
     ...(debug ? { debug: { envHasKey: !!process.env.OPENAI_API_KEY } } : {}),
   });
 }

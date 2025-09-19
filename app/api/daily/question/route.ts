@@ -25,6 +25,18 @@ function needCount(slot: "morning" | "noon" | "night") {
   return slot === "morning" ? 4 : slot === "noon" ? 3 : 2;
 }
 
+/** keyごとの意味に沿っているかをざっくり検査（最低限の保険） */
+const MEANING_PATTERNS: Record<EV, RegExp[]> = {
+  E: [/(衝動|勢い|行動|一歩|踏み出|動き|エネルギー)/],
+  V: [/(可能性|理想|夢|未来|ビジョン|想像|描い)/],
+  "Λ": [/(選択|決断|迷い|条件|取捨|葛藤|絞り)/],
+  "Ǝ": [/(観測|静寂|落ち着|観察|見つめ|一拍|整える|受容)/],
+};
+function matchesMeaning(key: EV, label: string) {
+  const pats = MEANING_PATTERNS[key];
+  return pats.some((re) => re.test(label));
+}
+
 export async function GET(req: NextRequest) {
   const slot = getSlot();
   const n = needCount(slot);
@@ -37,19 +49,31 @@ export async function GET(req: NextRequest) {
 
   try {
     const oa = getOpenAI();
-    const sys = `あなたはE/V/Λ/Ǝの4軸から短い選択肢を作る生成器です。
-必ず JSON で返す: {"question":"...","choices":[{"key":"E","label":"..."},...]}
-keyは"E","V","Λ","Ǝ"。labelは12〜18文字の自然な日本語。重複禁止。`;
+
+    // ★★★ 強化した system prompt（意味付けを厳密化） ★★★
+    const sys = `あなたはE/V/Λ/Ǝの4軸に対応する短い選択肢を生成する役割です。
+必ず 次のJSONだけ を返す: {"question":"...","choices":[{"key":"E","label":"..."}, ...]}
+厳守事項:
+- key は "E","V","Λ","Ǝ" のいずれか
+- label は12〜18文字の自然な日本語。体言止めや短文OK。重複禁止
+- 各keyのlabelは必ず次の意味領域に一致させる:
+  - E = 衝動・情熱・行動（例: 勢い/一歩/踏み出す/動き出す）
+  - V = 可能性・夢・理想（例: 未来/ビジョン/想像/描く）
+  - Λ = 選択・葛藤・決断（例: 迷い/取捨/条件/絞る/決める）
+  - Ǝ = 観測・静寂・受容（例: 落ち着く/観察/一拍/見つめる）
+- keyとlabelの意味が一致しない出力をしないこと
+- 日本語のみで出力。JSON以外の文字を前後に付けない`;
+
     const usr = `時間帯:${slot}（必要な選択肢:${n}）
-テーマ: デイリー診断の設問を1問だけ。
+テーマ: ソウルレイヤー診断のデイリー設問を1問だけ作る。
 制約:
-- questionは1文・20文字前後
-- 選択肢はE/V/Λ/Ǝから${n}個だけ
-- トーンは落ち着いた短文
+- questionは1文・20文字前後・落ち着いた短文
+- 選択肢はE/V/Λ/Ǝから${n}個だけ採用（不足分は除外して良い）
+- ユーザーの気分や行動方針を軽く自己観測できる内容にする
 seed:${seed}`;
 
     const res = await oa.responses.create({
-      model: "gpt-4o-mini",            // ★ まずは通りやすいモデルで確認
+      model: "gpt-4o-mini", // まずは通りやすいモデルで確認。OKになったら必要に応じて変更
       temperature: 0.6,
       max_output_tokens: 300,
       input: [
@@ -70,35 +94,43 @@ seed:${seed}`;
       raw = JSON.stringify(res);
     }
 
+    // JSON抽出
     const m = raw.match(/\{[\s\S]*\}$/);
     const jsonText = m ? m[0] : raw;
     const parsed = JSON.parse(jsonText);
 
     if (parsed?.question && Array.isArray(parsed?.choices)) {
       question = String(parsed.question);
-      choices = parsed.choices
-        .filter((c: any) => c && typeof c.key === "string" && typeof c.label === "string")
-        .map((c: any) => ({ key: c.key as EV, label: c.label as string }))
-        .filter((c, i, arr) =>
-          ["E", "V", "Λ", "Ǝ"].includes(c.key) &&
-          arr.findIndex((x) => x.key === c.key) === i
-        )
-        .slice(0, n);
-
+      // 整形 + 重複除去
+      const picked: Choice[] = [];
+      const seen = new Set<EV>();
+      for (const c of parsed.choices as any[]) {
+        if (!c || typeof c.key !== "string" || typeof c.label !== "string") continue;
+        const key = c.key as EV;
+        const label = c.label.trim();
+        if (!["E", "V", "Λ", "Ǝ"].includes(key)) continue;
+        if (seen.has(key)) continue;
+        // ★ 最低限の意味一致チェック
+        if (!matchesMeaning(key, label)) continue;
+        // 長さをざっくり調整
+        const norm = label.length > 20 ? label.slice(0, 18) + "…" : label;
+        picked.push({ key, label: norm });
+        seen.add(key);
+        if (picked.length >= n) break;
+      }
+      choices = picked;
       if (choices.length) source = "ai";
     }
   } catch (e: any) {
     console.error("[/api/daily/question] OpenAI error:", e?.message ?? e);
   }
 
+  // フォールバック（不足分を補完）
   if (!choices.length) {
-    const used = new Set<string>();
+    const used = new Set(choices.map((c) => c.key));
     for (const c of FALLBACK) {
       if (choices.length >= n) break;
-      if (!used.has(c.key)) {
-        used.add(c.key);
-        choices.push(c);
-      }
+      if (!used.has(c.key)) choices.push(c);
     }
     source = "fallback";
   }
@@ -110,7 +142,7 @@ seed:${seed}`;
     subset: choices.map((c) => c.key),
     slot,
     seed,
-    source,                                // ★ 追加：UIで確認しやすく
+    source,
     question_id: `daily-${new Date().toISOString().slice(0, 10)}-${slot}`,
     ...(debug ? { debug: { envHasKey: !!process.env.OPENAI_API_KEY } } : {}),
   });

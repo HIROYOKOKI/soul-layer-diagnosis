@@ -1,75 +1,206 @@
+// app/theme/ThemeClient.tsx
 "use client";
-import { useState } from "react";
 
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+type EV = "E" | "V" | "Λ" | "Ǝ";
+type ThemeKey = "work" | "love" | "future" | "self";
 type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
-const SCOPES: Scope[] = ["WORK", "LOVE", "FUTURE", "LIFE"];
+
+const THEMES: ThemeKey[] = ["work", "love", "future", "self"];
+
+const LABEL: Record<ThemeKey, string> = {
+  work: "仕事",
+  love: "恋愛・結婚",
+  future: "未来・進路",
+  self: "自己理解・性格",
+};
+
+const DESC: Record<ThemeKey, string> = {
+  work: "今の役割やキャリアの選び方を見直したい人へ",
+  love: "価値観の相性や関係の深め方を知りたい人へ",
+  future: "これからの進み方・分岐の判断材料が欲しい人へ",
+  self: "自分の傾向を言語化し、日常の選択に活かしたい人へ",
+};
+
+// 表示テーマ → EV（参考：UIのバッジ用など）
+const THEME_TO_EV: Record<ThemeKey, EV> = {
+  work: "Λ",
+  love: "V",
+  future: "E",
+  self: "Ǝ",
+};
+
+// 表示テーマ → APIに送るscope
+const THEME_TO_SCOPE: Record<ThemeKey, Scope> = {
+  work: "WORK",
+  love: "LOVE",
+  future: "FUTURE",
+  self: "LIFE",
+};
+
+// env 分離（デフォルト dev）※ scope保存には不要だが将来の拡張用に残す
+const ENV: "dev" | "prod" =
+  (process.env.NEXT_PUBLIC_APP_ENV as "dev" | "prod") || "dev";
 
 export default function ThemeClient() {
-  const [selected, setSelected] = useState<Scope>("LIFE");
+  const router = useRouter();
+  const [selected, setSelected] = useState<ThemeKey | null>(null);
   const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  async function onSave() {
+  // 直前の選択を復元（任意）＋現在のscopeを初期表示に反映
+  useEffect(() => {
+    (async () => {
+      try {
+        const prev = typeof window !== "undefined"
+          ? sessionStorage.getItem("evae_theme_selected")
+          : null;
+        const r = await fetch("/api/theme", { cache: "no-store" }).catch(() => null);
+        const j = r ? await r.json() : null;
+        const scope: Scope | null = j?.ok ? (j.scope as Scope) : null;
+
+        // scope優先でselectedを決定
+        const init =
+          scope === "WORK" ? "work" :
+          scope === "LOVE" ? "love" :
+          scope === "FUTURE" ? "future" :
+          scope === "LIFE" ? "self" :
+          (prev && THEMES.includes(prev as ThemeKey) ? (prev as ThemeKey) : "self");
+
+        setSelected(init);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const handleSelect = (k: ThemeKey) => {
+    setSelected(k);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("evae_theme_selected", k);
+    }
+    // 触感フィードバック（対応端末のみ）
+    const nav = (typeof navigator !== "undefined" ? navigator : undefined) as
+      | (Navigator & { vibrate?: (p: number | number[]) => boolean })
+      | undefined;
+    nav?.vibrate?.(10);
+  };
+
+  // ✅ 保存：/api/theme に scope をPOST（確認アラート付き）
+  async function onSaveTheme() {
+    if (!selected || saving) return;
+
+    // 変更による初期化の確認
+    const ok = window.confirm(
+      "テーマを変更すると、本日のデイリー未保存データが初期化されます。続行しますか？"
+    );
+    if (!ok) return;
+
     setSaving(true);
-    setErr(null);
-    setOk(false);
     try {
-      // 念のため大文字・バリデーション
-      const scope = (selected || "LIFE").toUpperCase() as Scope;
-      if (!SCOPES.includes(scope)) throw new Error("invalid_scope_client");
-
-      const r = await fetch("/api/theme", {
+      const scope = THEME_TO_SCOPE[selected]; // ← ここが肝：scopeを送る
+      const res = await fetch("/api/theme", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope, reset: true }), // ★ 重要: scope を送る
+        body: JSON.stringify({ scope, reset: true, env: ENV }),
       });
 
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j?.ok) {
-        throw new Error(j?.error || `save_failed_${r.status}`);
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) {
+        if (j?.error === "not_authenticated") {
+          alert("ログインが必要です。ログイン画面へ移動します。");
+          router.push("/login?next=/mypage");
+          return;
+        }
+        alert("保存に失敗しました");
+        return;
       }
 
-      setOk(true);
-      // 反映確認のため即 /mypage へ戻すなら↓
-      // location.href = "/mypage";
-    } catch (e: any) {
-      setErr(e?.message || "save_failed");
-      alert("保存に失敗しました"); // 既存のアラートに合わせる
+      // 成功：マイページへ
+      router.push("/mypage");
     } finally {
       setSaving(false);
     }
   }
 
-  return (
-    <div className="p-5">
-      {/* テーマ選択UI（例） */}
-      <div className="space-y-2">
-        {SCOPES.map((s) => (
-          <button
-            key={s}
-            onClick={() => setSelected(s)}
-            className={`w-full rounded-xl px-4 py-3 text-left border ${
-              selected === s ? "border-white/40 bg-white/10" : "border-white/15 bg-white/5"
-            }`}
-          >
-            {s === "WORK" && "仕事"}{s === "LOVE" && "恋愛・結婚"}
-            {s === "FUTURE" && "未来・進路"}{s === "LIFE" && "自己理解・性格"}
-            <span className="ml-2 text-xs opacity-60">({s})</span>
-          </button>
-        ))}
+  if (loading) {
+    return (
+      <div className="min-h-[100svh] grid place-items-center bg-black text-white">
+        読み込み中…
       </div>
+    );
+  }
 
-      <div className="mt-4 flex gap-3">
+  return (
+    <div className="min-h-[100svh] bg-black text-white">
+      <main className="px-5 pt-4 pb-28">
+        <h1 className="text-xl font-semibold tracking-wide">テーマ選択</h1>
+        <p className="text-white/60 text-sm mt-1">
+          今のあなたに一番近いテーマを1つ選んでください。
+        </p>
+
+        <section className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {THEMES.map((key) => {
+            const active = selected === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => handleSelect(key)}
+                aria-pressed={active}
+                className={[
+                  "w-full text-left rounded-2xl p-4",
+                  "border transition-transform",
+                  "active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+                  active
+                    ? "border-white/60 bg-white/10 shadow-[0_0_0_2px_rgba(255,255,255,0.12)_inset]"
+                    : "border-white/10 bg-white/5 hover:bg-white/8",
+                ].join(" ")}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 h-8 w-8 rounded-full bg-white/10 grid place-items-center">
+                    <span className="text-sm">
+                      {key === "work" && "Λ"}
+                      {key === "love" && "V"}
+                      {key === "future" && "E"}
+                      {key === "self" && "Ǝ"}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-medium">{LABEL[key]}</h2>
+                      {active && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/15">
+                          選択中
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-white/60 mt-1">{DESC[key]}</p>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </section>
+      </main>
+
+      {/* 下部：保存してマイページへ */}
+      <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 border-t border-white/10">
         <button
-          onClick={onSave}
-          disabled={saving}
-          className="rounded-xl bg-white text-black px-4 py-2 disabled:opacity-60"
+          type="button"
+          onClick={onSaveTheme}
+          disabled={!selected || saving}
+          className={[
+            "w-full h-12 rounded-xl font-medium border border-white/10",
+            !selected || saving
+              ? "bg-white/10 text-white/50"
+              : "bg-white text-black active:opacity-90",
+          ].join(" ")}
         >
-          {saving ? "保存中…" : "保存する"}
+          {saving ? "保存中…" : "保存してマイページへ"}
         </button>
-        {ok && <span className="text-green-300 text-sm">保存しました</span>}
-        {err && <span className="text-red-300 text-sm">エラー: {err}</span>}
       </div>
     </div>
   );

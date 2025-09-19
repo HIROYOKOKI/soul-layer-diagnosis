@@ -1,5 +1,6 @@
 // app/api/daily/question/route.ts
 import { NextResponse, type NextRequest } from "next/server";
+import { cookies } from "next/headers";  
 import { getOpenAI } from "@/lib/openai";
 
 export const runtime = "nodejs";
@@ -41,7 +42,13 @@ export async function GET(req: NextRequest) {
   const debug = url.searchParams.get("debug") === "1";
 
   // ★ 新: scope（テーマ）を受け取る。未指定は LIFE
-  const scope = (url.searchParams.get("scope")?.toUpperCase() as Scope) || "LIFE";
+  const qScope = url.searchParams.get("scope")?.toUpperCase();
+  const cScope = cookies().get(SCOPE_COOKIE)?.value?.toUpperCase();
+  const scope = (["WORK","LOVE","FUTURE","LIFE"] as const).includes(qScope as Scope)
+    ? (qScope as Scope)
+    : (["WORK","LOVE","FUTURE","LIFE"] as const).includes(cScope as Scope)
+      ? (cScope as Scope)
+      : "LIFE";
   const scopeHint = SCOPE_HINT[scope] ?? SCOPE_HINT.LIFE;
 
   let question = "今の流れを一歩進めるなら、どの感覚が近い？";

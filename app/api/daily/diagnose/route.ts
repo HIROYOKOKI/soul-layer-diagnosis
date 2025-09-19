@@ -81,4 +81,151 @@ const normalizeAffirmation = (code: EV, s: string): string => {
 /* ========= フォールバック文言 ========= */
 const FB_COMMENT: Record<EV, string> = {
   E: "今は内側の熱が静かに満ちる時期。小さな確定を一つ重ねれば、惰性はほどけていく。視線を近くに置き、今日できる最短の一歩を形にしよう。",
-  V: "
+  V: "頭の中の未来像を、現実の手触りに寄せていく段階。理想は曖昧なままで良い。輪郭を一筆だけ濃くして、届く距離に引き寄せていこう。",
+  Λ: "迷いは選ぶための素材。条件を一つに絞れば、余計な枝葉は落ちていく。比較を止めて基準を決める。その確定が次の余白を生む。",
+  Ǝ: "静けさが判断を澄ませる。結論を急がず、観測を一拍置く。言葉にしない気配を拾えば、必要なものと不要なものが自然と分かれていく。",
+}
+const FB_ADVICE: Record<EV, string> = {
+  E: "今日の行動は十分に小さく。五分で終わる作業を今ここで始める。終えたら深呼吸し、次の一手は明日に残す。",
+  V: "理想の断片をノートに三行。明日やる一手を一文で決め、夜のうちに準備を一つだけ整える。",
+  Λ: "判断の基準を一つ決める。「迷ったら◯◯」を書き出し、それに従う。比較は一度だけに。",
+  Ǝ: "画面を閉じ、三分の無音をつくる。浮かんだ言葉を一語だけメモし、今夜はそこから先を求めない。",
+}
+// ★ 一人称に改修
+const FB_QUOTE: Record<EV, string> = {
+  E: "私は最小の一歩で流れを変える",
+  V: "私は理想の輪郭を近づけている",
+  Λ: "私は基準を決めて前に進む",
+  Ǝ: "私は静けさの中で答えを見る",
+}
+
+/* ========= OpenAI生成 ========= */
+async function genWithAI(code: EV, slot: Slot) {
+  const oa = getOpenAI()
+  const sys = `あなたはAIキャラクター「ルネア」。出力は必ずJSONのみ。
+必須キー:
+- comment: ${LEN.commentMin}〜${LEN.commentMax}字（丁寧語）
+- advice : ${LEN.adviceMin}〜${LEN.adviceMax}字（具体的な一手）
+- quote  : ${LEN.quoteMin}〜${LEN.quoteMax}字（自己肯定のアファメーション）
+
+厳守:
+- quote は必ず「私は…」または「わたしは…」で始める一人称・現在形
+- quote は引用文・格言・第三者表現・《》や「」等の括りを使わない
+- 日本語のみ。JSON以外の文字や前後の説明は出力しない
+- comment/advice はユーザーの選択コードの性質（E=衝動, V=可能性, Λ=選択, Ǝ=観測）に沿うが、直接語を多用しすぎない`
+  const usr = `次の条件で「comment」「advice」「quote」をJSONのみで返してください。
+- 時間帯: ${slot}
+- コード: ${code}
+- テーマ: デイリー診断結果`
+
+  const res = await oa.responses.create({
+    model: "gpt-4.1-mini",
+    temperature: 0.7,
+    max_output_tokens: 400,
+    input: [
+      { role: "system", content: sys },
+      { role: "user", content: usr },
+    ],
+  })
+
+  const text = (res as any).output_text || "{}"
+  const json = JSON.parse(text.match(/\{[\s\S]*\}$/)?.[0] || "{}") as {
+    comment?: string
+    advice?: string
+    quote?: string   // ← アファメーション
+  }
+
+  // ポストプロセス
+  let comment = clampToRange(json.comment || "", LEN.commentMin, LEN.commentMax)
+  let advice  = clampToRange(json.advice  || "", LEN.adviceMin , LEN.adviceMax )
+  let quote   = clampToRange(json.quote   || "", LEN.quoteMin  , LEN.quoteMax  )
+
+  // 一度だけリトライ（文字数外など）
+  const needRetry =
+    !inRange(json.comment || "", LEN.commentMin, LEN.commentMax) ||
+    !inRange(json.advice  || "", LEN.adviceMin , LEN.adviceMax ) ||
+    !isAffirmation(json.quote || "") ||
+    !inRange(json.quote || "", LEN.quoteMin, LEN.quoteMax)
+
+  if (needRetry) {
+    const retry = await oa.responses.create({
+      model: "gpt-4.1-mini",
+      temperature: 0.6,
+      max_output_tokens: 400,
+      input: [
+        { role: "system", content: sys },
+        { role: "user", content: `前回は制約外でした。厳守して再出力。${usr}` },
+      ],
+    })
+    const t2 = (retry as any).output_text || "{}"
+    const j2 = JSON.parse(t2.match(/\{[\s\S]*\}$/)?.[0] || "{}") as {
+      comment?: string
+      advice?: string
+      quote?: string
+    }
+    comment = clampToRange(j2.comment || comment, LEN.commentMin, LEN.commentMax)
+    advice  = clampToRange(j2.advice  || advice , LEN.adviceMin , LEN.adviceMax )
+    quote   = clampToRange(j2.quote  || quote  , LEN.quoteMin  , LEN.quoteMax  )
+  }
+
+  // 最後に“アファメーション”として成立させる（保険）
+  quote = normalizeAffirmation(code, quote)
+
+  return { comment, advice, quote }
+}
+
+/* ========= ハンドラ ========= */
+export async function POST(req: Request) {
+  try {
+    const b = (await req.json()) as Body | null
+    if (!b?.id || !b.slot || !b.choice) {
+      return NextResponse.json({ ok: false, error: "bad_request" }, { status: 400 })
+    }
+
+    const env = b.env ?? "dev"
+    const theme = b.theme ?? "dev"
+    const code = b.choice
+
+    // 生成 → 欠損時はフォールバック
+    let comment: string | null = null
+    let advice: string | null = null
+    let quote: string | null = null
+
+    try {
+      const ai = await genWithAI(code, b.slot)
+      comment = ai.comment?.trim() || null
+      advice  = ai.advice?.trim()  || null
+      quote   = ai.quote?.trim()   || null
+    } catch {
+      /* noop（フォールバックに任せる） */
+    }
+
+    if (!comment) comment = FB_COMMENT[code]
+    if (!advice)  advice  = FB_ADVICE[code]
+    if (!quote)   quote   = FB_QUOTE[code]
+
+    // 最終レンジ & 体裁
+    comment = clampToRange(comment, LEN.commentMin, LEN.commentMax)
+    advice  = clampToRange(advice , LEN.adviceMin , LEN.adviceMax )
+    quote   = normalizeAffirmation(code, quote) // ← 最後まで“私は〜”を担保
+
+    const item = {
+      id: b.id,
+      slot: b.slot,
+      code,
+      comment,
+      advice,
+      quote,          // UI側では《アファメーション》として表示
+      env,
+      theme,
+      created_at: new Date().toISOString(),
+    }
+
+    return NextResponse.json({ ok: true, item })
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: e?.message ?? "internal_error" },
+      { status: 500 },
+    )
+  }
+}

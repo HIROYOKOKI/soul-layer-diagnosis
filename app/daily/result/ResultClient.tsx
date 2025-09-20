@@ -10,8 +10,8 @@ type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 
 type Item = {
   question_id?: string;
-  mode?: Slot;                          // = slot
-  scope?: Scope;                        // ★ 追加
+  mode?: Slot;                 // = slot
+  scope?: Scope;               // ← テーマ
   code: EV;
   comment: string;
   advice?: string | null;
@@ -21,20 +21,39 @@ type Item = {
 };
 
 export default function ResultClient() {
+  const [currentScope, setCurrentScope] = useState<Scope | null>(null);
   const [item, setItem] = useState<Item | null>(null);
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
-  // 最新のデイリー結果を取得
+  // === 初期ロード：現在のテーマ → そのテーマの最新結果 ===
   useEffect(() => {
     (async () => {
-      const r = await fetch("/api/mypage/daily-latest?env=dev", { cache: "no-store" });
-      const j = await r.json();
-      if (j?.ok && j.item) {
-        setItem(j.item as Item);
-        setStep(1);
+      try {
+        setErr(null);
+        // 1) 現在のテーマを取得
+        const themeRes = await fetch("/api/theme", { cache: "no-store" });
+        const themeJson = await themeRes.json().catch(() => null);
+        const scope: Scope | null = themeJson?.ok ? (themeJson.scope as Scope) : null;
+        setCurrentScope(scope);
+
+        // 2) テーマでフィルタして最新を取得（無ければAPI側で全体最新にフォールバック）
+        const qs = scope ? `?env=dev&scope=${scope}` : `?env=dev`;
+        const r = await fetch(`/api/mypage/daily-latest${qs}`, { cache: "no-store" });
+        if (!r.ok) throw new Error(`/api/mypage/daily-latest failed (${r.status})`);
+        const j = await r.json();
+
+        if (j?.ok && j.item) {
+          setItem(j.item as Item);
+          setStep(1);
+        } else {
+          setItem(null);
+        }
+      } catch (e: any) {
+        setErr(e?.message || "result_fetch_failed");
       }
     })();
   }, []);
@@ -66,16 +85,15 @@ export default function ResultClient() {
     setSaveMsg(null);
     try {
       const slot: Slot = item.mode || "night";
-      const scope: Scope = (item.scope as Scope) || "LIFE";
+      const scope: Scope = (item.scope as Scope) || currentScope || "LIFE";
 
-      // question_id が無い場合のフォールバック（scope まで含めて生成）
-      const fallbackId =
-        `daily-${new Date().toISOString().slice(0, 10)}-${slot}-${scope}`;
+      // question_id が無い場合のフォールバック（scope まで含める）
+      const fallbackId = `daily-${new Date().toISOString().slice(0, 10)}-${slot}-${scope}`;
 
       const payload = {
         id: item.question_id || fallbackId,
         slot,
-        scope,                                  // ★ 保存に含める
+        scope,               // ★ 保存にも scope を含める
         env: item.env || "dev",
         theme: "dev",
         choice: item.code,
@@ -104,6 +122,15 @@ export default function ResultClient() {
     }
   }
 
+  // ====== UI ======
+  if (err) {
+    return (
+      <div className="min-h-[60vh] grid place-items-center bg-black text-white">
+        <div className="text-red-300 text-sm">エラー: {err}</div>
+      </div>
+    );
+  }
+
   if (!item) {
     return (
       <div className="min-h-[60vh] grid place-items-center bg-black text-white">
@@ -118,11 +145,10 @@ export default function ResultClient() {
         {/* 日付＆テーマ表示 */}
         <div className="flex items-center justify-between text-xs opacity-70">
           <span>
-            {item.created_at &&
-              new Date(item.created_at).toLocaleString("ja-JP")}
+            {item.created_at && new Date(item.created_at).toLocaleString("ja-JP")}
           </span>
           <span>
-            テーマ: {item.scope ?? "—"} / スロット: {item.mode ?? "—"}
+            テーマ: {item.scope ?? currentScope ?? "—"} / スロット: {item.mode ?? "—"}
           </span>
         </div>
 

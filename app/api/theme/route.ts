@@ -1,40 +1,50 @@
 // app/api/theme/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
-const SCOPES: Scope[] = ["WORK","LOVE","FUTURE","LIFE"];
+export type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
+const SCOPES: Scope[] = ["WORK", "LOVE", "FUTURE", "LIFE"];
 const SCOPE_COOKIE = "sl_scope";
 
+/** POST: テーマを設定（WORK/LOVE/FUTURE/LIFE） */
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null) as { scope?: string; reset?: boolean } | null;
-  if (!body?.scope) return NextResponse.json({ ok:false, error:"bad_request" }, { status:400 });
+  const body = (await req.json().catch(() => null)) as { scope?: string; reset?: boolean } | null;
 
-  const scope = body.scope.toUpperCase();
-  if (!SCOPES.includes(scope as Scope)) {
-    return NextResponse.json({ ok:false, error:"invalid_scope" }, { status:400 });
+  if (body?.reset) {
+    // リセット要求：Cookie削除
+    cookies().delete(SCOPE_COOKIE);
+    return NextResponse.json({ ok: true, scope: "LIFE", resetApplied: true });
   }
 
-  // ★ ここが重要：本番は secure: true で保存
+  if (!body?.scope) {
+    return NextResponse.json({ ok: false, error: "bad_request" }, { status: 400 });
+  }
+
+  const scope = body.scope.toUpperCase() as Scope;
+  if (!SCOPES.includes(scope)) {
+    return NextResponse.json({ ok: false, error: "invalid_scope" }, { status: 400 });
+  }
+
+  // 本番は secure: true（Vercel/HTTPS前提）
   cookies().set({
     name: SCOPE_COOKIE,
     value: scope,
     path: "/",
     httpOnly: false,
     sameSite: "lax",
-    secure: true,               // ← 必須（Vercel/HTTPS）
+    secure: true,
     maxAge: 60 * 60 * 24 * 180, // 180日
   });
 
-  return NextResponse.json({ ok:true, scope, resetApplied: !!body.reset });
+  return NextResponse.json({ ok: true, scope });
 }
 
+/** GET: 現在のテーマを返す（なければ LIFE） */
 export async function GET() {
   const c = cookies().get(SCOPE_COOKIE)?.value?.toUpperCase();
-  const scope = (SCOPES as string[]).includes(c || "") ? (c as Scope) : "LIFE";
-  return NextResponse.json({ ok:true, scope, item: null /* EVΛƎテーマは省略 */ });
+  const scope: Scope = SCOPES.includes(c as Scope) ? (c as Scope) : "LIFE";
+  return NextResponse.json({ ok: true, scope });
 }

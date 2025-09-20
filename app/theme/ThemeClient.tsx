@@ -32,7 +32,7 @@ const THEME_TO_EV: Record<ThemeKey, EV> = {
   self: "Ǝ",
 };
 
-// 表示テーマ → APIに送るscope
+// 表示テーマ → APIに送る scope（大文字）
 const THEME_TO_SCOPE: Record<ThemeKey, Scope> = {
   work: "WORK",
   love: "LOVE",
@@ -40,34 +40,37 @@ const THEME_TO_SCOPE: Record<ThemeKey, Scope> = {
   self: "LIFE",
 };
 
-// env 分離（デフォルト dev）※ scope保存には不要だが将来の拡張用に残す
-const ENV: "dev" | "prod" =
-  (process.env.NEXT_PUBLIC_APP_ENV as "dev" | "prod") || "dev";
-
 export default function ThemeClient() {
   const router = useRouter();
   const [selected, setSelected] = useState<ThemeKey | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 直前の選択を復元（任意）＋現在のscopeを初期表示に反映
+  // 直前の選択を復元＋現在のscopeを初期表示に反映
   useEffect(() => {
     (async () => {
       try {
-        const prev = typeof window !== "undefined"
-          ? sessionStorage.getItem("evae_theme_selected")
-          : null;
+        const prev =
+          typeof window !== "undefined"
+            ? (sessionStorage.getItem("evae_theme_selected") as ThemeKey | null)
+            : null;
+
         const r = await fetch("/api/theme", { cache: "no-store" }).catch(() => null);
         const j = r ? await r.json() : null;
         const scope: Scope | null = j?.ok ? (j.scope as Scope) : null;
 
-        // scope優先でselectedを決定
-        const init =
-          scope === "WORK" ? "work" :
-          scope === "LOVE" ? "love" :
-          scope === "FUTURE" ? "future" :
-          scope === "LIFE" ? "self" :
-          (prev && THEMES.includes(prev as ThemeKey) ? (prev as ThemeKey) : "self");
+        const init: ThemeKey =
+          scope === "WORK"
+            ? "work"
+            : scope === "LOVE"
+            ? "love"
+            : scope === "FUTURE"
+            ? "future"
+            : scope === "LIFE"
+            ? "self"
+            : prev && THEMES.includes(prev)
+            ? prev
+            : "self";
 
         setSelected(init);
       } finally {
@@ -88,42 +91,37 @@ export default function ThemeClient() {
     nav?.vibrate?.(10);
   };
 
-  // ✅ 保存：/api/theme に scope をPOST（確認アラート付き）
- async function onSaveTheme() {
-  if (!selected) return;
-  setSaving(true);
-  try {
-    const resp = await fetch("/api/theme", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scope: selected }),
-    });
-    const res = await resp.json();
+  // ✅ 保存：/api/theme に scope をPOST
+  async function onSaveTheme() {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      const resp = await fetch("/api/theme", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // 大文字の scope を送る
+        body: JSON.stringify({ scope: THEME_TO_SCOPE[selected] }),
+      });
+      const res = await resp.json();
 
-    if (!res?.ok) {
-      if (res?.error === "not_authenticated") {
-        alert("ログインが必要です。ログイン画面へ移動します。");
-        router.push("/login?next=/mypage");
+      if (!res?.ok) {
+        if (res?.error === "not_authenticated") {
+          alert("ログインが必要です。ログイン画面へ移動します。");
+          router.push("/login?next=/mypage");
+          return;
+        }
+        alert("保存に失敗しました");
         return;
       }
-      alert("保存に失敗しました");
-      return;
-    }
 
-    alert("テーマを保存しました");
-    router.push("/mypage");
-  } catch (e) {
-    alert("通信に失敗しました");
-  } finally {
-    setSaving(false);
-  }
-}
-
-      // 成功：マイページへ
+      alert("テーマを保存しました");
       router.push("/mypage");
+    } catch {
+      alert("通信に失敗しました");
     } finally {
       setSaving(false);
     }
+  } // ← onSaveTheme はここで終了（この1個だけ）
 
   if (loading) {
     return (

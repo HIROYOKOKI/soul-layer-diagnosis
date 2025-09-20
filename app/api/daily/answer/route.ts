@@ -62,13 +62,14 @@ export async function POST(req: NextRequest) {
       NextV: N,
     };
 
-    // GPT or テンプレ
-    const ui = await toUiProd(evla);
+    // GPT or テンプレ（toUiProd は USE_OPENAI=true でGPT、失敗時テンプレにフォールバック）
+    const ui: any = await toUiProd(evla);
 
     // Supabase 保存
     const sb = getSupabaseAdmin();
     if (!sb) {
-      return NextResponse.json({ ok: false, error: "supabase_env_missing" }, { status: 500 });
+      const res: DailyAnswerResponse = { ok: false, error: "supabase_env_missing" };
+      return NextResponse.json(res, { status: 500 });
     }
 
     const themeDb = theme.toLowerCase(); // DB用は小文字
@@ -85,15 +86,17 @@ export async function POST(req: NextRequest) {
       });
     } catch (e: any) {
       console.error("[/api/daily/answer] insert failed:", e?.message || e);
-      return NextResponse.json({ ok: false, error: e?.message ?? "insert_failed" }, { status: 500 });
+      const res: DailyAnswerResponse = { ok: false, error: e?.message ?? "insert_failed" };
+      return NextResponse.json(res, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, ...ui } satisfies DailyAnswerResponse);
+    // --- デバッグ用ヘッダーで「gpt or template」を可視化 ---
+    const res = NextResponse.json({ ok: true, comment: ui.comment, advice: ui.advice, affirm: ui.affirm, score: ui.score } satisfies DailyAnswerResponse);
+    res.headers.set("x-ui-source", ui.__source ?? "unknown");
+    return res;
   } catch (e: any) {
     console.error("[/api/daily/answer] unhandled:", e);
-    return NextResponse.json(
-      { ok: false, error: e?.message ?? "unknown_error" } satisfies DailyAnswerResponse,
-      { status: 500 }
-    );
+    const res: DailyAnswerResponse = { ok: false, error: e?.message ?? "unknown_error" };
+    return NextResponse.json(res, { status: 500 });
   }
 }

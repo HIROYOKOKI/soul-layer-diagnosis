@@ -7,18 +7,22 @@ import type { DailyQuestionResponse, Slot, Theme } from "@/lib/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const THEMES: Theme[] = ["WORK", "LOVE", "FUTURE", "LIFE"] as const;
+const THEMES: Theme[] = ["WORK", "LOVE", "FUTURE", "LIFE"];
+const SCOPE_COOKIE = "sl_scope";
 
+/** theme 解決（query > cookie > LIFE） */
 function getThemeFromCookieOrQuery(req: NextRequest): Theme {
-  const themeQ = req.nextUrl.searchParams.get("theme")?.toUpperCase() as Theme | null;
-  if (themeQ && (THEMES as string[]).includes(themeQ)) return themeQ;
-  const c = cookies().get("ev_theme")?.value?.toUpperCase() as Theme | undefined;
-  return (c && (THEMES as string[]).includes(c)) ? c : "WORK";
+  const q = req.nextUrl.searchParams.get("theme")?.toUpperCase() as Theme | null;
+  if (q && THEMES.includes(q)) return q;
+  const c = cookies().get(SCOPE_COOKIE)?.value?.toUpperCase() as Theme | undefined;
+  return (c && THEMES.includes(c)) ? c : "LIFE";
 }
 
 function makeSeed(slot: Slot) {
   const d = new Date();
-  const ymd = `${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,"0")}${String(d.getUTCDate()).padStart(2,"0")}`;
+  const ymd = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(
+    d.getUTCDate()
+  ).padStart(2, "0")}`;
   return Number(`${ymd}${slot === "morning" ? "1" : slot === "noon" ? "2" : "3"}`);
 }
 
@@ -28,7 +32,7 @@ export async function GET(req: NextRequest) {
     const theme = getThemeFromCookieOrQuery(req);
     const seed = makeSeed(slot);
 
-    // 質問テンプレ（slot×themeで語尾をわずかに変える）
+    // 質問テンプレ
     const qMorning = [
       "今日の一歩を決めるなら、いまの衝動に一番近いのは？",
       "今朝の最初の選択、どの動きがしっくり来ますか？",
@@ -42,26 +46,39 @@ export async function GET(req: NextRequest) {
       "今日を軽く終えるための一手は？",
     ];
     const question =
-      slot === "morning" ? seededPick(qMorning, seed) :
-      slot === "noon"    ? seededPick(qNoon, seed)    :
-                           seededPick(qNight, seed);
+      slot === "morning"
+        ? seededPick(qMorning, seed)
+        : slot === "noon"
+        ? seededPick(qNoon, seed)
+        : seededPick(qNight, seed);
 
-    // 選択肢（slotによって個数変化: 朝4/昼3/夜2）
+    // 選択肢（slot別）
     const choices =
       slot === "morning"
-        ? [{ id: "A", label: "５分だけ着手" },
-           { id: "B", label: "阻害要因を１つ除去" },
-           { id: "C", label: "関係者に一言共有" },
-           { id: "D", label: "見積もりを更新" }]
+        ? [
+            { id: "A", label: "５分だけ着手" },
+            { id: "B", label: "阻害要因を１つ除去" },
+            { id: "C", label: "関係者に一言共有" },
+            { id: "D", label: "見積もりを更新" },
+          ]
         : slot === "noon"
-        ? [{ id: "A", label: "一点に集中" },
-           { id: "B", label: "優先順位を再確認" },
-           { id: "C", label: "途中経過を共有" }]
-        : [{ id: "A", label: "短い完了を置く" },
-           { id: "B", label: "明日の一手を予約" }];
+        ? [
+            { id: "A", label: "一点に集中" },
+            { id: "B", label: "優先順位を再確認" },
+            { id: "C", label: "途中経過を共有" },
+          ]
+        : [
+            { id: "A", label: "短い完了を置く" },
+            { id: "B", label: "明日の一手を予約" },
+          ];
 
     const res: DailyQuestionResponse = {
-      ok: true, seed, slot, theme, question, choices
+      ok: true,
+      seed,
+      slot,
+      theme,
+      question,
+      choices,
     };
     return NextResponse.json(res);
   } catch (e: any) {

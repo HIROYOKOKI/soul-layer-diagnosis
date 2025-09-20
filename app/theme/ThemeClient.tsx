@@ -119,7 +119,6 @@ export default function ThemeClient() {
     } finally {
       setSaving(false);
     }
-  }
 
   if (loading) {
     return (

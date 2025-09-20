@@ -30,42 +30,42 @@ export async function POST(req: NextRequest) {
     const theme: Theme = pickTheme(req, payload.theme);
     const choiceId = payload.choiceId;
 
-    // EVΛƎループを回す（候補作成→選択→観測→NextV）
+    // EVΛƎループ（E→V→Λ→Ǝ→NextV）
     const E = extractE(slot, theme);
     const V = generateCandidates(slot, theme);
-    // choiceId は UIの「選んだ行為の意志表示」。内部のΛ自動選択は保持（実験ログのため両存）
     const LambdaAuto = choose(E, V, slot);
     const Eps = observeTemplate(LambdaAuto, V);
     const N = nextV(Eps, LambdaAuto);
 
-    // EvlaLog（完全保存）
+    // 保存用ログ（上位は大文字Themeのまま）
     const evla: EvlaLog = {
       slot, mode: "EVΛƎ", theme,
       E, V,
-      Lambda: { ...LambdaAuto, reason: LambdaAuto.reason + `（ユーザー選択=${choiceId}）` },
+      Lambda: { ...LambdaAuto, reason: `${LambdaAuto.reason}（ユーザー選択=${choiceId}）` },
       Epsilon: Eps,
       NextV: N,
     };
 
-    // UI返却（固定契約）
+    // 返却UI（固定契約）
     const ui = toUi(evla);
 
-    // 保存
+    // Supabase 保存（DBは enum theme_key = 小文字想定のため小文字化）
     const sb = getSupabaseAdmin();
     if (!sb) {
       const res: DailyAnswerResponse = { ok: false, error: "supabase_env_missing" };
       return NextResponse.json(res, { status: 500 });
     }
 
-    // user_id は未認証でも null で許容する設計（あとでRLS導入）
+    const themeDb = theme.toLowerCase(); // "WORK" -> "work"
+
     const { error } = await sb.from("daily_results").insert({
       slot,
       score: ui.score,
       comment: ui.comment,
       advice: ui.advice,
       affirm: ui.affirm,
-      theme,
-      evla, // JSONB
+      theme: themeDb as any, // enum/text どちらでも通すため any キャスト
+      evla,                  // JSONB
     });
 
     if (error) {

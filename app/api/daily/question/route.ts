@@ -1,7 +1,8 @@
 // app/api/daily/question/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
-import { detectJstSlot, seededPick } from "@/lib/evla";
+// 👇 名前空間importに変更
+import * as EVLA from "@/lib/evla";
 import type { DailyQuestionResponse, Slot, Theme } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -15,7 +16,7 @@ function getThemeFromCookieOrQuery(req: NextRequest): Theme {
   const q = req.nextUrl.searchParams.get("theme")?.toUpperCase() as Theme | null;
   if (q && THEMES.includes(q)) return q;
   const c = cookies().get(SCOPE_COOKIE)?.value?.toUpperCase() as Theme | undefined;
-  return (c && THEMES.includes(c)) ? c : "LIFE";
+  return c && THEMES.includes(c) ? c : "LIFE";
 }
 
 function makeSeed(slot: Slot) {
@@ -28,7 +29,7 @@ function makeSeed(slot: Slot) {
 
 export async function GET(req: NextRequest) {
   try {
-    const slot = (req.nextUrl.searchParams.get("slot") as Slot) || detectJstSlot();
+    const slot = (req.nextUrl.searchParams.get("slot") as Slot) || EVLA.detectJstSlot();
     const theme = getThemeFromCookieOrQuery(req);
     const seed = makeSeed(slot);
 
@@ -47,10 +48,10 @@ export async function GET(req: NextRequest) {
     ];
     const question =
       slot === "morning"
-        ? seededPick(qMorning, seed)
+        ? EVLA.seededPick(qMorning, seed)
         : slot === "noon"
-        ? seededPick(qNoon, seed)
-        : seededPick(qNight, seed);
+        ? EVLA.seededPick(qNoon, seed)
+        : EVLA.seededPick(qNight, seed);
 
     // 選択肢（slot別）
     const choices =
@@ -72,14 +73,7 @@ export async function GET(req: NextRequest) {
             { id: "B", label: "明日の一手を予約" },
           ];
 
-    const res: DailyQuestionResponse = {
-      ok: true,
-      seed,
-      slot,
-      theme,
-      question,
-      choices,
-    };
+    const res: DailyQuestionResponse = { ok: true, seed, slot, theme, question, choices };
     return NextResponse.json(res);
   } catch (e: any) {
     const res: DailyQuestionResponse = { ok: false, error: e?.message ?? "unknown_error" };

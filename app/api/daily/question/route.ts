@@ -1,131 +1,71 @@
 // app/api/daily/question/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
-import { getOpenAI } from "@/lib/openai";
+import { detectJstSlot, seededPick } from "@/lib/evla";
+import type { DailyQuestionResponse, Slot, Theme } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type EV = "E" | "V" | "Λ" | "Ǝ";
-type Choice = { key: EV; label: string };
-type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
+const THEMES: Theme[] = ["WORK", "LOVE", "FUTURE", "LIFE"] as const;
 
-const SCOPE_COOKIE = "sl_scope";
-const SCOPE_HINT: Record<Scope, string> = {
-  WORK:   "仕事・学び・成果・チーム連携・自己効率に関する文脈で書く",
-  LOVE:   "恋愛・信頼・距離感・関係性の深め方に関する文脈で書く",
-  FUTURE: "将来・目標・計画・進路の意思決定に関する文脈で書く",
-  LIFE:   "生活リズム・習慣・心身の整え・日々の選択に関する文脈で書く",
-};
-
-const FALLBACK: Choice[] = [
-  { key: "E", label: "勢いで踏み出す" },
-  { key: "V", label: "理想を描いて進む" },
-  { key: "Λ", label: "条件を決めて選ぶ" },
-  { key: "Ǝ", label: "一拍置いて観測する" },
-];
-
-function getSlot(): "morning" | "noon" | "night" {
-  const j = (new Date().getUTCHours() + 9) % 24;
-  if (j < 11) return "morning";
-  if (j < 17) return "noon";
-  return "night";
+function getThemeFromCookieOrQuery(req: NextRequest): Theme {
+  const themeQ = req.nextUrl.searchParams.get("theme")?.toUpperCase() as Theme | null;
+  if (themeQ && (THEMES as string[]).includes(themeQ)) return themeQ;
+  const c = cookies().get("ev_theme")?.value?.toUpperCase() as Theme | undefined;
+  return (c && (THEMES as string[]).includes(c)) ? c : "WORK";
 }
-function needCount(slot: "morning" | "noon" | "night") {
-  return slot === "morning" ? 4 : slot === "noon" ? 3 : 2;
+
+function makeSeed(slot: Slot) {
+  const d = new Date();
+  const ymd = `${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,"0")}${String(d.getUTCDate()).padStart(2,"0")}`;
+  return Number(`${ymd}${slot === "morning" ? "1" : slot === "noon" ? "2" : "3"}`);
 }
 
 export async function GET(req: NextRequest) {
-  const url = req.nextUrl;
-  const slot = getSlot();
-  const n = needCount(slot);
-  const seed = Date.now();
-  const debug = url.searchParams.get("debug") === "1";
-
-  // 1) scopeの決定: クエリ > Cookie > LIFE
-  const qScope = url.searchParams.get("scope")?.toUpperCase();
-  const cScope = cookies().get(SCOPE_COOKIE)?.value?.toUpperCase();
-  const scope = (["WORK","LOVE","FUTURE","LIFE"] as const).includes(qScope as any)
-    ? (qScope as Scope)
-    : (["WORK","LOVE","FUTURE","LIFE"] as const).includes(cScope as any)
-      ? (cScope as Scope)
-      : "LIFE";
-
-  let question = "今の流れを一歩進めるなら、どの感覚が近い？";
-  let choices: Choice[] = [];
-  let source: "ai" | "fallback" = "fallback";
-
   try {
-    const oa = getOpenAI();
-    const sys = `あなたはE/V/Λ/Ǝの4軸に対応する短い選択肢を生成する役割です。
-必ず 次のJSONだけ を返す: {"question":"...","choices":[{"key":"E","label":"..."}, ...]}
-厳守:
-- key は "E","V","Λ","Ǝ"
-- label は12〜18文字の自然な日本語、重複禁止
-- 各keyの意味:
-  - E=衝動・情熱・行動
-  - V=可能性・夢・理想
-  - Λ=選択・葛藤・決断
-  - Ǝ=観測・静寂・受容
-- JSON以外の文字は出さない`;
+    const slot = (req.nextUrl.searchParams.get("slot") as Slot) || detectJstSlot();
+    const theme = getThemeFromCookieOrQuery(req);
+    const seed = makeSeed(slot);
 
-    const usr = `デイリー診断の設問を1問だけ生成する。
-前提テーマ(scope): ${scope}
-テーマ文脈: ${SCOPE_HINT[scope]}
-時間帯: ${slot}（必要な選択肢:${n}）
-制約:
-- questionは1文・20文字前後・落ち着いた短文
-- 選択肢はE/V/Λ/Ǝから${n}個だけ（テーマ文脈に寄せた表現にする）
-seed:${seed}`;
+    // 質問テンプレ（slot×themeで語尾をわずかに変える）
+    const qMorning = [
+      "今日の一歩を決めるなら、いまの衝動に一番近いのは？",
+      "今朝の最初の選択、どの動きがしっくり来ますか？",
+    ];
+    const qNoon = [
+      "午後、流れを強めるために寄せたい意識は？",
+      "この時間、集中を高めるならどれを選びますか？",
+    ];
+    const qNight = [
+      "一日を締める小さな完了はどれ？",
+      "今日を軽く終えるための一手は？",
+    ];
+    const question =
+      slot === "morning" ? seededPick(qMorning, seed) :
+      slot === "noon"    ? seededPick(qNoon, seed)    :
+                           seededPick(qNight, seed);
 
-    const res = await oa.responses.create({
-      model: "gpt-4o-mini",
-      temperature: 0.6,
-      max_output_tokens: 300,
-      input: [{ role: "system", content: sys }, { role: "user", content: usr }],
-    });
+    // 選択肢（slotによって個数変化: 朝4/昼3/夜2）
+    const choices =
+      slot === "morning"
+        ? [{ id: "A", label: "５分だけ着手" },
+           { id: "B", label: "阻害要因を１つ除去" },
+           { id: "C", label: "関係者に一言共有" },
+           { id: "D", label: "見積もりを更新" }]
+        : slot === "noon"
+        ? [{ id: "A", label: "一点に集中" },
+           { id: "B", label: "優先順位を再確認" },
+           { id: "C", label: "途中経過を共有" }]
+        : [{ id: "A", label: "短い完了を置く" },
+           { id: "B", label: "明日の一手を予約" }];
 
-    let raw = (res as any).output_text || "";
-    if (!raw && (res as any)?.output?.[0]?.content?.[0]?.text) {
-      raw = (res as any).output[0].content[0].text;
-    }
-
-    const parsed = JSON.parse(raw.match(/\{[\s\S]*\}$/)?.[0] || "{}");
-    if (parsed?.question && Array.isArray(parsed?.choices)) {
-      question = String(parsed.question);
-      choices = (parsed.choices as any[])
-        .filter(c => c && typeof c.key === "string" && typeof c.label === "string")
-        .map(c => ({ key: c.key as EV, label: (c.label as string).trim() }))
-        .filter((c, i, arr) =>
-          ["E","V","Λ","Ǝ"].includes(c.key) &&
-          arr.findIndex(x => x.key === c.key) === i
-        )
-        .slice(0, n);
-      if (choices.length) source = "ai";
-    }
+    const res: DailyQuestionResponse = {
+      ok: true, seed, slot, theme, question, choices
+    };
+    return NextResponse.json(res);
   } catch (e: any) {
-    console.error("[/api/daily/question] OpenAI error:", e?.message ?? e);
+    const res: DailyQuestionResponse = { ok: false, error: e?.message ?? "unknown_error" };
+    return NextResponse.json(res, { status: 500 });
   }
-
-  if (!choices.length) {
-    const used = new Set<string>();
-    for (const c of FALLBACK) {
-      if (choices.length >= n) break;
-      if (!used.has(c.key)) { used.add(c.key); choices.push(c); }
-    }
-    source = "fallback";
-  }
-
-  return NextResponse.json({
-    ok: true,
-    question,
-    choices,
-    subset: choices.map(c => c.key),
-    slot,
-    scope,                                            // ← 明示的に返す
-    seed,
-    source,
-    question_id: `daily-${new Date().toISOString().slice(0,10)}-${slot}-${scope}`, // ← idにもscope
-    ...(debug ? { debug: { envHasKey: !!process.env.OPENAI_API_KEY } } : {}),
-  });
 }

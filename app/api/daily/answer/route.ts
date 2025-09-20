@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   detectJstSlot, extractE, generateCandidates, choose,
-  observeTemplate, nextV, toUi
+  observeTemplate, nextV, toUiProd
 } from "@/lib/evla";
 import type {
   DailyAnswerRequest, DailyAnswerResponse, Slot, Theme, EvlaLog
@@ -15,12 +15,25 @@ export const dynamic = "force-dynamic";
 
 const THEMES: Theme[] = ["WORK", "LOVE", "FUTURE", "LIFE"];
 
+/** theme 解決（body > query > cookie > WORK） */
 function pickTheme(req: NextRequest, bodyTheme?: Theme): Theme {
   const q = req.nextUrl.searchParams.get("theme")?.toUpperCase() as Theme | null;
   if (bodyTheme && THEMES.includes(bodyTheme)) return bodyTheme;
   if (q && THEMES.includes(q)) return q;
   const c = cookies().get("ev_theme")?.value?.toUpperCase() as Theme | undefined;
   return (c && THEMES.includes(c)) ? c : "WORK";
+}
+
+/** 失敗時に少し待って再試行（ネットワーク短期エラー対策） */
+async function insertWithRetry(sb: any, row: any, n = 2) {
+  let last: any;
+  for (let i = 0; i <= n; i++) {
+    const { error } = await sb.from("daily_results").insert(row);
+    if (!error) return;
+    last = error;
+    await new Promise((r) => setTimeout(r, 200 * (i + 1)));
+  }
+  throw last;
 }
 
 export async function POST(req: NextRequest) {
@@ -46,10 +59,10 @@ export async function POST(req: NextRequest) {
       NextV: N,
     };
 
-    // 返却UI（固定契約）
-    const ui = toUi(evla);
+    // 本番UI：USE_OPENAI=true でGPT、失敗時テンプレにフォールバック
+    const ui = await toUiProd(evla);
 
-    // Supabase 保存（DBは enum theme_key = 小文字想定のため小文字化）
+    // Supabase 保存（DBの theme は enum/text の小文字想定）
     const sb = getSupabaseAdmin();
     if (!sb) {
       const res: DailyAnswerResponse = { ok: false, error: "supabase_env_missing" };
@@ -58,24 +71,26 @@ export async function POST(req: NextRequest) {
 
     const themeDb = theme.toLowerCase(); // "WORK" -> "work"
 
-    const { error } = await sb.from("daily_results").insert({
-      slot,
-      score: ui.score,
-      comment: ui.comment,
-      advice: ui.advice,
-      affirm: ui.affirm,
-      theme: themeDb as any, // enum/text どちらでも通すため any キャスト
-      evla,                  // JSONB
-    });
-
-    if (error) {
-      const res: DailyAnswerResponse = { ok: false, error: error.message };
+    try {
+      await insertWithRetry(sb, {
+        slot,
+        score: ui.score,
+        comment: ui.comment,
+        advice: ui.advice,
+        affirm: ui.affirm,
+        theme: themeDb as any,
+        evla, // JSONB
+      });
+    } catch (e: any) {
+      console.error("[/api/daily/answer] insert failed:", e?.message || e);
+      const res: DailyAnswerResponse = { ok: false, error: e?.message ?? "insert_failed" };
       return NextResponse.json(res, { status: 500 });
     }
 
     const res: DailyAnswerResponse = { ok: true, ...ui };
     return NextResponse.json(res);
   } catch (e: any) {
+    console.error("[/api/daily/answer] unhandled:", e);
     const res: DailyAnswerResponse = { ok: false, error: e?.message ?? "unknown_error" };
     return NextResponse.json(res, { status: 500 });
   }

@@ -6,32 +6,37 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Env = "dev" | "prod";
+type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 
 export async function GET(req: NextRequest) {
   const sb = getSupabaseAdmin();
-  if (!sb) {
-    return NextResponse.json({ ok: false, error: "supabase_env_missing" }, { status: 500 });
-  }
+  if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 });
 
-  try {
-    const envParam = req.nextUrl.searchParams.get("env");
-    const env = ((envParam ?? "dev").toLowerCase() as Env) || "dev";
+  const env = ((req.nextUrl.searchParams.get("env") ?? "dev").toLowerCase() as Env) || "dev";
+  const scope = req.nextUrl.searchParams.get("scope")?.toUpperCase() as Scope | undefined;
 
-    const { data, error } = await sb
+  let q = sb.from("daily_results")
+    .select("code, comment, advice, quote, scope, mode, env, created_at, question_id")
+    .eq("env", env)
+    .order("created_at", { ascending:false })
+    .limit(1);
+
+  if (scope) q = q.eq("scope", scope);   // ★ ここでテーマ絞り込み
+
+  const { data, error } = await q.maybeSingle();
+  if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 });
+
+  // 指定scopeに該当が無かった場合は、全体の最新をフォールバックで返す
+  if (!data && scope) {
+    const { data: anyLatest } = await sb
       .from("daily_results")
-      // ★ scope と mode と env を含めて返す
       .select("code, comment, advice, quote, scope, mode, env, created_at, question_id")
       .eq("env", env)
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending:false })
       .limit(1)
       .maybeSingle();
-
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ ok: true, item: data ?? null });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? "internal_error" }, { status: 500 });
+    return NextResponse.json({ ok:true, item: anyLatest ?? null });
   }
+
+  return NextResponse.json({ ok:true, item: data ?? null });
 }

@@ -24,7 +24,7 @@ const DESC: Record<ThemeKey, string> = {
   self: "自分の傾向を言語化し、日常の選択に活かしたい人へ",
 };
 
-// 表示テーマ → EV（参考：UIのバッジ用など）
+// 表示テーマ → EV（UI用）
 const THEME_TO_EV: Record<ThemeKey, EV> = {
   work: "Λ",
   love: "V",
@@ -46,7 +46,7 @@ export default function ThemeClient() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 直前の選択を復元＋現在のscopeを初期表示に反映
+  // 初期：サーバの現在scope優先、無ければ前回選択
   useEffect(() => {
     (async () => {
       try {
@@ -91,7 +91,7 @@ export default function ThemeClient() {
     nav?.vibrate?.(10);
   };
 
-  // ✅ 保存：/api/theme に scope をPOST
+  // 保存：/api/theme に scope をPOST
   async function onSaveTheme() {
     if (!selected) return;
     setSaving(true);
@@ -99,7 +99,6 @@ export default function ThemeClient() {
       const resp = await fetch("/api/theme", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // 大文字の scope を送る
         body: JSON.stringify({ scope: THEME_TO_SCOPE[selected] }),
       });
       const res = await resp.json();
@@ -121,7 +120,7 @@ export default function ThemeClient() {
     } finally {
       setSaving(false);
     }
-  } // ← onSaveTheme はここで終了（この1個だけ）
+  }
 
   if (loading) {
     return (

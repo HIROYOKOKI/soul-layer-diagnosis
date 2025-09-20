@@ -1,5 +1,7 @@
-// /lib/types.ts
+// lib/types.ts
+export type EV = "E" | "V" | "Λ" | "Ǝ";
 export type Slot = "morning" | "noon" | "night";
+export type Theme = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 
 export type Candidate = {
   id: string;
@@ -12,25 +14,26 @@ export type Candidate = {
 
 export type EBlock = {
   goal: string;
-  urgency: number;
+  urgency: number; // 0..1
   constraints?: Record<string, unknown>;
 };
 
 export type LambdaPick = {
-  pick: string;          // Candidate.id
+  pick: string; // Candidate.id
   reason: string;
-  rank_point: number;    // slotに応じた配点（3/2/1/0 など）
-  confidence: number;    // 0..1
+  rank_point: number; // slotに応じた配点
+  confidence: number; // 0..1
 };
 
 export type EpsilonBlock = {
-  outcome_score: number | null; // ユーザーの主観レビューや自動採点
+  outcome_score: number | null; // 0..1 | null（未観測）
   notes?: string;
 };
 
 export type EvlaLog = {
   slot: Slot;
   mode: "EVΛƎ";
+  theme: Theme;
   E: EBlock;
   V: Candidate[];
   Lambda: LambdaPick;
@@ -39,26 +42,29 @@ export type EvlaLog = {
 };
 
 export type UiResult = {
-  comment: string; // 100–150字
-  advice: string;  // 100–150字
-  affirm: string;  // 15–30字
-  score: number;   // 朝0.3/昼0.2/夜0.1（rank_point×0.1）
+  comment: string; // 100-150字目安
+  advice: string;  // 100-150字目安
+  affirm: string;  // 15-30字目安
+  score: number;   // 朝0.3 / 昼0.2 / 夜0.1（既定）
 };
 
-/* ============== API 契約（質問） ==============
-/api/daily/question の返却契約（固定）
-{
-  ok: true,
-  question: string,           // 50–100字
-  choices: Candidate[],       // UI表示用（id/label）
-  slot: Slot,
-  question_id: string,        // daily-YYYY-MM-DD-<slot>
-  seed: number
-}
-================================================ */
+// API I/O
+export type DailyQuestionResponse = {
+  ok: true;
+  seed: number;
+  slot: Slot;
+  theme: Theme;
+  question: string;
+  choices: { id: string; label: string }[]; // 候補A/B/C..（slotで個数可変）
+} | { ok: false; error: string };
 
-/* ============== API 契約（回答→結果） ==============
-/api/daily/answer の返却契約（固定）
-→ UiResult のみ（裏では EvlaLog を daily_results.evla に保存）
-{ "comment":"...", "advice":"...", "affirm":"...", "score":0.3 }
-==================================================== */
+export type DailyAnswerRequest = {
+  seed: number;
+  slot?: Slot;          // 省略時はJSTから自動推定
+  theme?: Theme;        // 省略時は "WORK"
+  choiceId: string;     // "A" | "B" | "C" ...
+};
+
+export type DailyAnswerResponse = UiResult & {
+  ok: true;
+} | { ok: false; error: string };

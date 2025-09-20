@@ -89,34 +89,30 @@ export default function ThemeClient() {
   };
 
   // ✅ 保存：/api/theme に scope をPOST（確認アラート付き）
-  async function onSaveTheme() {
-    if (!selected || saving) return;
-
-    // 変更による初期化の確認
-    const ok = window.confirm(
-      "テーマを変更すると、本日のデイリー未保存データが初期化されます。続行しますか？"
-    );
-    if (!ok) return;
-
-    setSaving(true);
-    try {
-      const scope = THEME_TO_SCOPE[selected]; // ← ここが肝：scopeを送る
-      const res = await fetch("/api/theme", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope, reset: true, env: ENV }),
-      });
-
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok || !j?.ok) {
-        if (j?.error === "not_authenticated") {
-          alert("ログインが必要です。ログイン画面へ移動します。");
-          router.push("/login?next=/mypage");
-          return;
-        }
-        alert("保存に失敗しました");
+ async function onSaveTheme() {
+  if (!selected) return;
+  try {
+    const resp = await fetch("/api/theme", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope: selected }),
+    });
+    const res = await resp.json();
+    if (!res?.ok) {
+      if (res?.error === "not_authenticated") {
+        alert("ログインが必要です。ログイン画面へ移動します。");
+        router.push("/login?next=/mypage");
         return;
       }
+      alert("保存に失敗しました");
+      return;
+    }
+    alert("テーマを保存しました");
+    router.push("/mypage");
+  } catch (e) {
+    alert("通信に失敗しました");
+  }
+}
 
       // 成功：マイページへ
       router.push("/mypage");

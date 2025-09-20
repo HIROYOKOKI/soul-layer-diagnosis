@@ -209,14 +209,14 @@ export async function toUiProd(evla: EvlaLog): Promise<UiResult> {
     });
     const txt = (r.output_text ?? "{}").trim();
     const parsed = JSON.parse(txt);
-    return {
-      comment: clampLen(parsed.comment ?? base.eExplain, 100, 150),
-      advice: clampLen(parsed.advice ?? base.advice, 100, 150),
-      affirm: clampLen(parsed.affirm ?? base.affirm[0], 15, 30),
-      score: evla.slot==="morning"?0.3:evla.slot==="noon"?0.2:0.1,
-    };
-  } catch (e) {
-    console.error("[toUiProd]", e);
-    return toUi(evla); // フェイルセーフ
+    return Object.assign({
+  comment: clampLen(parsed.comment ?? base.eExplain, 100, 150),
+  advice:  clampLen(parsed.advice  ?? base.advice,  100, 150),
+  affirm:  clampLen(parsed.affirm  ?? base.affirm[0], 15, 30),
+  score: evla.slot==="morning"?0.3:evla.slot==="noon"?0.2:0.1,
+}, { __source: "gpt" }) as any;
+
+// 失敗（フォールバック）時
+return Object.assign(toUi(evla), { __source: "template" }) as any;
   }
 }

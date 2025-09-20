@@ -156,12 +156,14 @@ export const nextV = (_: EpsilonBlock, __: LambdaPick) => ([
 ]);
 
 // ============ UI 整形（テーマ反映＆字数ガード） ============
-const clampLen = (s: string, min: number, max: number) => {
-  const t = s.trim();
-  if (t.length < min) return t + "。".repeat(Math.max(0, min - t.length));
-  if (t.length > max) return t.slice(0, max);
-  return t;
+// 上限だけを守る（下限はLLM生成やテンプレ側で担保）
+const clampLen = (s: string, _min: number, max: number) => {
+  const t = s.trim().replace(/\s+/g, " ");         // 空白整形
+  // 句点連打が入っていた場合の保険（既存データにも効く）
+  const noPad = t.replace(/(。+)\s*$/u, "。");
+  return noPad.length > max ? noPad.slice(0, max) : noPad;
 };
+
 
 export function toUi(evla: EvlaLog): UiResult {
   const w = slotScoreWeight(evla.slot);

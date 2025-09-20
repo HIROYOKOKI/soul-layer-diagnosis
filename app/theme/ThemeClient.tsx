@@ -91,6 +91,7 @@ export default function ThemeClient() {
   // ✅ 保存：/api/theme に scope をPOST（確認アラート付き）
  async function onSaveTheme() {
   if (!selected) return;
+  setSaving(true);
   try {
     const resp = await fetch("/api/theme", {
       method: "POST",
@@ -98,6 +99,7 @@ export default function ThemeClient() {
       body: JSON.stringify({ scope: selected }),
     });
     const res = await resp.json();
+
     if (!res?.ok) {
       if (res?.error === "not_authenticated") {
         alert("ログインが必要です。ログイン画面へ移動します。");
@@ -107,10 +109,13 @@ export default function ThemeClient() {
       alert("保存に失敗しました");
       return;
     }
+
     alert("テーマを保存しました");
     router.push("/mypage");
   } catch (e) {
     alert("通信に失敗しました");
+  } finally {
+    setSaving(false);
   }
 }
 

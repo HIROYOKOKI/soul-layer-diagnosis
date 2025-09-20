@@ -2,12 +2,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import {
-  detectJstSlot, extractE, generateCandidates, choose,
-  observeTemplate, nextV, toUiProd
-} from "@/lib/evla";
+
+// 👇 evla の関数は名前空間でまとめて import
+import * as EVLA from "@/lib/evla";
+
 import type {
-  DailyAnswerRequest, DailyAnswerResponse, Slot, Theme, EvlaLog
+  DailyAnswerRequest,
+  DailyAnswerResponse,
+  Slot,
+  Theme,
+  EvlaLog,
 } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -22,9 +26,8 @@ function pickTheme(req: NextRequest, bodyTheme?: Theme): Theme {
   if (bodyTheme && THEMES.includes(bodyTheme)) return bodyTheme;
   if (q && THEMES.includes(q)) return q;
 
-  // 新Cookie sl_scope を参照
   const c = cookies().get(SCOPE_COOKIE)?.value?.toUpperCase() as Theme | undefined;
-  return (c && THEMES.includes(c)) ? c : "LIFE";
+  return c && THEMES.includes(c) ? c : "LIFE";
 }
 
 /** 失敗時に少し待って再試行（短期的なDBエラー対策） */
@@ -42,37 +45,46 @@ async function insertWithRetry(sb: any, row: any, n = 2) {
 export async function POST(req: NextRequest) {
   try {
     const payload = (await req.json()) as DailyAnswerRequest;
-    const slot: Slot = payload.slot ?? detectJstSlot();
+    const slot: Slot = payload.slot ?? EVLA.detectJstSlot();
     const theme: Theme = pickTheme(req, payload.theme);
     const choiceId = payload.choiceId;
 
     // EVΛƎループ
-    const E = extractE(slot, theme);
-    const V = generateCandidates(slot, theme);
-    const LambdaAuto = choose(E, V, slot);
-    const Eps = observeTemplate(LambdaAuto, V);
-    const N = nextV(Eps, LambdaAuto);
+    const E = EVLA.extractE(slot, theme);
+    const V = EVLA.generateCandidates(slot, theme);
+    const LambdaAuto = EVLA.choose(E, V, slot);
+    const Eps = EVLA.observeTemplate(LambdaAuto, V);
+    const N = EVLA.nextV(Eps, LambdaAuto);
 
     // 保存用ログ
     const evla: EvlaLog = {
-      slot, mode: "EVΛƎ", theme,
-      E, V,
-      Lambda: { ...LambdaAuto, reason: `${LambdaAuto.reason}（ユーザー選択=${choiceId}）` },
+      slot,
+      mode: "EVΛƎ",
+      theme,
+      E,
+      V,
+      Lambda: {
+        ...LambdaAuto,
+        reason: `${LambdaAuto.reason}（ユーザー選択=${choiceId}）`,
+      },
       Epsilon: Eps,
       NextV: N,
     };
 
-    // GPT or テンプレ（toUiProd は USE_OPENAI=true でGPT、失敗時テンプレにフォールバック）
-    const ui: any = await toUiProd(evla);
+    // GPT or テンプレ
+    const ui: any = await EVLA.toUiProd(evla);
 
     // Supabase 保存
     const sb = getSupabaseAdmin();
     if (!sb) {
-      const res: DailyAnswerResponse = { ok: false, error: "supabase_env_missing" };
+      const res: DailyAnswerResponse = {
+        ok: false,
+        error: "supabase_env_missing",
+      };
       return NextResponse.json(res, { status: 500 });
     }
 
-    const themeDb = theme.toLowerCase(); // DB用は小文字
+    const themeDb = theme.toLowerCase();
 
     try {
       await insertWithRetry(sb, {
@@ -86,17 +98,29 @@ export async function POST(req: NextRequest) {
       });
     } catch (e: any) {
       console.error("[/api/daily/answer] insert failed:", e?.message || e);
-      const res: DailyAnswerResponse = { ok: false, error: e?.message ?? "insert_failed" };
+      const res: DailyAnswerResponse = {
+        ok: false,
+        error: e?.message ?? "insert_failed",
+      };
       return NextResponse.json(res, { status: 500 });
     }
 
     // --- デバッグ用ヘッダーで「gpt or template」を可視化 ---
-    const res = NextResponse.json({ ok: true, comment: ui.comment, advice: ui.advice, affirm: ui.affirm, score: ui.score } satisfies DailyAnswerResponse);
+    const res = NextResponse.json({
+      ok: true,
+      comment: ui.comment,
+      advice: ui.advice,
+      affirm: ui.affirm,
+      score: ui.score,
+    } satisfies DailyAnswerResponse);
     res.headers.set("x-ui-source", ui.__source ?? "unknown");
     return res;
   } catch (e: any) {
     console.error("[/api/daily/answer] unhandled:", e);
-    const res: DailyAnswerResponse = { ok: false, error: e?.message ?? "unknown_error" };
+    const res: DailyAnswerResponse = {
+      ok: false,
+      error: e?.message ?? "unknown_error",
+    };
     return NextResponse.json(res, { status: 500 });
   }
 }

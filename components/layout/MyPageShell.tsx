@@ -14,6 +14,7 @@ export type MyPageData = {
 
 const EMPTY_DATA: Readonly<MyPageData> = Object.freeze({})
 
+/* ====== 共通カード ====== */
 export function Card({
   title,
   children,
@@ -34,6 +35,7 @@ export function Card({
   )
 }
 
+/* ====== 日付フォーマット（YYYY/MM/DD HH:mm） ====== */
 export function formatJP(iso?: string | null): string {
   if (!iso) return ''
   const d = new Date(iso)
@@ -50,6 +52,7 @@ export type MyPageShellProps = {
   children?: ReactNode
 }
 
+/* ====== 本体レイアウト ====== */
 export default function MyPageShell({ data, children }: MyPageShellProps) {
   const d = (data ?? EMPTY_DATA) as MyPageData
   const name = d?.user?.name ?? 'Hiro'
@@ -65,7 +68,7 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
         </span>
       </div>
 
-      {/* プロフィール行（カード外）＋ 右端⚙️ */}
+      {/* プロフィール行（カード外）＋右端⚙️ */}
       <div className="mb-1 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
         <div className="flex items-center gap-4">
           <div className="h-14 w-14 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center">
@@ -90,18 +93,18 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
         </button>
       </div>
 
-      {/* テーマ行（ヘッダ直下・左端揃え） */}
+      {/* テーマ行（ヘッダ直下・左端） */}
       <div className="mt-2 mb-6 rounded-none border-0 bg-transparent p-0 shadow-none">
         <ThemeRow
           label="テーマ"
-          value={d?.theme?.name ?? 'LOVE'}
+          value={d?.theme?.name ?? 'LOVE'}                    // ← "work/love/future/life" でもOK（ThemeRow側で大文字表示）
           date={d?.theme?.updated_at ?? '2025-09-07T23:34:00'}
         />
       </div>
 
-      {/* カードグリッド（プロフィール枠は含めない） */}
+      {/* カードグリッド（必要に応じて children を追加） */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Quick（条件付き） */}
+        {/* Quick（条件付き表示） */}
         {d?.quick?.order?.length ? (
           <Card title="Quick 結果">
             <div className="text-white text-sm tracking-wide">{d.quick.order.join(' ')}</div>
@@ -139,7 +142,7 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
               デイリー診断
               <div className="text-xs text-neutral-400">1問 / 今日のゆらぎ</div>
             </button>
-            <button className="flex-1 px-4 py-3 rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600">
+            <button className="flex-1 px-4 py-3 rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600" disabled>
               診断タイプを選ぶ
               <div className="text-xs text-neutral-400">Weekly / Monthly (予定)</div>
             </button>

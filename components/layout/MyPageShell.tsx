@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import ThemeRow from './ThemeRow'
+import { formatJP } from './date'   // ← ここを追加（元の formatJP 定義は削除）
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 

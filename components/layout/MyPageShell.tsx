@@ -66,7 +66,7 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
       </div>
 
       {/* プロフィール行（カード外）＋ 右端⚙️ */}
-      <div className="mb-1 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
         <div className="flex items-center gap-4">
           <div className="h-14 w-14 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center">
             {avatar ? (
@@ -91,7 +91,7 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
       </div>
 
       {/* テーマ行（ヘッダ直下・左端揃え） */}
-      <div className="mt-2 mb-6">
+      <div className="mt-2 mb-6 rounded-none border-0 bg-transparent p-0 shadow-none">
         <ThemeRow
           label="テーマ"
           value={d?.theme?.name ?? 'LOVE'}

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import ThemeRow from './ThemeRow'
-import { formatJP } from './date'   // ← ここを追加（元の formatJP 定義は削除）
+import { formatJP } from './date'  // 共通utilから
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
@@ -34,17 +34,6 @@ export function Card({
       {children}
     </div>
   )
-}
-
-/* ====== 日付フォーマット（YYYY/MM/DD HH:mm） ====== */
-  if (!iso) return ''
-  const d = new Date(iso)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${y}/${m}/${day} ${hh}:${mm}`
 }
 
 export type MyPageShellProps = {
@@ -97,7 +86,7 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
       <div className="mt-2 mb-6 rounded-none border-0 bg-transparent p-0 shadow-none">
         <ThemeRow
           label="テーマ"
-          value={d?.theme?.name ?? 'LOVE'}                    // ← "work/love/future/life" でもOK（ThemeRow側で大文字表示）
+          value={d?.theme?.name ?? 'LOVE'} // "work/love/future/life" でもOK（ThemeRow側で大文字化）
           date={d?.theme?.updated_at ?? '2025-09-07T23:34:00'}
         />
       </div>
@@ -142,7 +131,10 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
               デイリー診断
               <div className="text-xs text-neutral-400">1問 / 今日のゆらぎ</div>
             </button>
-            <button className="flex-1 px-4 py-3 rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600" disabled>
+            <button
+              className="flex-1 px-4 py-3 rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600"
+              disabled
+            >
               診断タイプを選ぶ
               <div className="text-xs text-neutral-400">Weekly / Monthly (予定)</div>
             </button>

@@ -1,7 +1,12 @@
-import MyPageClient from "./MyPageClient";
+'use client'
 
-export const dynamic = "force-dynamic";
+import MyPageShell from '@/components/layout/MyPageShell'
+import DataBridge from '@/components/layout/DataBridge'
 
-export default async function MyPagePage() {
-  return <MyPageClient />;
+export default function Page() {
+  return (
+    <DataBridge demo>
+      <MyPageShell />
+    </DataBridge>
+  )
 }

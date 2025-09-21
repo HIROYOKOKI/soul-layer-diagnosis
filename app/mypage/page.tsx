@@ -5,7 +5,7 @@ import DataBridge from '@/components/layout/DataBridge'
 
 export default function Page() {
   return (
-    <DataBridge demo>
+    <DataBridge demo={false}>
       <MyPageShell />
     </DataBridge>
   )

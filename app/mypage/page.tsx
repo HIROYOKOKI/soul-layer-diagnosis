@@ -1,12 +1,10 @@
 // app/mypage/page.tsx
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-export const fetchCache = 'force-no-store';
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
 
-import MyPageShell from '../../components/layout/MyPageShell'
-import DataBridge from '../../components/layout/DataBridge'
-
+import MyPageClientWrapper from './MyPageClientWrapper' // ← 直後に作る薄ラッパ
 
 export default function Page() {
-  return <MyPageClient />;
+  return <MyPageClientWrapper />
 }

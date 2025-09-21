@@ -1,17 +1,10 @@
 // app/mypage/page.tsx
-'use client'
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
-import MyPageShell from '@/components/layout/MyPageShell'
-import DataBridge from '@/components/layout/DataBridge'
-
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-export const fetchCache = 'force-no-store'
+import MyPageClient from './MyPageClientWrapper';
 
 export default function Page() {
-  return (
-    <DataBridge demo={false}>
-      <MyPageShell />
-    </DataBridge>
-  )
+  return <MyPageClient />;
 }

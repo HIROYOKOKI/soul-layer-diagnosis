@@ -1,8 +1,7 @@
-// app/log/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
-import { formatJP } from '@/components/layout/date';
+import { formatJP } from '../../components/layout/date';
 
 type EV = 'E'|'V'|'Λ'|'Ǝ';
 type DailyItem = { code?: EV|null; comment?: string|null; created_at?: string|null }|null;

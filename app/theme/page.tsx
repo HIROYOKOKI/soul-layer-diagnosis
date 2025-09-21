@@ -1,8 +1,6 @@
-// app/theme/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
-
 type Scope = 'WORK' | 'LOVE' | 'FUTURE' | 'LIFE';
 
 export default function ThemePage() {
@@ -14,9 +12,9 @@ export default function ThemePage() {
     (async () => {
       try {
         const r = await fetch('/api/theme', { cache: 'no-store' });
-        const json = await r.json();
-        if (json?.ok && json?.scope) setScope(json.scope as Scope);
-      } catch {/* no-op */}
+        const j = await r.json();
+        if (j?.ok && j?.scope) setScope(j.scope as Scope);
+      } catch {}
     })();
   }, []);
 
@@ -27,9 +25,9 @@ export default function ThemePage() {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ scope: s }),
       });
-      const json = await r.json();
-      if (json?.ok) { setScope(s); setMsg('テーマを保存しました'); }
-      else setMsg(json?.error ?? '保存に失敗しました');
+      const j = await r.json();
+      if (j?.ok) { setScope(s); setMsg('テーマを保存しました'); }
+      else setMsg(j?.error ?? '保存に失敗しました');
     } catch (e:any) { setMsg(e?.message ?? '保存に失敗しました'); }
     finally { setSaving(false); }
   }

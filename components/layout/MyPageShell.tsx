@@ -2,7 +2,8 @@
 
 import type { ReactNode } from 'react'
 import ThemeRow from './ThemeRow'
-import { formatJP } from './date'  // 共通utilから
+import { formatJP } from './date'
+import Link from 'next/link'
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
@@ -57,8 +58,8 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
         </span>
       </div>
 
-      {/* プロフィール行（カード外）＋右端⚙️ */}
-      <div className="mb-1 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
+      {/* プロフィール行 */}
+      <div className="mb-1 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="h-14 w-14 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center">
             {avatar ? (
@@ -82,16 +83,16 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
         </button>
       </div>
 
-      {/* テーマ行（ヘッダ直下・左端） */}
-      <div className="mt-2 mb-6 rounded-none border-0 bg-transparent p-0 shadow-none">
+      {/* テーマ行 */}
+      <div className="mt-2 mb-6">
         <ThemeRow
           label="テーマ"
-          value={d?.theme?.name ?? 'LOVE'} // ThemeRow側で大文字化
+          value={d?.theme?.name ?? 'LOVE'}
           date={d?.theme?.updated_at ?? ''}
         />
       </div>
 
-      {/* カードグリッド（必要に応じて children を追加） */}
+      {/* カードグリッド */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Quick（条件付き表示） */}
         {Array.isArray(d?.quick?.order) && d.quick?.order?.length > 0 ? (
@@ -121,7 +122,7 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
           )}
         </Card>
 
-        {/* 構造バランス（レーダー枠） */}
+        {/* 構造バランス */}
         <Card title="構造バランス">
           <div className="h-48 flex items-center justify-center text-neutral-500">
             [Radar Chart Placeholder]
@@ -130,18 +131,23 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
 
         {/* 次の一歩 */}
         <Card title="次の一歩を選んでください">
-          <div className="flex gap-4">
-            <button className="flex-1 px-4 py-3 rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600">
+          <div className="grid grid-cols-2 gap-3">
+            <Link href="/daily" className="rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600 px-4 py-3 text-center hover:bg-neutral-700">
               デイリー診断
               <div className="text-xs text-neutral-400">1問 / 今日のゆらぎ</div>
-            </button>
-            <button
-              className="flex-1 px-4 py-3 rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600"
-              disabled
-            >
-              診断タイプを選ぶ
-              <div className="text-xs text-neutral-400">Weekly / Monthly (予定)</div>
-            </button>
+            </Link>
+            <Link href="/theme" className="rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600 px-4 py-3 text-center hover:bg-neutral-700">
+              テーマ設定
+              <div className="text-xs text-neutral-400">WORK/LOVE/FUTURE/LIFE</div>
+            </Link>
+            <Link href="/quick" className="rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600 px-4 py-3 text-center hover:bg-neutral-700">
+              Quick診断
+              <div className="text-xs text-neutral-400">近日拡張</div>
+            </Link>
+            <Link href="/log" className="rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600 px-4 py-3 text-center hover:bg-neutral-700">
+              診断ログ
+              <div className="text-xs text-neutral-400">最新2種を表示</div>
+            </Link>
           </div>
         </Card>
 

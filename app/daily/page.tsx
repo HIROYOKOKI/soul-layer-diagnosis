@@ -1,10 +1,22 @@
-// app/daily/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { Slot, Theme, DailyQuestionResponse, DailyAnswerResponse } from '@/lib/types';
 
+type Slot = 'morning' | 'noon' | 'night';
+type Theme = 'WORK' | 'LOVE' | 'FUTURE' | 'LIFE';
 type Phase = 'ask' | 'result' | 'error';
+
+type DailyQuestionResponse = {
+  ok: boolean; error?: string;
+  slot: Slot; theme: Theme; seed: number;
+  question: string; choices: { id: string; label: string }[];
+};
+
+type DailyAnswerResponse = {
+  ok: boolean; error?: string;
+  comment: string; advice?: string; affirm?: string;
+  score?: number;
+};
 
 export default function DailyPage() {
   const [phase, setPhase] = useState<Phase>('ask');
@@ -27,9 +39,8 @@ export default function DailyPage() {
         setSlot(json.slot); setTheme(json.theme); setSeed(json.seed);
         setQuestion(json.question); setChoices(json.choices);
         setPhase('ask');
-      } catch (e: any) {
-        setErr(e?.message ?? 'failed_to_load'); setPhase('error');
-      } finally { setLoading(false); }
+      } catch (e: any) { setErr(e?.message ?? 'failed_to_load'); setPhase('error'); }
+      finally { setLoading(false); }
     })();
   }, []);
 
@@ -42,16 +53,16 @@ export default function DailyPage() {
         body: JSON.stringify({ seed, choiceId, theme }),
       });
       const json = (await r.json()) as DailyAnswerResponse;
-      if (!json.ok) throw new Error((json as any)?.error ?? 'failed');
+      if (!json.ok) throw new Error(json?.error ?? 'failed');
       setResult(json); setPhase('result');
     } catch (e:any) { setErr(e?.message ?? 'failed_to_answer'); setPhase('error'); }
     finally { setLoading(false); }
   }
 
   const header = useMemo(() => {
-    const s = slot === 'morning' ? '朝' : slot === 'noon' ? '昼' : slot === 'night' ? '夜' : '';
-    const t = theme === 'WORK' ? '仕事' : theme === 'LOVE' ? '愛' : theme === 'FUTURE' ? '未来' : '生活';
-    return `デイリー診断${s || t ? `（${[s,t].filter(Boolean).join(' × ')}）` : ''}`;
+    const s = slot==='morning'?'朝':slot==='noon'?'昼':slot==='night'?'夜':'';
+    const t = theme==='WORK'?'仕事':theme==='LOVE'?'愛':theme==='FUTURE'?'未来':'生活';
+    return `デイリー診断${s||t ? `（${[s,t].filter(Boolean).join(' × ')}）` : ''}`;
   }, [slot, theme]);
 
   return (

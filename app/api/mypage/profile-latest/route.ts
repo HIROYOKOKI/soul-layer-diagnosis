@@ -6,15 +6,24 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const sb = getSupabaseAdmin();
-  if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 });
+  if (!sb) {
+    return NextResponse.json(
+      { ok: false, error: "supabase_env_missing" },
+      { status: 500 }
+    );
+  }
 
+  // 期待スキーマ（例）: profile_results(fortune text, personality text, partner text, created_at timestamptz, ...）
+  // 必要なら base_model / base_order など列を後から追加してOK
   const { data, error } = await sb
     .from("profile_results")
-    .select("fortune, personality, partner, base_model, base_order, created_at")
-    .order("created_at", { ascending:false })
+    .select("fortune, personality, partner, created_at")
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 });
-  return NextResponse.json({ ok:true, item: data ?? null });
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true, item: data ?? null });
 }

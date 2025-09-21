@@ -37,7 +37,6 @@ export function Card({
 }
 
 /* ====== 日付フォーマット（YYYY/MM/DD HH:mm） ====== */
-export function formatJP(iso?: string | null): string {
   if (!iso) return ''
   const d = new Date(iso)
   const y = d.getFullYear()

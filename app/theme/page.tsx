@@ -1,13 +1,18 @@
-// app/theme/page.tsx  ← 先頭に "use client" を置かない！
-import type { Metadata } from "next";
-import ThemeClient from "./ThemeClient";
+'use client'
 
-export const metadata: Metadata = {
-  title: "テーマ選択 | Soul Layer",
-  description: "テーマを選ぶページ",
-};
+import MyPageShell, { Card } from '@/components/layout/MyPageShell'
+import DataBridge from '@/components/layout/DataBridge'
 
-export default function ThemePage() {
-  // Client Component をそのまま描画OK
-  return <ThemeClient />;
+export default function Page() {
+  return (
+    <DataBridge demo={false}>
+      <MyPageShell>
+        <Card title="テーマ設定">
+          <div className="text-sm text-neutral-300">
+            （テーマ選択や更新UIをここに実装予定）
+          </div>
+        </Card>
+      </MyPageShell>
+    </DataBridge>
+  )
 }

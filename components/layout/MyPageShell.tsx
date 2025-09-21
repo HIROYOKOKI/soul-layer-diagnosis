@@ -8,7 +8,7 @@ type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
 export type MyPageData = {
   user?: { name?: string | null; displayId?: string | null; avatarUrl?: string | null } | null
-  quick?: { order?: EV[]; created_at?: string | null } | null
+  quick?: { order?: EV[] | null; created_at?: string | null } | null
   theme?: { name?: string | null; updated_at?: string | null } | null
   daily?: { code?: EV | null; comment?: string | null; created_at?: string | null } | null
 } | null
@@ -86,19 +86,21 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
       <div className="mt-2 mb-6 rounded-none border-0 bg-transparent p-0 shadow-none">
         <ThemeRow
           label="テーマ"
-          value={d?.theme?.name ?? 'LOVE'} // "work/love/future/life" でもOK（ThemeRow側で大文字化）
-          date={d?.theme?.updated_at ?? '2025-09-07T23:34:00'}
+          value={d?.theme?.name ?? 'LOVE'} // ThemeRow側で大文字化
+          date={d?.theme?.updated_at ?? ''}
         />
       </div>
 
       {/* カードグリッド（必要に応じて children を追加） */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Quick（条件付き表示） */}
-        {d?.quick?.order?.length ? (
+        {Array.isArray(d?.quick?.order) && d.quick?.order?.length > 0 ? (
           <Card title="Quick 結果">
-            <div className="text-white text-sm tracking-wide">{d.quick.order.join(' ')}</div>
+            <div className="text-white text-sm tracking-wide">
+              {d.quick?.order?.join(' ')}
+            </div>
             <div className="mt-3 text-xs text-neutral-400">
-              {d.quick.created_at ? `更新: ${formatJP(d.quick.created_at)}` : ''}
+              {d.quick?.created_at ? `更新: ${formatJP(d.quick.created_at)}` : ''}
             </div>
           </Card>
         ) : null}
@@ -108,9 +110,11 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
           {d?.daily?.code ? (
             <>
               <p className="text-sm text-neutral-200 leading-relaxed">
-                {d.daily.comment ?? 'コメントはまだありません。'}
+                {d.daily?.comment ?? 'コメントはまだありません。'}
               </p>
-              <div className="mt-3 text-xs text-neutral-400">更新: {formatJP(d.daily.created_at)}</div>
+              <div className="mt-3 text-xs text-neutral-400">
+                {d.daily?.created_at ? `更新: ${formatJP(d.daily.created_at)}` : ''}
+              </div>
             </>
           ) : (
             <p className="text-xs text-neutral-500">未取得</p>

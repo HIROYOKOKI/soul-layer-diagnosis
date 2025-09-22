@@ -3,6 +3,8 @@
 import type { ReactNode } from 'react'
 import ThemeRow from './ThemeRow'
 import { formatJP } from './date'  // 共通utilから
+import ClockJST from '@/components/ClockJST';
+
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
@@ -104,6 +106,15 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
             </div>
           </Card>
         ) : null}
+        // 見出しブロック例
+<div className="flex items-center justify-between mb-2">
+  <h2 className="text-xl font-semibold tracking-wide text-violet-300">
+    EVΛƎ（未来志向型）
+  </h2>
+  <div className="text-xs text-neutral-400">
+    現在時刻（JST）：<ClockJST />
+  </div>
+</div>
 
         {/* デイリー（最新） */}
         <Card title="デイリー（最新）">

@@ -1,7 +1,7 @@
 // components/layout/MyPageShell.tsx
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { formatJP } from './date'
 import ClockJST from './ClockJST'
 
@@ -17,6 +17,49 @@ export type MyPageData = {
 
 const EMPTY_DATA: Readonly<MyPageData> = Object.freeze({})
 
+// ---- 内蔵：アバターアップロード（/api/profile/avatar にPOST） ----
+function AvatarUpload({
+  userId,
+  onUploaded,
+}: {
+  userId?: string
+  onUploaded?: (url: string) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  if (!userId) return null
+
+  const onChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.[0]) return
+    setBusy(true)
+    const fd = new FormData()
+    fd.append('file', e.target.files[0])
+    fd.append('user_id', userId)
+    try {
+      const res = await fetch('/api/profile/avatar', { method: 'POST', body: fd })
+      const json = await res.json()
+      if (json?.ok && json.url) onUploaded?.(json.url)
+      else alert('アップロード失敗: ' + (json?.error ?? 'unknown_error'))
+    } catch (err: any) {
+      alert('アップロード失敗: ' + (err?.message ?? 'network_error'))
+    } finally {
+      setBusy(false)
+      // 連続選択できるように
+      e.currentTarget.value = ''
+    }
+  }
+
+  return (
+    <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-neutral-300 hover:text-white">
+      <span className="px-2 py-1 rounded-md bg-white/5 border border-white/10 hover:bg-white/10">
+        画像を変更
+      </span>
+      <input type="file" accept="image/*" className="hidden" onChange={onChange} />
+      {busy && <span className="text-neutral-400">アップロード中…</span>}
+    </label>
+  )
+}
+
+// ---- 共通カード ----
 export function Card({
   title, children, right,
 }: { title: string; children: ReactNode; right?: ReactNode }) {
@@ -31,14 +74,21 @@ export function Card({
   )
 }
 
-export type MyPageShellProps = { data?: MyPageData | null; children?: ReactNode }
+export type MyPageShellProps = {
+  data?: MyPageData | null
+  children?: ReactNode
+  /** ログイン中のユーザーID（Supabaseの user.id）。アップロードに必要 */
+  userId?: string
+}
 
-export default function MyPageShell({ data, children }: MyPageShellProps) {
+export default function MyPageShell({ data, children, userId }: MyPageShellProps) {
   const d = (data ?? EMPTY_DATA) as MyPageData
 
   const name = d?.user?.name ?? 'Hiro'
   const did = d?.user?.displayId ?? '0001'
-  const avatar = d?.user?.avatarUrl ?? ''
+
+  // アバターはアップロード後に即時反映したいのでローカルstateで持つ
+  const [avatar, setAvatar] = useState<string>(d?.user?.avatarUrl ?? '')
 
   // ==== Quick の型（タイトルへ反映。未取得時は EVΛƎ/未来志向型 を既定表示） ====
   const model = (d?.quick?.model ?? 'EVΛƎ') as 'EVΛƎ' | 'EΛVƎ'
@@ -72,9 +122,14 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
             <div className="text-xs text-neutral-400">ID: {did}</div>
           </div>
         </div>
-        <button type="button" aria-label="設定" className="text-xl text-neutral-300 hover:text-white transition-colors">
-          ⚙️
-        </button>
+
+        {/* 右側：設定アイコン＋画像変更 */}
+        <div className="flex items-center gap-3">
+          <AvatarUpload userId={userId} onUploaded={(url) => setAvatar(url)} />
+          <button type="button" aria-label="設定" className="text-xl text-neutral-300 hover:text-white transition-colors">
+            ⚙️
+          </button>
+        </div>
       </div>
 
       {/* テーマ行（左：テーマ名のみ／右：JST 現在時刻） */}

@@ -1,9 +1,9 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import ThemeRow from './ThemeRow'
-import { formatJP } from './date'  // 共通utilから
-import ClockJST from '../ClockJST';   
+import ThemeRow from './ThemeRow';
+import { formatJP } from './date';
+import ClockJST from '../ClockJST';   // ←ここを修正
 
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ'

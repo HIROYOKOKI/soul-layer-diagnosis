@@ -1,7 +1,7 @@
 // components/layout/MyPageShell.tsx
 'use client'
 
-import { useRef, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { formatJP } from './date'
 import ClockJST from './ClockJST'
 
@@ -9,6 +9,7 @@ type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
 export type MyPageData = {
   user?: { name?: string | null; displayId?: string | null; avatarUrl?: string | null } | null
+  // 見出しは Quick の model/label だけ使う（並びは表示しない方針）
   quick?: { model?: 'EVΛƎ' | 'EΛVƎ' | null; label?: string | null; created_at?: string | null } | null
   theme?: { name?: string | null; updated_at?: string | null } | null
   daily?: { code?: EV | null; comment?: string | null; created_at?: string | null } | null
@@ -16,55 +17,7 @@ export type MyPageData = {
 
 const EMPTY_DATA: Readonly<MyPageData> = Object.freeze({})
 
-// ---- 右上⚙️から開く 設定メニュー内で画像変更を実行 ----
-function useAvatarMenuUpload(onDone?: (url: string) => void) {
-  const inputRef = useRef<HTMLInputElement | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  const trigger = () => {
-    inputRef.current?.click()
-  }
-
-  const FileInput = ({ userId }: { userId?: string }) => (
-    <input
-      ref={inputRef}
-      type="file"
-      accept="image/*"
-      className="hidden"
-      onChange={async (e) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-        if (!userId) {
-          alert('ログインしてから実行してください')
-          e.currentTarget.value = ''
-          return
-        }
-        setBusy(true)
-        const fd = new FormData()
-        fd.append('file', file)
-        fd.append('user_id', userId)
-        try {
-          const res = await fetch('/api/profile/avatar', { method: 'POST', body: fd })
-          const json = await res.json()
-          if (json?.ok && json.url) {
-            onDone?.(json.url)
-          } else {
-            alert('アップロード失敗: ' + (json?.error ?? 'unknown_error'))
-          }
-        } catch (err: any) {
-          alert('アップロード失敗: ' + (err?.message ?? 'network_error'))
-        } finally {
-          setBusy(false)
-          e.currentTarget.value = '' // 連続で同じファイルを選べるように
-        }
-      }}
-    />
-  )
-
-  return { trigger, FileInput, busy }
-}
-
-// ---- 共通カード ----
+/* ===== 共通カード ===== */
 export function Card({
   title, children, right,
 }: { title: string; children: ReactNode; right?: ReactNode }) {
@@ -79,49 +32,69 @@ export function Card({
   )
 }
 
-export type MyPageShellProps = {
-  data?: MyPageData | null
-  children?: ReactNode
-  /** ログイン中のユーザーID（Supabaseの user.id）。アップロードに必要 */
-  userId?: string
-}
+export type MyPageShellProps = { data?: MyPageData | null; children?: ReactNode }
 
-export default function MyPageShell({ data, children, userId }: MyPageShellProps) {
+/* ===== 本体レイアウト ===== */
+export default function MyPageShell({ data, children }: MyPageShellProps) {
   const d = (data ?? EMPTY_DATA) as MyPageData
 
   const name = d?.user?.name ?? 'Hiro'
   const did = d?.user?.displayId ?? '0001'
+  const avatar = d?.user?.avatarUrl ?? ''
 
-  // アバターは即時反映
-  const [avatar, setAvatar] = useState<string>(d?.user?.avatarUrl ?? '')
-
-  // Quick タイトル
+  // Quick 見出し（型と色）
   const model = (d?.quick?.model ?? 'EVΛƎ') as 'EVΛƎ' | 'EΛVƎ'
   const modelLabel = d?.quick?.label ?? (model === 'EVΛƎ' ? '未来志向型' : '現実思考型')
+  const modelColor = model === 'EVΛƎ' ? '#FF4500' : '#B833F5' // EVΛƎ=オレンジ / EΛVƎ=パープル
 
-  // テーマ
-  const themeName = ((d?.theme?.name ?? 'LIFE') as string).toUpperCase()
-
-  // 設定メニューの開閉
-  const [menuOpen, setMenuOpen] = useState(false)
-
-  // メニュー内「画像を変更」で使うアップローダ
-  const { trigger: triggerUpload, FileInput, busy: uploading } = useAvatarMenuUpload((url) => {
-    setAvatar(url)
-    setMenuOpen(false)
-  })
+  // テーマ表記（lowercase表示＋更新日）
+  const themeRaw = (d?.theme?.name ?? 'LIFE') as string
+  const themeName = themeRaw.toLowerCase()
+  const themeUpdated = d?.theme?.updated_at ? formatJP(d.theme.updated_at) : ''
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:py-10 bg-black min-h-screen font-sans">
-      {/* 中央タイトル */}
-      <div className="mb-2 md:mb-3 flex justify-center">
-        <span className="text-[22px] md:text-3xl font-extrabold text-purple-400 tracking-wide">
-          {model}（{modelLabel}）
-        </span>
+      {/* ===== ヘッダー（画像の構成に合わせる） ===== */}
+      <div className="mb-3 flex items-start justify-between">
+        {/* 左：MY PAGE と 型名（50%縮小・色分け）＋サブコピー */}
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-3">
+            <div className="text-[22px] md:text-3xl font-extrabold text-white tracking-wide">
+              MY PAGE
+            </div>
+            <div
+              className="font-extrabold tracking-wide"
+              // 以前の見出しの約 50% に縮小
+              style={{ color: modelColor, fontSize: '14px' /* ~50% */ }}
+            >
+              {model}（{modelLabel}）
+            </div>
+          </div>
+          <div className="mt-1 text-xs text-neutral-400">
+            あなたの軌跡と、いまを映す
+          </div>
+        </div>
+
+        {/* 右：設定ボタン（ピル形） */}
+        <button
+          type="button"
+          aria-label="設定"
+          className="shrink-0 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-neutral-200 hover:bg-white/10"
+        >
+          設定
+        </button>
       </div>
 
-      {/* プロフィール行 */}
-      <div className="mb-1 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
+      {/* サブ行：テーマ（左）と 現在時刻（右） */}
+      <div className="mb-6 flex items-center justify-between">
+        <div className="text-xs text-neutral-400">
+          テーマ：{themeName}{themeUpdated ? ` ・ ${themeUpdated}` : ''}
+        </div>
+        <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
+      </div>
+
+      {/* ===== プロフィール行 ===== */}
+      <div className="mb-2 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center">
             {avatar ? (
@@ -136,73 +109,10 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
             <div className="text-xs text-neutral-400">ID: {did}</div>
           </div>
         </div>
-
-        {/* 右側：設定メニュー */}
-        <div className="relative">
-          <button
-            type="button"
-            aria-label="設定"
-            className="text-xl text-neutral-300 hover:text-white transition-colors"
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            ⚙️
-          </button>
-
-          {menuOpen && (
-            <div
-              className="absolute right-0 mt-2 w-56 rounded-xl border border-white/10 bg-neutral-900/95 backdrop-blur shadow-lg z-20"
-              onMouseLeave={() => setMenuOpen(false)}
-            >
-              {/* ヘッダ */}
-              <div className="px-4 py-3 border-b border-white/10">
-                <div className="text-xs text-neutral-400">プロフィール設定</div>
-              </div>
-
-              {/* メニュー項目 */}
-              <div className="py-1">
-                <button
-                  type="button"
-                  className={`w-full text-left px-4 py-2 text-sm ${
-                    userId ? 'text-white hover:bg-white/5' : 'text-neutral-500 cursor-not-allowed'
-                  }`}
-                  onClick={() => userId && triggerUpload()}
-                >
-                  {uploading ? '画像を変更（アップロード中…）' : '画像を変更'}
-                </button>
-
-                <button
-                  type="button"
-                  className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/5"
-                  onClick={() => alert('プロフィール編集は準備中です')}
-                >
-                  プロフィール編集（準備中）
-                </button>
-
-                <button
-                  type="button"
-                  className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/5"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  閉じる
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 非表示のファイル入力（メニューから起動） */}
-          <FileInput userId={userId} />
-        </div>
       </div>
 
-      {/* テーマ行 */}
-      <div className="mt-2 mb-6 flex items-center justify-between">
-        <div className="text-sm text-white">テーマ: {themeName}</div>
-        <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
-      </div>
-
-      {/* カードグリッド */}
+      {/* ===== カードグリッド ===== */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
         {/* デイリー（最新） */}
         <Card title="デイリー（最新）">
           {d?.daily?.code ? (

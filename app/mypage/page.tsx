@@ -2,10 +2,18 @@
 import MyPageClientWrapper from './MyPageClientWrapper';
 
 export default async function MyPagePage() {
-  // 相対URL + no-store → Cookieが必ず乗る＆常に最新
-  const res = await fetch('/api/theme', { cache: 'no-store' }).catch(() => null);
-  const json = await res?.json().catch(() => null);
-  const theme: string | null = json?.scope ?? null; // "WORK" | "LOVE" | "FUTURE" | "LIFE" | null
+  const [tRes, qRes] = await Promise.all([
+    fetch('/api/theme', { cache: 'no-store' }).catch(() => null),
+    fetch('/api/mypage/quick-latest', { cache: 'no-store' }).catch(() => null),
+  ]);
 
-  return <MyPageClientWrapper theme={theme} />;
+  const tJson = await tRes?.json().catch(() => null);
+  const qJson = await qRes?.json().catch(() => null);
+
+  const theme: string | null = tJson?.scope ?? null;
+
+  // API 期待形: { ok:true, item:{ model:'EVΛƎ'|'EΛVƎ', order:['E','V','Λ','Ǝ'], created_at:'...' } }
+  const quick = qJson?.item ?? null;
+
+  return <MyPageClientWrapper theme={theme} quick={quick} />;
 }

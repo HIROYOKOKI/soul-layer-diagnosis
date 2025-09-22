@@ -1,7 +1,7 @@
 // components/layout/MyPageShell.tsx
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { formatJP } from './date'
 import ClockJST from './ClockJST'
 
@@ -9,7 +9,6 @@ type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
 export type MyPageData = {
   user?: { name?: string | null; displayId?: string | null; avatarUrl?: string | null } | null
-  // quick は「タイトル用の型名/ラベル」だけ受け取る（並びは渡さない方針）
   quick?: { model?: 'EVΛƎ' | 'EΛVƎ' | null; label?: string | null; created_at?: string | null } | null
   theme?: { name?: string | null; updated_at?: string | null } | null
   daily?: { code?: EV | null; comment?: string | null; created_at?: string | null } | null
@@ -17,46 +16,52 @@ export type MyPageData = {
 
 const EMPTY_DATA: Readonly<MyPageData> = Object.freeze({})
 
-// ---- 内蔵：アバターアップロード（/api/profile/avatar にPOST） ----
-function AvatarUpload({
-  userId,
-  onUploaded,
-}: {
-  userId?: string
-  onUploaded?: (url: string) => void
-}) {
+// ---- 右上⚙️から開く 設定メニュー内で画像変更を実行 ----
+function useAvatarMenuUpload(onDone?: (url: string) => void) {
+  const inputRef = useRef<HTMLInputElement | null>(null)
   const [busy, setBusy] = useState(false)
-  if (!userId) return null
 
-  const onChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0]) return
-    setBusy(true)
-    const fd = new FormData()
-    fd.append('file', e.target.files[0])
-    fd.append('user_id', userId)
-    try {
-      const res = await fetch('/api/profile/avatar', { method: 'POST', body: fd })
-      const json = await res.json()
-      if (json?.ok && json.url) onUploaded?.(json.url)
-      else alert('アップロード失敗: ' + (json?.error ?? 'unknown_error'))
-    } catch (err: any) {
-      alert('アップロード失敗: ' + (err?.message ?? 'network_error'))
-    } finally {
-      setBusy(false)
-      // 連続選択できるように
-      e.currentTarget.value = ''
-    }
+  const trigger = () => {
+    inputRef.current?.click()
   }
 
-  return (
-    <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-neutral-300 hover:text-white">
-      <span className="px-2 py-1 rounded-md bg-white/5 border border-white/10 hover:bg-white/10">
-        画像を変更
-      </span>
-      <input type="file" accept="image/*" className="hidden" onChange={onChange} />
-      {busy && <span className="text-neutral-400">アップロード中…</span>}
-    </label>
+  const FileInput = ({ userId }: { userId?: string }) => (
+    <input
+      ref={inputRef}
+      type="file"
+      accept="image/*"
+      className="hidden"
+      onChange={async (e) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        if (!userId) {
+          alert('ログインしてから実行してください')
+          e.currentTarget.value = ''
+          return
+        }
+        setBusy(true)
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('user_id', userId)
+        try {
+          const res = await fetch('/api/profile/avatar', { method: 'POST', body: fd })
+          const json = await res.json()
+          if (json?.ok && json.url) {
+            onDone?.(json.url)
+          } else {
+            alert('アップロード失敗: ' + (json?.error ?? 'unknown_error'))
+          }
+        } catch (err: any) {
+          alert('アップロード失敗: ' + (err?.message ?? 'network_error'))
+        } finally {
+          setBusy(false)
+          e.currentTarget.value = '' // 連続で同じファイルを選べるように
+        }
+      }}
+    />
   )
+
+  return { trigger, FileInput, busy }
 }
 
 // ---- 共通カード ----
@@ -87,19 +92,28 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
   const name = d?.user?.name ?? 'Hiro'
   const did = d?.user?.displayId ?? '0001'
 
-  // アバターはアップロード後に即時反映したいのでローカルstateで持つ
+  // アバターは即時反映
   const [avatar, setAvatar] = useState<string>(d?.user?.avatarUrl ?? '')
 
-  // ==== Quick の型（タイトルへ反映。未取得時は EVΛƎ/未来志向型 を既定表示） ====
+  // Quick タイトル
   const model = (d?.quick?.model ?? 'EVΛƎ') as 'EVΛƎ' | 'EΛVƎ'
   const modelLabel = d?.quick?.label ?? (model === 'EVΛƎ' ? '未来志向型' : '現実思考型')
 
-  // テーマ（左側ラベル）
+  // テーマ
   const themeName = ((d?.theme?.name ?? 'LIFE') as string).toUpperCase()
+
+  // 設定メニューの開閉
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  // メニュー内「画像を変更」で使うアップローダ
+  const { trigger: triggerUpload, FileInput, busy: uploading } = useAvatarMenuUpload((url) => {
+    setAvatar(url)
+    setMenuOpen(false)
+  })
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:py-10 bg-black min-h-screen font-sans">
-      {/* 中央タイトル（Quick の型のみ表示） */}
+      {/* 中央タイトル */}
       <div className="mb-2 md:mb-3 flex justify-center">
         <span className="text-[22px] md:text-3xl font-extrabold text-purple-400 tracking-wide">
           {model}（{modelLabel}）
@@ -123,16 +137,64 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
           </div>
         </div>
 
-        {/* 右側：設定アイコン＋画像変更 */}
-        <div className="flex items-center gap-3">
-          <AvatarUpload userId={userId} onUploaded={(url) => setAvatar(url)} />
-          <button type="button" aria-label="設定" className="text-xl text-neutral-300 hover:text-white transition-colors">
+        {/* 右側：設定メニュー */}
+        <div className="relative">
+          <button
+            type="button"
+            aria-label="設定"
+            className="text-xl text-neutral-300 hover:text-white transition-colors"
+            onClick={() => setMenuOpen((v) => !v)}
+          >
             ⚙️
           </button>
+
+          {menuOpen && (
+            <div
+              className="absolute right-0 mt-2 w-56 rounded-xl border border-white/10 bg-neutral-900/95 backdrop-blur shadow-lg z-20"
+              onMouseLeave={() => setMenuOpen(false)}
+            >
+              {/* ヘッダ */}
+              <div className="px-4 py-3 border-b border-white/10">
+                <div className="text-xs text-neutral-400">プロフィール設定</div>
+              </div>
+
+              {/* メニュー項目 */}
+              <div className="py-1">
+                <button
+                  type="button"
+                  className={`w-full text-left px-4 py-2 text-sm ${
+                    userId ? 'text-white hover:bg-white/5' : 'text-neutral-500 cursor-not-allowed'
+                  }`}
+                  onClick={() => userId && triggerUpload()}
+                >
+                  {uploading ? '画像を変更（アップロード中…）' : '画像を変更'}
+                </button>
+
+                <button
+                  type="button"
+                  className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/5"
+                  onClick={() => alert('プロフィール編集は準備中です')}
+                >
+                  プロフィール編集（準備中）
+                </button>
+
+                <button
+                  type="button"
+                  className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/5"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  閉じる
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 非表示のファイル入力（メニューから起動） */}
+          <FileInput userId={userId} />
         </div>
       </div>
 
-      {/* テーマ行（左：テーマ名のみ／右：JST 現在時刻） */}
+      {/* テーマ行 */}
       <div className="mt-2 mb-6 flex items-center justify-between">
         <div className="text-sm text-white">テーマ: {themeName}</div>
         <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />

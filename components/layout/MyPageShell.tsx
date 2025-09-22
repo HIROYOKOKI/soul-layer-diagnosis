@@ -89,8 +89,10 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
       {/* テーマ行（ヘッダ直下・左端） */}
      <div className="mt-2 mb-6 flex items-center justify-between">
   <div className="text-sm text-white">
-    テーマ: {d?.theme?.name ?? 'LOVE'}
+    テーマ: {(d?.theme?.name ?? 'LIFE').toUpperCase()}
   </div>
+  <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
+</div>
   <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
 </div>
       {/* カードグリッド（必要に応じて children を追加） */}

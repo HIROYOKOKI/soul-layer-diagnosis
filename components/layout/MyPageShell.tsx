@@ -40,8 +40,9 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
   const avatar = d?.user?.avatarUrl ?? ''
 
   // ==== Quick の型（タイトルに反映） ====
-  const model = (d?.quick?.model ?? 'EVΛƎ') as 'EVΛƎ' | 'EΛVƎ'
-  const modelLabel = model === 'EVΛƎ' ? '未来志向型' : '現実思考型'
+ const model = (d?.quick?.model ?? 'EVΛƎ') as 'EVΛƎ' | 'EΛVƎ';
+const modelLabel = d?.quick?.label ?? (model === 'EVΛƎ' ? '未来志向型' : '現実思考型');
+
 
   // テーマ（左側ラベル）
   const themeName = ((d?.theme?.name ?? 'LIFE') as string).toUpperCase()
@@ -56,12 +57,12 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
       </div>
 
       {/* Quick の補助行（並びと最終更新） */}
-      <div className="mb-4 flex items-center justify-center gap-3 text-xs text-neutral-400">
-        {Array.isArray(d?.quick?.order) && d?.quick?.order?.length ? (
-          <span>Quick: {d?.quick?.order?.join(' ')}</span>
-        ) : <span>Quick: -</span>}
-        {d?.quick?.created_at && <span>・更新 {formatJP(d.quick.created_at)}</span>}
-      </div>
+     <div className="mb-4 flex items-center justify-center gap-3 text-xs text-neutral-400">
+  {Array.isArray(d?.quick?.order) && d.quick?.order?.length
+    ? <span>Quick: {d.quick.order.join(' ')}</span>
+    : <span>Quick: -</span>}
+  {d?.quick?.created_at && <span>・更新 {formatJP(d.quick.created_at)}</span>}
+</div>
 
       {/* プロフィール行 */}
       <div className="mb-1 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
@@ -93,16 +94,14 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
       {/* カードグリッド */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Quick（詳しく見せたいならここに拡張） */}
-        {Array.isArray(d?.quick?.order) && (d.quick?.order?.length ?? 0) > 0 ? (
-          <Card title="Quick 結果">
-            <div className="text-white text-sm tracking-wide">
-              並び：{d.quick?.order?.join(' ')}
-            </div>
-            <div className="mt-2 text-xs text-neutral-400">
-              {d.quick?.created_at ? `更新: ${formatJP(d.quick.created_at)}` : ''}
-            </div>
-          </Card>
-        ) : null}
+      {Array.isArray(d?.quick?.order) && (d.quick?.order?.length ?? 0) > 0 ? (
+  <Card title="Quick 結果">
+    <div className="text-white text-sm tracking-wide">並び：{d.quick.order.join(' ')}</div>
+    <div className="mt-2 text-xs text-neutral-400">
+      {d.quick.created_at ? `更新: ${formatJP(d.quick.created_at)}` : ''}
+    </div>
+  </Card>
+) : null}
 
         {/* デイリー（最新） */}
         <Card title="デイリー（最新）">

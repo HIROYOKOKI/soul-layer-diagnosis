@@ -11,7 +11,7 @@ export default function MyPageClientWrapper({ theme: ssrTheme }: { theme?: strin
   // 2) クライアント側でも /api/theme を no-store で再取得して上書// app/mypage/MyPageClientWrapper.tsx
 'use client';
 
-import MyPageShell from '../../components/layout/MyPageShell';
+import MyPageShell from '../components/layout/MyPageShell';
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ';
 type QuickLatest = {

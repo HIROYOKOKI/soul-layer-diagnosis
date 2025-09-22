@@ -64,39 +64,38 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
       </div>
 
       {/* プロフィール行（カード外）＋右端⚙️ */}
-      <div className="mb-1 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
-        <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center">
-            {avatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatar} alt="avatar" className="h-full w-full object-cover" />
-            ) : (
-              <span className="text-neutral-500 text-xl">𓂀</span>
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-lg md:text-xl font-semibold text-white truncate">{name}</div>
-            <div className="text-xs text-neutral-400">ID: {did}</div>
-          </div>
-        </div>
-        <button
-          type="button"
-          aria-label="設定"
-          className="text-xl text-neutral-300 hover:text-white transition-colors"
-        >
-          ⚙️
-        </button>
-      </div>
+     <div className="mb-1 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
+  <div className="flex items-center gap-4">
+    <div className="h-16 w-16 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center">
+      {avatar ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={avatar} alt="avatar" className="h-full w-full object-cover" />
+      ) : (
+        <span className="text-neutral-500 text-4xl">🙂</span>
+      )}
+    </div>
+    <div className="min-w-0 flex-1">
+      <div className="text-lg md:text-xl font-semibold text-white truncate">{name}</div>
+      <div className="text-xs text-neutral-400">ID: {did}</div>
+    </div>
+  </div>
+  <button
+    type="button"
+    aria-label="設定"
+    className="text-xl text-neutral-300 hover:text-white transition-colors"
+  >
+    ⚙️
+  </button>
+</div>
+
 
       {/* テーマ行（ヘッダ直下・左端） */}
-      <div className="mt-2 mb-6 rounded-none border-0 bg-transparent p-0 shadow-none">
-        <ThemeRow
-          label="テーマ"
-          value={d?.theme?.name ?? 'LOVE'} // ThemeRow側で大文字化
-          date={d?.theme?.updated_at ?? ''}
-        />
-      </div>
-
+     <div className="mt-2 mb-6 flex items-center justify-between">
+  <div className="text-sm text-white">
+    テーマ: {d?.theme?.name ?? 'LOVE'}
+  </div>
+  <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
+</div>
       {/* カードグリッド（必要に応じて children を追加） */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Quick（条件付き表示） */}

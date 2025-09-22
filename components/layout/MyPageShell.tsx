@@ -9,7 +9,8 @@ type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
 export type MyPageData = {
   user?: { name?: string | null; displayId?: string | null; avatarUrl?: string | null } | null
-  quick?: { order?: EV[] | null; model?: 'EVΛƎ' | 'EΛVƎ' | null; created_at?: string | null } | null
+  // quick は「タイトル用の型名/ラベル」だけ受け取る（並びは渡さない方針）
+  quick?: { model?: 'EVΛƎ' | 'EΛVƎ' | null; label?: string | null; created_at?: string | null } | null
   theme?: { name?: string | null; updated_at?: string | null } | null
   daily?: { code?: EV | null; comment?: string | null; created_at?: string | null } | null
 } | null
@@ -39,30 +40,21 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
   const did = d?.user?.displayId ?? '0001'
   const avatar = d?.user?.avatarUrl ?? ''
 
-  // ==== Quick の型（タイトルに反映） ====
- const model = (d?.quick?.model ?? 'EVΛƎ') as 'EVΛƎ' | 'EΛVƎ';
-const modelLabel = d?.quick?.label ?? (model === 'EVΛƎ' ? '未来志向型' : '現実思考型');
-
+  // ==== Quick の型（タイトルへ反映。未取得時は EVΛƎ/未来志向型 を既定表示） ====
+  const model = (d?.quick?.model ?? 'EVΛƎ') as 'EVΛƎ' | 'EΛVƎ'
+  const modelLabel = d?.quick?.label ?? (model === 'EVΛƎ' ? '未来志向型' : '現実思考型')
 
   // テーマ（左側ラベル）
   const themeName = ((d?.theme?.name ?? 'LIFE') as string).toUpperCase()
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:py-10 bg-black min-h-screen font-sans">
-      {/* 中央タイトル（Quickの型を反映） */}
+      {/* 中央タイトル（Quick の型のみ表示） */}
       <div className="mb-2 md:mb-3 flex justify-center">
         <span className="text-[22px] md:text-3xl font-extrabold text-purple-400 tracking-wide">
           {model}（{modelLabel}）
         </span>
       </div>
-
-      {/* Quick の補助行（並びと最終更新） */}
-     <div className="mb-4 flex items-center justify-center gap-3 text-xs text-neutral-400">
-  {Array.isArray(d?.quick?.order) && d.quick?.order?.length
-    ? <span>Quick: {d.quick.order.join(' ')}</span>
-    : <span>Quick: -</span>}
-  {d?.quick?.created_at && <span>・更新 {formatJP(d.quick.created_at)}</span>}
-</div>
 
       {/* プロフィール行 */}
       <div className="mb-1 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
@@ -85,7 +77,7 @@ const modelLabel = d?.quick?.label ?? (model === 'EVΛƎ' ? '未来志向型' : 
         </button>
       </div>
 
-      {/* テーマ行（左：テーマ名のみ／右：JST現在時刻） */}
+      {/* テーマ行（左：テーマ名のみ／右：JST 現在時刻） */}
       <div className="mt-2 mb-6 flex items-center justify-between">
         <div className="text-sm text-white">テーマ: {themeName}</div>
         <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
@@ -93,15 +85,6 @@ const modelLabel = d?.quick?.label ?? (model === 'EVΛƎ' ? '未来志向型' : 
 
       {/* カードグリッド */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Quick（詳しく見せたいならここに拡張） */}
-      {Array.isArray(d?.quick?.order) && (d.quick?.order?.length ?? 0) > 0 ? (
-  <Card title="Quick 結果">
-    <div className="text-white text-sm tracking-wide">並び：{d.quick.order.join(' ')}</div>
-    <div className="mt-2 text-xs text-neutral-400">
-      {d.quick.created_at ? `更新: ${formatJP(d.quick.created_at)}` : ''}
-    </div>
-  </Card>
-) : null}
 
         {/* デイリー（最新） */}
         <Card title="デイリー（最新）">

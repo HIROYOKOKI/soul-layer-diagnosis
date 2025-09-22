@@ -1,39 +1,41 @@
+// app/api/profile/avatar/route.ts
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const formData = await req.formData();
-  const file = formData.get("file") as File | null;
-  const userId = formData.get("user_id") as string;
-
+  const form = await req.formData();
+  const file = form.get("file") as File | null;
+  const userId = form.get("user_id") as string | null;
   if (!file || !userId) {
     return NextResponse.json({ ok: false, error: "missing_file_or_user" }, { status: 400 });
   }
 
   const sb = getSupabaseAdmin();
-  const fileName = `${userId}/${uuidv4()}.png`;
+  if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 });
 
-  // 1) ストレージ保存
-  const { error: uploadError } = await sb.storage
-    .from("avatars")
-    .upload(fileName, file, { upsert: true });
+  // 拡張子
+  const ext = (file.name?.split(".").pop() || "png").toLowerCase();
+  const objectPath = `${userId}/${randomUUID()}.${ext}`;
 
-  if (uploadError) {
-    return NextResponse.json({ ok: false, error: uploadError.message }, { status: 500 });
-  }
+  // 1) Storage へ保存
+  const { error: upErr } = await sb.storage.from("avatars").upload(objectPath, file, {
+    cacheControl: "3600",
+    upsert: true,
+    contentType: file.type || `image/${ext}`,
+  });
+  if (upErr) return NextResponse.json({ ok:false, error: upErr.message }, { status:500 });
 
-  const { data: urlData } = sb.storage.from("avatars").getPublicUrl(fileName);
+  // 2) 公開URL取得
+  const { data: pub } = sb.storage.from("avatars").getPublicUrl(objectPath);
+  const url = pub.publicUrl;
 
-  // 2) DB 更新
-  const { error: updateError } = await sb
-    .from("profiles")
-    .update({ avatar_url: urlData.publicUrl })
-    .eq("id", userId);
+  // 3) profiles.avatar_url を更新（テーブル名はプロジェクトに合わせて）
+  const { error: updErr } = await sb.from("profiles").update({ avatar_url: url }).eq("id", userId);
+  if (updErr) return NextResponse.json({ ok:false, error: updErr.message }, { status:500 });
 
-  if (updateError) {
-    return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ ok: true, url: urlData.publicUrl });
+  return NextResponse.json({ ok:true, url });
 }

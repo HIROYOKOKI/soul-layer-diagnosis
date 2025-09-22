@@ -70,13 +70,14 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
             MY PAGE
           </div>
           {/* 型名は従来見出しの約50%サイズ・色分け */}
-          <div
-            className="font-extrabold tracking-wide"
-            style={{ color: modelColor, fontSize: '14px' }} // だいたい 50% 縮小
-          >
-            {model}（{cleanedLabel}）
-          </div>
-        </div>
+         <div className="flex justify-center">
+  <div
+    className="font-extrabold tracking-wide"
+    style={{ color: modelColor, fontSize: '14px' }}
+  >
+    {model}（{cleanedLabel}）
+  </div>
+</div>
         <div className="mt-1 text-xs text-neutral-400">
           あなたの軌跡と、いまを映す
         </div>

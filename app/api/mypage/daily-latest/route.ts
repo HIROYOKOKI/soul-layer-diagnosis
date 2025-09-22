@@ -6,24 +6,16 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const sb = getSupabaseAdmin();
-  if (!sb) {
-    return NextResponse.json(
-      { ok: false, error: "supabase_env_missing" },
-      { status: 500 }
-    );
-  }
+  if (!sb) return NextResponse.json({ ok: false, error: "supabase_env_missing" }, { status: 500 });
 
-  // 期待スキーマ（例）: daily_results(code text, comment text, created_at timestamptz, ...）
+  // 認証導入前は「最新1件」を単純取得（本番では user_id で絞る）
   const { data, error } = await sb
     .from("daily_results")
-    .select("code, comment, created_at")
+    .select("slot, theme, score, comment, advice, affirm, quote, code, evla, created_at")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  }
-  // データが無い場合も { ok:true, item:null } を返す（フロントで「未取得」表示）
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, item: data ?? null });
 }

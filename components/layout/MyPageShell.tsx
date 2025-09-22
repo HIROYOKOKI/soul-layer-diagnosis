@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import ThemeRow from './ThemeRow'
 import { formatJP } from './date'  // 共通utilから
-import ClockJST from '../../components/ClockJST';
+import ClockJST from '../components/ClockJST';
 
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ'

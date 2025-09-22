@@ -1,9 +1,12 @@
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-export const fetchCache = 'force-no-store'
+// app/mypage/page.tsx
+import MyPageClient from './MyPageClient'
 
-import MyPageClientWrapper from './MyPageClientWrapper' // ← 直後に作る薄ラッパ
+export default async function MyPagePage() {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/theme`, {
+    cache: 'no-store',
+  })
+  const json = await res.json()
+  const theme = json?.scope ?? null
 
-export default function Page() {
-  return <MyPageClientWrapper />
+  return <MyPageClient theme={theme} />
 }

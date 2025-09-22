@@ -12,12 +12,12 @@ type Slot = "morning" | "noon" | "night";
 type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 
 type Body = {
-  id: string;                     // フロントで発行（例: daily-YYYY-MM-DD-morning）
+  id: string;                     // 例: daily-YYYY-MM-DD-morning
   slot: Slot;
   choice: EV;                     // 選択コード
-  scope?: Scope;                  // WORK / LOVE / FUTURE / LIFE（既定: LIFE）
-  env?: "dev" | "prod";           // 任意: ログ分離
-  theme?: "dev" | "prod";         // 互換
+  scope?: Scope;                  // 既定: LIFE
+  env?: "dev" | "prod";
+  theme?: "dev" | "prod";
   ts?: string;                    // 任意: クライアント時刻
 };
 
@@ -115,13 +115,12 @@ const FB_AFFIRM: Record<EV, string> = {
   Ǝ: `私は静けさの中で答えを見る`,
 };
 
-/* ================== スロット → ランク点・係数 ================== */
+/* ================== スロット → ランク点 ================== */
 const rankPointsBySlot: Record<Slot, number[]> = {
   morning: [3, 2, 1, 0], // 4択
   noon: [2, 1, 0],       // 3択
   night: [1, 0],         // 2択
 };
-const slotWeight: Record<Slot, number> = { morning: 0.3, noon: 0.2, night: 0.1 };
 
 /* ================== EVΛƎ 生成ユーティリティ（MVP） ================== */
 function extractE(slot: Slot, code: EV): EVLA["E"] {
@@ -140,8 +139,9 @@ function generateCandidates(E: EVLA["E"], n: number, slot: Slot): EVLA["V"] {
   return seeds.slice(0, n).map((label, i) => ({
     id: String.fromCharCode(65 + i), // A,B,C...
     label,
-    risk: 0.1 + i * 0.1,
-    cost: 0.1 + i * 0.1,
+    // 浮動小数の見た目対策で丸め
+    risk: Number((0.1 + i * 0.1).toFixed(2)),
+    cost: Number((0.1 + i * 0.1).toFixed(2)),
   }));
 }
 
@@ -202,7 +202,7 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
 
   // 1st try
   const resp = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-5-mini",
     temperature: 0.7,
     messages: [
       { role: "system", content: sys },
@@ -308,8 +308,8 @@ export async function POST(req: Request) {
     const NextV = generateNextV(b.slot);
     const evla: EVLA = { slot: b.slot, mode: "EVΛƎ", E, V, Lambda, Epsilon, NextV };
 
-    // 3) スコア（朝0.3 / 昼0.2 / 夜0.1）
-    const score = rankPoint * slotWeight[b.slot];
+    // 3) スコア（朝3/昼2/夜1 → ×0.1）
+    const score = Math.round(rankPoint * 10) / 100; // rankPoint×0.1 を小数2桁に丸め
 
     // 4) 保存（ベストエフォート）
     const created_at = new Date().toISOString();
@@ -318,7 +318,7 @@ export async function POST(req: Request) {
       const sb = getSupabaseAdmin();
       if (!sb) throw new Error("supabase_env_missing");
       await sb.from("daily_results").insert({
-        id: b.id,            // 既にユニーク制約がある想定（なければDB側で生成でもOK）
+        id: b.id,
         slot: b.slot,
         scope,
         code,
@@ -354,9 +354,9 @@ export async function POST(req: Request) {
         theme,
         client_ts: b.ts ?? null,
         created_at,
-        evla, // 裏ログ（将来の可視化/学習用）
+        evla, // 将来の可視化/学習用
       },
-      save_error, // null なら保存成功（または保存トライしていない）
+      save_error, // null なら保存成功
     });
   } catch (e: any) {
     return NextResponse.json(

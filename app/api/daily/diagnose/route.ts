@@ -1,6 +1,7 @@
 // app/api/daily/diagnose/route.ts
 import { NextResponse } from "next/server";
 import { getOpenAI } from "@/lib/openai";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,13 +12,23 @@ type Slot = "morning" | "noon" | "night";
 type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 
 type Body = {
-  id: string;
+  id: string;                     // フロントで発行（例: daily-YYYY-MM-DD-morning）
   slot: Slot;
-  choice: EV;
-  scope?: Scope;
-  env?: "dev" | "prod";
-  theme?: "dev" | "prod";
-  ts?: string;
+  choice: EV;                     // 選択コード
+  scope?: Scope;                  // WORK / LOVE / FUTURE / LIFE（既定: LIFE）
+  env?: "dev" | "prod";           // 任意: ログ分離
+  theme?: "dev" | "prod";         // 互換
+  ts?: string;                    // 任意: クライアント時刻
+};
+
+type EVLA = {
+  slot: Slot;
+  mode: "EVΛƎ";
+  E: { goal: string; urgency: number; constraints: Record<string, unknown> };
+  V: { id: string; label: string; risk: number; cost: number }[];
+  Lambda: { pick: string; reason: string; rank_point: number; confidence: number };
+  Epsilon: { outcome_score: number; notes: string };
+  NextV: { id: string; label: string }[];
 };
 
 /* ================== スコープ説明 ================== */
@@ -49,7 +60,7 @@ const inRange = (s: string, min: number, max: number) => {
   return n >= min && n <= max;
 };
 
-/* ================== 仕様 ================== */
+/* ================== 仕様（文字数） ================== */
 const LEN = {
   commentMin: 100,
   commentMax: 150,
@@ -59,7 +70,7 @@ const LEN = {
   affirmMax: 30,
 } as const;
 
-/* ================== アファメーション補正 ================== */
+/* ================== アファメーション検査/補正 ================== */
 const isAffirmation = (s: string) => {
   const t = (s || "").trim();
   if (!/^(私は|わたしは)/.test(t)) return false;
@@ -104,17 +115,72 @@ const FB_AFFIRM: Record<EV, string> = {
   Ǝ: `私は静けさの中で答えを見る`,
 };
 
-/* ================== OpenAI生成 ================== */
+/* ================== スロット → ランク点・係数 ================== */
+const rankPointsBySlot: Record<Slot, number[]> = {
+  morning: [3, 2, 1, 0], // 4択
+  noon: [2, 1, 0],       // 3択
+  night: [1, 0],         // 2択
+};
+const slotWeight: Record<Slot, number> = { morning: 0.3, noon: 0.2, night: 0.1 };
+
+/* ================== EVΛƎ 生成ユーティリティ（MVP） ================== */
+function extractE(slot: Slot, code: EV): EVLA["E"] {
+  const goal = code === "E" ? "前進" : code === "V" ? "構想" : code === "Λ" ? "選択" : "観測";
+  const urgency = slot === "morning" ? 0.6 : slot === "noon" ? 0.4 : 0.2;
+  return { goal, urgency, constraints: {} };
+}
+
+function generateCandidates(E: EVLA["E"], n: number, slot: Slot): EVLA["V"] {
+  const seeds =
+    slot === "morning"
+      ? ["5分だけ着手", "阻害要因を1つ整理", "関係者に一言連絡", "最小タスクを切る"]
+      : slot === "noon"
+      ? ["30分だけ集中", "優先順位を再整列", "不要作業を1つ捨てる"]
+      : ["今日の記録を3行", "明日の最初の一手を書く"];
+  return seeds.slice(0, n).map((label, i) => ({
+    id: String.fromCharCode(65 + i), // A,B,C...
+    label,
+    risk: 0.1 + i * 0.1,
+    cost: 0.1 + i * 0.1,
+  }));
+}
+
+function chooseIndex(_V: EVLA["V"], _slot: Slot): number {
+  // MVP: 常に 0 を選択（将来: rank_point × confidence − λrisk − λcost）
+  return 0;
+}
+
+function toReason(E: EVLA["E"], picked: EVLA["V"]): string {
+  return E.goal === "前進" ? "慣性をつくるための最小着手" : `目的「${E.goal}」に直結する一手`;
+}
+
+function toObserveNotes(Lambda: EVLA["Lambda"], V: EVLA["V"]): string {
+  const label = V.find((x) => x.id === Lambda.pick)?.label ?? "";
+  return `${label} を実行。小さな完了で流れを維持。`;
+}
+
+function generateNextV(slot: Slot): EVLA["NextV"] {
+  const pool =
+    slot === "morning"
+      ? ["もう5分", "阻害要因解消", "共有"]
+      : slot === "noon"
+      ? ["一息観測", "30分再開", "不要を捨てる"]
+      : ["明日の一手を一行", "記録の整頓", "早めに休む"];
+  return pool.slice(0, 3).map((label, i) => ({ id: `N${i + 1}`, label }));
+}
+
+/* ================== OpenAI 生成（コメント/アドバイス/アファ） ================== */
 async function genWithAI(code: EV, slot: Slot, scope: Scope) {
   const openai = getOpenAI();
   if (!openai) throw new Error("openai_env_missing");
 
   const sys = [
     "あなたは『ルネア（Lunea）』。観測型のナビAIとして、短くやさしい日本語で話す。",
-    `出力は必ずJSONのみ。キーは "comment", "advice", "affirm"。`,
+    `出力は必ずJSONのみ（説明文なし）。キーは "comment", "advice", "affirm"。`,
     `文字数: comment ${LEN.commentMin}〜${LEN.commentMax}字、advice ${LEN.adviceMin}〜${LEN.adviceMax}字、affirm ${LEN.affirmMin}〜${LEN.affirmMax}字。`,
-    `affirmは必ず「私は…」or「わたしは…」で始める。引用・括弧禁止。`,
-    `comment/adviceはコード（E/V/Λ/Ǝ）とscopeの文脈に沿い、日常で使える具体性を持たせる。`,
+    `affirmは必ず「私は…」or「わたしは…」で始める一人称・現在形。引用・括弧・三人称禁止。`,
+    `comment/adviceはコード（E=衝動, V=可能性, Λ=選択, Ǝ=観測）とscopeの文脈に沿い、日常で使える具体性を持たせる。`,
+    `医療・法務・投資等の専門助言や危険行為の示唆は行わない。`,
   ].join("\n");
 
   const user = JSON.stringify({
@@ -122,8 +188,19 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
     scope,
     scope_hint: SCOPE_HINT[scope],
     code,
+    style: "calm-positive",
+    schema: {
+      type: "object",
+      properties: {
+        comment: { type: "string" },
+        advice: { type: "string" },
+        affirm: { type: "string" },
+      },
+      required: ["comment", "advice", "affirm"],
+    },
   });
 
+  // 1st try
   const resp = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.7,
@@ -134,24 +211,52 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
     response_format: { type: "json_object" },
   });
 
-  const j = JSON.parse(resp.choices[0]?.message?.content || "{}") as {
+  const first = JSON.parse(resp.choices[0]?.message?.content || "{}") as {
     comment?: string;
     advice?: string;
     affirm?: string;
   };
 
-  let comment = clampToRange(j.comment || "", LEN.commentMin, LEN.commentMax);
-  let advice  = clampToRange(j.advice  || "", LEN.adviceMin , LEN.adviceMax );
-  let affirm  = clampToRange(j.affirm  || "", LEN.affirmMin , LEN.affirmMax );
+  let comment = clampToRange(first.comment || "", LEN.commentMin, LEN.commentMax);
+  let advice  = clampToRange(first.advice  || "", LEN.adviceMin , LEN.adviceMax );
+  let affirm  = clampToRange(first.affirm  || "", LEN.affirmMin , LEN.affirmMax );
 
-  if (
-    !inRange(j.comment || "", LEN.commentMin, LEN.commentMax) ||
-    !inRange(j.advice  || "", LEN.adviceMin , LEN.adviceMax ) ||
-    !isAffirmation(j.affirm || "")
-  ) {
-    affirm = normalizeAffirmation(code, affirm);
+  const violate =
+    !inRange(first.comment || "", LEN.commentMin, LEN.commentMax) ||
+    !inRange(first.advice  || "", LEN.adviceMin , LEN.adviceMax ) ||
+    !isAffirmation(first.affirm || "") ||
+    !inRange(first.affirm || "", LEN.affirmMin, LEN.affirmMax);
+
+  if (violate) {
+    // 2nd try（厳しめ）
+    const resp2 = await openai.chat.completions.create({
+      model: "gpt-5-mini",
+      temperature: 0.4,
+      messages: [
+        { role: "system", content: sys },
+        {
+          role: "user",
+          content: JSON.stringify({
+            ...JSON.parse(user),
+            note: "前回は制約外。厳守して再出力（JSONのみ）。",
+          }),
+        },
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    const second = JSON.parse(resp2.choices[0]?.message?.content || "{}") as {
+      comment?: string;
+      advice?: string;
+      affirm?: string;
+    };
+
+    comment = clampToRange(second.comment || comment, LEN.commentMin, LEN.commentMax);
+    advice  = clampToRange(second.advice  || advice , LEN.adviceMin , LEN.adviceMax );
+    affirm  = clampToRange(second.affirm  || affirm , LEN.affirmMin , LEN.affirmMax );
   }
 
+  affirm = normalizeAffirmation(code, affirm);
   return { comment, advice, affirm };
 }
 
@@ -168,19 +273,18 @@ export async function POST(req: Request) {
     const code = b.choice;
     const scope: Scope = (b.scope?.toUpperCase() as Scope) || "LIFE";
 
+    // 1) LLM生成（UI向け）
     let comment: string | null = null;
     let advice: string | null = null;
     let affirm: string | null = null;
-
     try {
       const ai = await genWithAI(code, b.slot, scope);
       comment = ai.comment?.trim() || null;
       advice  = ai.advice?.trim()  || null;
       affirm  = ai.affirm?.trim()  || null;
     } catch {
-      // noop
+      // noop → フォールバックへ
     }
-
     if (!comment) comment = FB_COMMENT[code];
     if (!advice)  advice  = FB_ADVICE[code];
     if (!affirm)  affirm  = FB_AFFIRM[code];
@@ -189,21 +293,71 @@ export async function POST(req: Request) {
     advice  = clampToRange(advice , LEN.adviceMin , LEN.adviceMax );
     affirm  = normalizeAffirmation(code, affirm);
 
-    const item = {
-      id: b.id,
-      slot: b.slot,
-      scope,
-      code,
-      comment,
-      advice,
-      affirm,
-      env,
-      theme,
-      client_ts: b.ts ?? null,
-      created_at: new Date().toISOString(),
+    // 2) EVΛƎ 生成（裏ログ）
+    const E = extractE(b.slot, code);
+    const V = generateCandidates(E, rankPointsBySlot[b.slot].length, b.slot);
+    const pickedIndex = chooseIndex(V, b.slot);
+    const rankPoint = rankPointsBySlot[b.slot][pickedIndex] ?? 0;
+    const Lambda = {
+      pick: V[pickedIndex].id,
+      reason: toReason(E, V[pickedIndex]),
+      rank_point: rankPoint,
+      confidence: 1.0,
     };
+    const Epsilon = { outcome_score: 1, notes: toObserveNotes(Lambda, V) };
+    const NextV = generateNextV(b.slot);
+    const evla: EVLA = { slot: b.slot, mode: "EVΛƎ", E, V, Lambda, Epsilon, NextV };
 
-    return NextResponse.json({ ok: true, item });
+    // 3) スコア（朝0.3 / 昼0.2 / 夜0.1）
+    const score = rankPoint * slotWeight[b.slot];
+
+    // 4) 保存（ベストエフォート）
+    const created_at = new Date().toISOString();
+    let save_error: string | null = null;
+    try {
+      const sb = getSupabaseAdmin();
+      if (!sb) throw new Error("supabase_env_missing");
+      await sb.from("daily_results").insert({
+        id: b.id,            // 既にユニーク制約がある想定（なければDB側で生成でもOK）
+        slot: b.slot,
+        scope,
+        code,
+        comment,
+        advice,
+        affirm,
+        score,
+        evla,               // JSONB
+        created_at,
+        env,
+        theme,
+        client_ts: b.ts ?? null,
+      });
+    } catch (e: any) {
+      // 保存失敗はレスポンスを阻害しない
+      save_error = e?.message ?? "save_failed";
+    }
+
+    // 5) 返却（UI最小＋保存用）
+    return NextResponse.json({
+      ok: true,
+      result: { comment, advice, affirm, score }, // UI表示はこれだけ
+      item: {
+        id: b.id,
+        slot: b.slot,
+        scope,
+        code,
+        comment,
+        advice,
+        affirm,
+        score,
+        env,
+        theme,
+        client_ts: b.ts ?? null,
+        created_at,
+        evla, // 裏ログ（将来の可視化/学習用）
+      },
+      save_error, // null なら保存成功（または保存トライしていない）
+    });
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e?.message ?? "internal_error" },

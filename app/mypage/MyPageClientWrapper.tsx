@@ -2,16 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import MyPageShell from '../../components/layout/MyPageShell';
-
-export default function MyPageClientWrapper({ theme: ssrTheme }: { theme?: string | null }) {
-  // 1) SSR値で初期化
-  const [theme, setTheme] = useState<string>((ssrTheme ?? 'LIFE').toUpperCase());
-
-  // 2) クライアント側でも /api/theme を no-store で再取得して上書// app/mypage/MyPageClientWrapper.tsx
-'use client';
-
-import MyPageShell from '../components/layout/MyPageShell';
+import MyPageShell from '../../components/layout/MyPageShell'; // ← ここが正解（../../）
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ';
 type QuickLatest = {
@@ -21,39 +12,24 @@ type QuickLatest = {
 } | null;
 
 export default function MyPageClientWrapper({
-  theme,
-  quick,
+  theme: ssrTheme,
+  quick: ssrQuick,
 }: {
   theme?: string | null;
   quick?: QuickLatest;
 }) {
-  return (
-    <MyPageShell
-      data={{
-        theme: theme ? { name: theme, updated_at: null } : undefined,
-        quick: quick
-          ? {
-              order: (quick.order ?? undefined) as EV[] | undefined,
-              // ↓ Shell が参照できるように model を入れる
-              // @ts-expect-error: extend shape loosely
-              model: quick.model ?? undefined,
-              created_at: quick.created_at ?? undefined,
-            }
-          : undefined,
-      }}
-    />
-  );
-}
-き（確実に反映）
+  // —— テーマは SSR 値で即表示し、CSR でもう一度 /api/theme を取って上書き（確実反映）
+  const [theme, setTheme] = useState<string>((ssrTheme ?? 'LIFE').toUpperCase());
+
   useEffect(() => {
     (async () => {
       try {
         const r = await fetch('/api/theme', { cache: 'no-store' });
         const j = await r.json();
         const scope = (j?.scope ?? 'LIFE') as string;
-        setTheme(String(scope).toUpperCase());
+        setTheme(scope.toUpperCase());
       } catch {
-        // 失敗時は SSR 値を維持
+        /* noop: SSR値を維持 */
       }
     })();
   }, []);
@@ -62,6 +38,14 @@ export default function MyPageClientWrapper({
     <MyPageShell
       data={{
         theme: { name: theme, updated_at: null },
+        quick: ssrQuick
+          ? {
+              order: (ssrQuick.order ?? undefined) as EV[] | undefined,
+              // @ts-expect-error: MyPageShell 側の拡張用に model を素通し
+              model: ssrQuick.model ?? undefined,
+              created_at: ssrQuick.created_at ?? undefined,
+            }
+          : undefined,
       }}
     />
   );

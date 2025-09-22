@@ -1,9 +1,9 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import ThemeRow from './ThemeRow';
-import { formatJP } from './date';
-import ClockJST from './ClockJST';
+import ThemeRow from './ThemeRow'
+import { formatJP } from './date'
+import ClockJST from './ClockJST'
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
@@ -52,10 +52,15 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:py-10 bg-black min-h-screen font-sans">
       {/* 中央タイトル（固定） */}
-      <div className="mb-5 md:mb-6 flex justify-center">
+      <div className="mb-2 md:mb-3 flex justify-center">
         <span className="text-[22px] md:text-3xl font-extrabold text-purple-400 tracking-wide">
           EVΛƎ（未来志向型）
         </span>
+      </div>
+
+      {/* 日時（JST）だけ右肩に小さく表示 */}
+      <div className="flex justify-end mb-4">
+        <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
       </div>
 
       {/* プロフィール行（カード外）＋右端⚙️ */}
@@ -66,7 +71,7 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatar} alt="avatar" className="h-full w-full object-cover" />
             ) : (
-              <span className="text-neutral-500 text-xl">🙂</span>
+              <span className="text-neutral-500 text-xl">𓂀</span>
             )}
           </div>
           <div className="min-w-0 flex-1">
@@ -105,12 +110,6 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
             </div>
           </Card>
         ) : null}
-     
-  </h2>
-  <div className="text-xs text-neutral-400">
-（JST）：<ClockJST />
-  </div>
-</div>
 
         {/* デイリー（最新） */}
         <Card title="デイリー（最新）">

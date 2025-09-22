@@ -9,8 +9,8 @@ type QuickTypeKey = "EVΛƎ" | "EΛVƎ"; // 未来志向 or 現実思考
 
 // 表示ラベル
 const TYPE_LABEL: Record<QuickTypeKey, string> = {
-  EVΛƎ: "EVΛƎ型（未来志向型）",
-  EΛVƎ: "EΛVƎ型（現実思考型）",
+  EVΛƎ: "EVΛƎ（未来志向型）",
+  EΛVƎ: "EΛVƎ（現実思考型）",
 };
 
 // 公式カラー（確定値）

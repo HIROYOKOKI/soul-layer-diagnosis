@@ -1,85 +1,88 @@
-// app/api/daily/save/route.ts
-import { NextResponse } from "next/server"
-import { getSupabaseAdmin } from "@/lib/supabase-admin"
+import { NextResponse, type NextRequest } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
-type Slot = "morning" | "noon" | "night"
-type Env = "dev" | "prod"
-type Theme = "dev" | "prod"
-type EV = "E" | "V" | "Λ" | "Ǝ"
-type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE"
+// ▼ 型（最小）
+type EV = "E" | "V" | "Λ" | "Ǝ";
+type Slot = "morning" | "noon" | "night";
+type Env = "dev" | "prod";
 
-export async function POST(req: Request) {
-  const sb = getSupabaseAdmin()
-  if (!sb) {
-    return NextResponse.json({ ok: false, error: "supabase_env_missing" }, { status: 500 })
-  }
+type Body = {
+  user_id: string;                  // 必須：auth.users.id
+  slot: Slot;                       // 必須：'morning' | 'noon' | 'night'
+  env?: Env;                        // 既定: 'dev'（本番は'prod'で）
+  question_id?: string | null;
+  scope?: string | null;            // 'WORK' | 'LOVE' | 'FUTURE' | 'LIFE' など自由文字列
+  theme?: string | null;            // 実データは 'work'|'love'|'future'|'life' を想定
 
+  code: EV;                         // 必須：'E'|'V'|'Λ'|'Ǝ'
+  score?: number | null;            // 0..100 推奨
+  comment?: string | null;
+  advice?: string | null;
+  affirm?: string | null;
+  quote?: string | null;
+  evla?: Record<string, number> | null; // 例 {"E":0.6,"V":0.2,"Λ":0.1,"Ǝ":0.1}
+};
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function bad(msg: string, status = 400) {
+  return NextResponse.json({ ok: false, error: msg }, { status });
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as {
-      id?: string                  // e.g. daily-2025-09-20-morning-LOVE
-      slot?: Slot
-      env?: Env
-      theme?: Theme
-      choice?: EV
-      scope?: Scope                // ★ 追加: デイリーテーマ
-      result?: { code?: EV; comment?: string; advice?: string; quote?: string }
-      user_id?: string | null
-    }
+    const sb = getSupabaseAdmin();
+    if (!sb) return bad("supabase_env_missing", 500);
 
-    const {
-      id,
+    const body = (await req.json()) as Body;
+
+    // ---- 入力バリデーション（軽量）----
+    if (!body?.user_id) return bad("user_id_required");
+    const slot = body.slot;
+    if (!slot || !["morning", "noon", "night"].includes(slot)) return bad("invalid_slot");
+    const code = body.code;
+    if (!code || !["E", "V", "Λ", "Ǝ"].includes(code)) return bad("invalid_code");
+
+    const env: Env = body.env ?? "dev";
+    if (!["dev", "prod"].includes(env)) return bad("invalid_env");
+
+    // 数値のクランプ（任意）
+    const score =
+      typeof body.score === "number" && Number.isFinite(body.score)
+        ? Math.max(0, Math.min(100, Math.round(body.score)))
+        : null;
+
+    // ---- アップサート ----
+    // ユニークキーは (user_id, date_jst, slot)
+    const row = {
+      user_id: body.user_id,
       slot,
-      env = "dev",
-      theme = "dev",
-      choice,
-      scope,
-      result,
-      user_id,
-    } = body || {}
-
-    if (!id || !result?.code) {
-      return NextResponse.json(
-        { ok: false, error: "bad_request_missing_fields" },
-        { status: 400 }
-      )
-    }
-
-    // 保存用レコード
-    const payload: Record<string, any> = {
-      question_id: id,
       env,
-      theme,
-      choice: choice ?? result.code,
-      code: result.code,
-      comment: result.comment ?? null,
-      advice: result.advice ?? null,
-      quote: result.quote ?? null,
-    }
+      question_id: body.question_id ?? null,
+      scope: body.scope ?? null,
+      theme: body.theme ?? null,
 
-    if (slot) payload.mode = slot
-    if (scope) payload.scope = scope         // ★ scope を保存
-    if (user_id) payload.user_id = user_id
+      code,
+      score,
+      comment: body.comment ?? null,
+      advice: body.advice ?? null,
+      affirm: body.affirm ?? null,
+      quote: body.quote ?? null,
+      evla: body.evla ?? null,
+      // date_jst は DB の default ((now() at time zone 'Asia/Tokyo')::date) に任せる
+    };
 
     const { data, error } = await sb
       .from("daily_results")
-      .upsert(payload, { onConflict: "question_id" })
-      .select("id, question_id, scope")
-      .maybeSingle()
+      .upsert(row, { onConflict: "user_id,date_jst,slot" })
+      .select("id, user_id, date_jst, slot, code, score, comment, advice, affirm, quote, created_at, updated_at")
+      .single();
 
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-    }
+    if (error) return bad(error.message, 500);
 
-    return NextResponse.json({
-      ok: true,
-      id: data?.id,
-      question_id: data?.question_id ?? id,
-      scope: data?.scope ?? scope,         // 応答にも scope を含める
-    })
+    return NextResponse.json({ ok: true, item: data });
   } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: e?.message ?? "internal_error" },
-      { status: 500 },
-    )
+    return bad(e?.message ?? "unknown_error", 500);
   }
 }

@@ -2,11 +2,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import LuneaBubble from "@/components/LuneaBubble";
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
 type Slot = "morning" | "noon" | "night";
 type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
+type Env = "dev" | "prod";
 
 type Item = {
   question_id?: string;
@@ -15,12 +18,25 @@ type Item = {
   code: EV;
   comment: string;
   advice?: string | null;
-  quote?: string | null;
+  quote?: string | null;       // 名言
   created_at?: string;
-  env?: "dev" | "prod";
+  env?: Env;
 };
 
+// ===== JSTスロット判定（朝=4-10, 昼=11-16, 夜=その他） =====
+function getJstSlot(): Slot {
+  const now = new Date();
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const h = jst.getUTCHours(); // JST基準
+  if (h >= 4 && h <= 10) return "morning";
+  if (h >= 11 && h <= 16) return "noon";
+  return "night";
+}
+
 export default function ResultClient() {
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+
   const [currentScope, setCurrentScope] = useState<Scope | null>(null);
   const [item, setItem] = useState<Item | null>(null);
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
@@ -59,7 +75,7 @@ export default function ResultClient() {
   }, []);
 
   const hasAdvice = !!(item?.advice && item.advice.trim().length);
-  const hasAffirm = !!(item?.quote && item.quote.trim().length);
+  const hasAffirm = !!(item?.quote && item.quote.trim().length); // ここは名言を短文表示に流用
   const nextAfterComment = useMemo(() => (hasAdvice ? 2 : 3), [hasAdvice]);
 
   const handleCommentDone = useCallback(() => {
@@ -79,30 +95,46 @@ export default function ResultClient() {
     });
   }, [hasAdvice]);
 
+  // ===== 保存処理 =====
   async function onSave() {
     if (!item || saving) return;
     setSaving(true);
     setSaveMsg(null);
     try {
-      const slot: Slot = item.mode || "night";
+      // 1) 認証（user_id 必須）
+      const { data } = await supabase.auth.getUser();
+      const user = data?.user;
+      if (!user) {
+        alert("ログインが必要です。");
+        router.push("/login?next=/daily/result");
+        return;
+      }
+
+      // 2) スロット・スコープ・テーマの確定
+      const slot: Slot = item.mode || getJstSlot();
       const scope: Scope = (item.scope as Scope) || currentScope || "LIFE";
+      const theme = scope.toLowerCase(); // 'work' | 'love' | 'future' | 'life'
+      const env: Env = item.env || "dev";
 
-      // question_id が無い場合のフォールバック（scope まで含める）
-      const fallbackId = `daily-${new Date().toISOString().slice(0, 10)}-${slot}-${scope}`;
+      // 3) question_id が無い場合のフォールバック（date/slot/scopeを埋める）
+      const isoDate = new Date().toISOString().slice(0, 10);
+      const question_id = item.question_id || `daily-${isoDate}-${slot}-${scope}`;
 
+      // 4) /api/daily/save へ（DB側は (user_id,date_jst,slot) でUpsert）
       const payload = {
-        id: item.question_id || fallbackId,
+        user_id: user.id,
         slot,
-        scope,               // ★ 保存にも scope を含める
-        env: item.env || "dev",
-        theme: "dev",
-        choice: item.code,
-        result: {
-          code: item.code,
-          comment: item.comment,
-          advice: item.advice ?? undefined,
-          quote: item.quote ?? undefined,
-        },
+        env,
+        question_id,
+        scope,                  // 文字列でOK
+        theme,                  // 小文字
+        code: item.code,
+        score: null as number | null, // 現状スコア無し
+        comment: item.comment,
+        advice: item.advice ?? null,
+        affirm: null as string | null, // （必要になれば別途セット）
+        quote: item.quote ?? null,     // 名言
+        evla: null as Record<string, number> | null,
       };
 
       const r = await fetch("/api/daily/save", {
@@ -115,6 +147,8 @@ export default function ResultClient() {
 
       setSaved(true);
       setSaveMsg("保存しました。");
+      // 必要ならマイページへ
+      // router.push("/mypage");
     } catch (e: any) {
       setSaveMsg("保存に失敗しました：" + (e?.message || "unknown"));
     } finally {
@@ -173,7 +207,7 @@ export default function ResultClient() {
           </div>
         )}
 
-        {/* アファメーション（短文なので少し速め） */}
+        {/* アファメーション（短文なので少し速め）※名言を流用 */}
         {step >= 3 && hasAffirm && (
           <div className="translate-y-1 opacity-90">
             <LuneaBubble text={`《アファメーション》\n${item.quote}`} speed={80} />
@@ -206,7 +240,7 @@ export default function ResultClient() {
 
           <a
             href="/mypage"
-            className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5"
+            className="px-4 py-2 rounded-xl border border-white/20 hover:bg白/5"
           >
             マイページへ
           </a>

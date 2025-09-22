@@ -9,23 +9,16 @@ type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
 export type MyPageData = {
   user?: { name?: string | null; displayId?: string | null; avatarUrl?: string | null } | null
-  quick?: { order?: EV[] | null; created_at?: string | null } | null
+  quick?: { order?: EV[] | null; model?: 'EVΛƎ' | 'EΛVƎ' | null; created_at?: string | null } | null
   theme?: { name?: string | null; updated_at?: string | null } | null
   daily?: { code?: EV | null; comment?: string | null; created_at?: string | null } | null
 } | null
 
 const EMPTY_DATA: Readonly<MyPageData> = Object.freeze({})
 
-/* ====== 共通カード ====== */
 export function Card({
-  title,
-  children,
-  right,
-}: {
-  title: string
-  children: ReactNode
-  right?: ReactNode
-}) {
+  title, children, right,
+}: { title: string; children: ReactNode; right?: ReactNode }) {
   return (
     <div className="rounded-2xl shadow-sm border border-white/10 bg-black/90 backdrop-blur p-5 font-sans">
       <div className="flex items-center justify-between mb-3">
@@ -37,30 +30,40 @@ export function Card({
   )
 }
 
-export type MyPageShellProps = {
-  data?: MyPageData | null
-  children?: ReactNode
-}
+export type MyPageShellProps = { data?: MyPageData | null; children?: ReactNode }
 
-/* ====== 本体レイアウト ====== */
 export default function MyPageShell({ data, children }: MyPageShellProps) {
   const d = (data ?? EMPTY_DATA) as MyPageData
 
   const name = d?.user?.name ?? 'Hiro'
   const did = d?.user?.displayId ?? '0001'
   const avatar = d?.user?.avatarUrl ?? ''
+
+  // ==== Quick の型（タイトルに反映） ====
+  const model = (d?.quick?.model ?? 'EVΛƎ') as 'EVΛƎ' | 'EΛVƎ'
+  const modelLabel = model === 'EVΛƎ' ? '未来志向型' : '現実思考型'
+
+  // テーマ（左側ラベル）
   const themeName = ((d?.theme?.name ?? 'LIFE') as string).toUpperCase()
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:py-10 bg-black min-h-screen font-sans">
-      {/* 中央タイトル（固定） */}
+      {/* 中央タイトル（Quickの型を反映） */}
       <div className="mb-2 md:mb-3 flex justify-center">
         <span className="text-[22px] md:text-3xl font-extrabold text-purple-400 tracking-wide">
-          EVΛƎ（未来志向型）
+          {model}（{modelLabel}）
         </span>
       </div>
 
-      {/* プロフィール行（カード外）＋右端⚙️ */}
+      {/* Quick の補助行（並びと最終更新） */}
+      <div className="mb-4 flex items-center justify-center gap-3 text-xs text-neutral-400">
+        {Array.isArray(d?.quick?.order) && d?.quick?.order?.length ? (
+          <span>Quick: {d?.quick?.order?.join(' ')}</span>
+        ) : <span>Quick: -</span>}
+        {d?.quick?.created_at && <span>・更新 {formatJP(d.quick.created_at)}</span>}
+      </div>
+
+      {/* プロフィール行 */}
       <div className="mb-1 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center">
@@ -76,11 +79,7 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
             <div className="text-xs text-neutral-400">ID: {did}</div>
           </div>
         </div>
-        <button
-          type="button"
-          aria-label="設定"
-          className="text-xl text-neutral-300 hover:text-white transition-colors"
-        >
+        <button type="button" aria-label="設定" className="text-xl text-neutral-300 hover:text-white transition-colors">
           ⚙️
         </button>
       </div>
@@ -91,15 +90,15 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
         <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
       </div>
 
-      {/* カードグリッド（必要に応じて children を追加） */}
+      {/* カードグリッド */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Quick（条件付き表示） */}
+        {/* Quick（詳しく見せたいならここに拡張） */}
         {Array.isArray(d?.quick?.order) && (d.quick?.order?.length ?? 0) > 0 ? (
           <Card title="Quick 結果">
             <div className="text-white text-sm tracking-wide">
-              {d.quick?.order?.join(' ')}
+              並び：{d.quick?.order?.join(' ')}
             </div>
-            <div className="mt-3 text-xs text-neutral-400">
+            <div className="mt-2 text-xs text-neutral-400">
               {d.quick?.created_at ? `更新: ${formatJP(d.quick.created_at)}` : ''}
             </div>
           </Card>
@@ -145,7 +144,6 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
           </div>
         </Card>
 
-        {/* ページ固有の差し込み */}
         {children}
       </div>
     </div>

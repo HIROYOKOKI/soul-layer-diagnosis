@@ -1,4 +1,3 @@
-// app/daily/result/ResultClient.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -18,6 +17,7 @@ type Item = {
   code: EV;
   comment: string;
   advice?: string | null;
+  affirm?: string | null;      // ✅ アファメーション専用を追加
   quote?: string | null;       // 名言
   created_at?: string;
   env?: Env;
@@ -27,7 +27,7 @@ type Item = {
 function getJstSlot(): Slot {
   const now = new Date();
   const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const h = jst.getUTCHours(); // JST基準
+  const h = jst.getUTCHours();
   if (h >= 4 && h <= 10) return "morning";
   if (h >= 11 && h <= 16) return "noon";
   return "night";
@@ -45,18 +45,16 @@ export default function ResultClient() {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  // === 初期ロード：現在のテーマ → そのテーマの最新結果 ===
+  // === 初期ロード ===
   useEffect(() => {
     (async () => {
       try {
         setErr(null);
-        // 1) 現在のテーマを取得
         const themeRes = await fetch("/api/theme", { cache: "no-store" });
         const themeJson = await themeRes.json().catch(() => null);
         const scope: Scope | null = themeJson?.ok ? (themeJson.scope as Scope) : null;
         setCurrentScope(scope);
 
-        // 2) テーマでフィルタして最新を取得（無ければAPI側で全体最新にフォールバック）
         const qs = scope ? `?env=dev&scope=${scope}` : `?env=dev`;
         const r = await fetch(`/api/mypage/daily-latest${qs}`, { cache: "no-store" });
         if (!r.ok) throw new Error(`/api/mypage/daily-latest failed (${r.status})`);
@@ -75,7 +73,7 @@ export default function ResultClient() {
   }, []);
 
   const hasAdvice = !!(item?.advice && item.advice.trim().length);
-  const hasAffirm = !!(item?.quote && item.quote.trim().length); // ここは名言を短文表示に流用
+  const hasAffirm = !!(item?.affirm && item.affirm.trim().length); // ✅ affirmをチェック
   const nextAfterComment = useMemo(() => (hasAdvice ? 2 : 3), [hasAdvice]);
 
   const handleCommentDone = useCallback(() => {
@@ -101,7 +99,6 @@ export default function ResultClient() {
     setSaving(true);
     setSaveMsg(null);
     try {
-      // 1) 認証（user_id 必須）
       const { data } = await supabase.auth.getUser();
       const user = data?.user;
       if (!user) {
@@ -110,30 +107,27 @@ export default function ResultClient() {
         return;
       }
 
-      // 2) スロット・スコープ・テーマの確定
       const slot: Slot = item.mode || getJstSlot();
       const scope: Scope = (item.scope as Scope) || currentScope || "LIFE";
-      const theme = scope.toLowerCase(); // 'work' | 'love' | 'future' | 'life'
+      const theme = scope.toLowerCase();
       const env: Env = item.env || "dev";
 
-      // 3) question_id が無い場合のフォールバック（date/slot/scopeを埋める）
       const isoDate = new Date().toISOString().slice(0, 10);
       const question_id = item.question_id || `daily-${isoDate}-${slot}-${scope}`;
 
-      // 4) /api/daily/save へ（DB側は (user_id,date_jst,slot) でUpsert）
       const payload = {
         user_id: user.id,
         slot,
         env,
         question_id,
-        scope,                  // 文字列でOK
-        theme,                  // 小文字
+        scope,
+        theme,
         code: item.code,
-        score: null as number | null, // 現状スコア無し
+        score: null as number | null,
         comment: item.comment,
         advice: item.advice ?? null,
-        affirm: null as string | null, // （必要になれば別途セット）
-        quote: item.quote ?? null,     // 名言
+        affirm: item.affirm ?? null,   // ✅ affirmを保存
+        quote: item.quote ?? null,
         evla: null as Record<string, number> | null,
       };
 
@@ -147,8 +141,6 @@ export default function ResultClient() {
 
       setSaved(true);
       setSaveMsg("保存しました。");
-      // 必要ならマイページへ
-      // router.push("/mypage");
     } catch (e: any) {
       setSaveMsg("保存に失敗しました：" + (e?.message || "unknown"));
     } finally {
@@ -186,7 +178,7 @@ export default function ResultClient() {
           </span>
         </div>
 
-        {/* コメント（ゆっくり表示） */}
+        {/* コメント */}
         {step >= 1 && (
           <LuneaBubble
             text={`《コメント》\n${item.comment}`}
@@ -196,7 +188,7 @@ export default function ResultClient() {
           />
         )}
 
-        {/* アドバイス（ゆっくり表示） */}
+        {/* アドバイス */}
         {step >= 2 && hasAdvice && (
           <div className="translate-y-1 opacity-95">
             <LuneaBubble
@@ -207,10 +199,10 @@ export default function ResultClient() {
           </div>
         )}
 
-        {/* アファメーション（短文なので少し速め）※名言を流用 */}
+        {/* アファメーション */}
         {step >= 3 && hasAffirm && (
           <div className="translate-y-1 opacity-90">
-            <LuneaBubble text={`《アファメーション》\n${item.quote}`} speed={80} />
+            <LuneaBubble text={`《アファメーション》\n${item.affirm}`} speed={80} />
           </div>
         )}
 
@@ -240,7 +232,7 @@ export default function ResultClient() {
 
           <a
             href="/mypage"
-            className="px-4 py-2 rounded-xl border border-white/20 hover:bg白/5"
+            className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5"
           >
             マイページへ
           </a>

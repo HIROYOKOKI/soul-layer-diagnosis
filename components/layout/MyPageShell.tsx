@@ -58,10 +58,11 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
         </span>
       </div>
 
-      {/* 日時（JST）だけ右肩に小さく表示 */}
-      <div className="flex justify-end mb-4">
-        <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
-      </div>
+     {/* テーマ行（左：テーマ、右：現在時刻） */}
+<div className="mt-2 mb-6 flex items-center justify-between">
+  <div className="text-sm text-white">テーマ: {d?.theme?.name ?? 'LOVE'}</div>
+  <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
+</div>
 
       {/* プロフィール行（カード外）＋右端⚙️ */}
      <div className="mb-1 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
@@ -71,7 +72,7 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={avatar} alt="avatar" className="h-full w-full object-cover" />
       ) : (
-        <span className="text-neutral-500 text-4xl">🙂</span>
+        <span className="text-neutral-500 text-5xl">🙂</span>
       )}
     </div>
     <div className="min-w-0 flex-1">

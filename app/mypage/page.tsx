@@ -2,6 +2,7 @@
 import MyPageClientWrapper from './MyPageClientWrapper';
 
 export default async function MyPagePage() {
+  // 相対 + no-store で毎回最新を取得（Cookieも同梱）
   const [tRes, qRes] = await Promise.all([
     fetch('/api/theme', { cache: 'no-store' }).catch(() => null),
     fetch('/api/mypage/quick-latest', { cache: 'no-store' }).catch(() => null),
@@ -11,8 +12,7 @@ export default async function MyPagePage() {
   const qJson = await qRes?.json().catch(() => null);
 
   const theme: string | null = tJson?.scope ?? null;
-
-  // API 期待形: { ok:true, item:{ model:'EVΛƎ'|'EΛVƎ', order:['E','V','Λ','Ǝ'], created_at:'...' } }
+  // ⚠️ ここが重要：APIの item をそのまま渡す
   const quick = qJson?.item ?? null;
 
   return <MyPageClientWrapper theme={theme} quick={quick} />;

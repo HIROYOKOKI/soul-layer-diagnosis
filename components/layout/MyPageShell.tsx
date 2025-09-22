@@ -1,4 +1,3 @@
-// components/layout/MyPageShell.tsx
 'use client'
 
 import type { ReactNode } from 'react'
@@ -9,7 +8,7 @@ type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
 export type MyPageData = {
   user?: { name?: string | null; displayId?: string | null; avatarUrl?: string | null } | null
-  // 見出し用に型のみ（並びは表示しない）
+  // 見出し用（型とラベルのみ）
   quick?: { model?: 'EVΛƎ' | 'EΛVƎ' | null; label?: string | null; created_at?: string | null } | null
   theme?: { name?: string | null; updated_at?: string | null } | null
   daily?: { code?: EV | null; comment?: string | null; created_at?: string | null } | null
@@ -42,12 +41,11 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
   const idText = d?.user?.displayId ?? '0001'
   const nameText = d?.user?.name ?? 'Hiro'
 
-  // ===== 見出し（Quick の型を“1回だけ”中央表示） =====
+  // ===== 見出し（型名の重複除去＆色分け・50%縮小） =====
   const model = (d?.quick?.model ?? 'EVΛƎ') as 'EVΛƎ' | 'EΛVƎ'
-
-  // API の label が「EVΛƎ（未来志向型）」「EVΛƎ型（未来志向型）」の両方に対応して重複除去
   const fallback = model === 'EVΛƎ' ? '未来志向型' : '現実思考型'
   const rawLabel = (d?.quick?.label ?? fallback).trim()
+
   const cleanedLabel = (() => {
     // 例: "EVΛƎ（未来志向型）" / "EVΛƎ型（未来志向型）" → "未来志向型"
     const re = new RegExp(`^${model}(型)?（(.+?)）$`)
@@ -59,16 +57,29 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
     return rawLabel
   })()
 
-  // ===== テーマ表記（プロフィール直下に戻す） =====
+  const modelColor = model === 'EVΛƎ' ? '#FF4500' : '#B833F5' // 指定色
+  // テーマ（プロフィール直下）
   const themeName = (d?.theme?.name ?? 'LOVE').toString().toUpperCase()
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:py-10 bg-black min-h-screen font-sans">
-      {/* ===== 見出し：左右中央に配置（重複なし） ===== */}
-      <div className="mb-3 flex justify-center">
-        <span className="text-xl md:text-2xl font-extrabold tracking-wide text-purple-400">
-          {model}（{cleanedLabel}）
-        </span>
+      {/* ===== ヘッダー（左揃え：MY PAGE + 型名(小さく色付き) + サブコピー） ===== */}
+      <div className="mb-4">
+        <div className="flex items-baseline gap-3">
+          <div className="text-[22px] md:text-3xl font-extrabold text-white tracking-wide">
+            MY PAGE
+          </div>
+          {/* 型名は従来見出しの約50%サイズ・色分け */}
+          <div
+            className="font-extrabold tracking-wide"
+            style={{ color: modelColor, fontSize: '14px' }} // だいたい 50% 縮小
+          >
+            {model}（{cleanedLabel}）
+          </div>
+        </div>
+        <div className="mt-1 text-xs text-neutral-400">
+          あなたの軌跡と、いまを映す
+        </div>
       </div>
 
       {/* ===== プロフィール行（設定ボタンは右端＝元位置） ===== */}
@@ -83,7 +94,7 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            {/* 指示：ID の下に名前を表示 */}
+            {/* 指示：ID の下に名前 */}
             <div className="text-xs text-neutral-400">ID: {idText}</div>
             <div className="text-lg md:text-xl font-semibold text-white truncate">{nameText}</div>
           </div>
@@ -99,13 +110,13 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
         </button>
       </div>
 
-      {/* ===== テーマはアイコンの下へ戻す／日時は右端（元の位置） ===== */}
+      {/* ===== テーマ（プロフィールの下に戻す）＋ 日時（右端：元位置） ===== */}
       <div className="mt-2 mb-6 flex items-center justify-between">
         <div className="text-sm text-white">テーマ: {themeName}</div>
         <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
       </div>
 
-      {/* ===== カードグリッド（他のレイアウトは変更しない） ===== */}
+      {/* ===== カードグリッド（他は触らない） ===== */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* デイリー（最新） */}
         <Card title="デイリー（最新）">

@@ -9,7 +9,7 @@ type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
 export type MyPageData = {
   user?: { name?: string | null; displayId?: string | null; avatarUrl?: string | null } | null
-  // 見出しに使う型のみ（並びは /mypage では非表示）
+  // 見出し用に型のみ（並びは表示しない）
   quick?: { model?: 'EVΛƎ' | 'EΛVƎ' | null; label?: string | null; created_at?: string | null } | null
   theme?: { name?: string | null; updated_at?: string | null } | null
   daily?: { code?: EV | null; comment?: string | null; created_at?: string | null } | null
@@ -42,32 +42,36 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
   const idText = d?.user?.displayId ?? '0001'
   const nameText = d?.user?.name ?? 'Hiro'
 
-  // ===== 見出し（Quick の型を中央に1回だけ表示） =====
+  // ===== 見出し（Quick の型を“1回だけ”中央表示） =====
   const model = (d?.quick?.model ?? 'EVΛƎ') as 'EVΛƎ' | 'EΛVƎ'
 
-  // APIの label が「EVΛƎ型（未来志向型）」のように model を含む場合があるため整形
-  const rawLabel = d?.quick?.label ?? (model === 'EVΛƎ' ? '未来志向型' : '現実思考型')
+  // API の label が「EVΛƎ（未来志向型）」「EVΛƎ型（未来志向型）」の両方に対応して重複除去
+  const fallback = model === 'EVΛƎ' ? '未来志向型' : '現実思考型'
+  const rawLabel = (d?.quick?.label ?? fallback).trim()
   const cleanedLabel = (() => {
-    // 先頭に「EVΛƎ型」や「EΛVƎ型」が付いていたら除去
-    const r = rawLabel.replace(/^E[VΛƎ]+型（?/, '').replace(/）?$/, '')
-    return r || (model === 'EVΛƎ' ? '未来志向型' : '現実思考型')
+    // 例: "EVΛƎ（未来志向型）" / "EVΛƎ型（未来志向型）" → "未来志向型"
+    const re = new RegExp(`^${model}(型)?（(.+?)）$`)
+    const m = rawLabel.match(re)
+    if (m) return m[2]
+    const m2 = rawLabel.match(/（(.+?)）/)
+    if (m2) return m2[1]
+    if (rawLabel === 'EVΛƎ' || rawLabel === 'EΛVƎ') return fallback
+    return rawLabel
   })()
 
-  // ※色は既定のまま（レイアウトのみ調整）。必要なら model で色分岐可。
-
-  // テーマ表記（プロフィール直下へ戻す）
+  // ===== テーマ表記（プロフィール直下に戻す） =====
   const themeName = (d?.theme?.name ?? 'LOVE').toString().toUpperCase()
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:py-10 bg-black min-h-screen font-sans">
-      {/* ===== タイトル：左右中央 ===== */}
+      {/* ===== 見出し：左右中央に配置（重複なし） ===== */}
       <div className="mb-3 flex justify-center">
         <span className="text-xl md:text-2xl font-extrabold tracking-wide text-purple-400">
           {model}（{cleanedLabel}）
         </span>
       </div>
 
-      {/* ===== プロフィール行（設定ボタンは右端：元の位置） ===== */}
+      {/* ===== プロフィール行（設定ボタンは右端＝元位置） ===== */}
       <div className="mb-1 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center">
@@ -79,7 +83,7 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            {/* 指定：ID の下に名前を表示 */}
+            {/* 指示：ID の下に名前を表示 */}
             <div className="text-xs text-neutral-400">ID: {idText}</div>
             <div className="text-lg md:text-xl font-semibold text-white truncate">{nameText}</div>
           </div>
@@ -95,13 +99,13 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
         </button>
       </div>
 
-      {/* ===== テーマ行（プロフィールの下に戻す）＋ 日時は右端（元の位置） ===== */}
+      {/* ===== テーマはアイコンの下へ戻す／日時は右端（元の位置） ===== */}
       <div className="mt-2 mb-6 flex items-center justify-between">
         <div className="text-sm text-white">テーマ: {themeName}</div>
         <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
       </div>
 
-      {/* ===== カードグリッド ===== */}
+      {/* ===== カードグリッド（他のレイアウトは変更しない） ===== */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* デイリー（最新） */}
         <Card title="デイリー（最新）">

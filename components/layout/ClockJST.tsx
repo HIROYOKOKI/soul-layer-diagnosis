@@ -1,27 +1,27 @@
 'use client';
 import { useEffect, useState } from 'react';
 
-function fmt(d: Date) {
-  const y = d.getFullYear();
-  const m = `${d.getMonth()+1}`.padStart(2,'0');
-  const day = `${d.getDate()}`.padStart(2,'0');
-  const hh = `${d.getHours()}`.padStart(2,'0');
-  const mm = `${d.getMinutes()}`.padStart(2,'0');
-  return `${y}/${m}/${day} ${hh}:${mm}`;
-}
+type Props = { className?: string };
 
-export default function ClockJST({ className }: { className?: string }) {
+export default function ClockJST({ className }: Props) {
   const [now, setNow] = useState<string>('');
 
   useEffect(() => {
-    const update = () => {
-      const utc = new Date();
-      // JST = UTC+9
-      const jst = new Date(utc.getTime() + 9 * 60 * 60 * 1000);
-      setNow(fmt(jst));
-    };
-    update();
-    const id = setInterval(update, 60 * 1000);
+    const fmt = () =>
+      new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(new Date());
+
+    const tick = () => setNow(fmt());
+
+    tick(); // 初回即時
+    const id = setInterval(tick, 60 * 1000);
     return () => clearInterval(id);
   }, []);
 

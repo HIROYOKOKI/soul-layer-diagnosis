@@ -1,10 +1,11 @@
+// app/mypage/MyPageClientWrapper.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import MyPageShell from '../../components/layout/MyPageShell';
 
-/* ===== 型（最低限） ===== */
+/* ===== 型 ===== */
 type QuickAny =
   | { model?: 'EVΛƎ' | 'EΛVƎ' | null; label?: string | null; created_at?: string | null }
   | { type_key?: 'EVΛƎ' | 'EΛVƎ' | null; type_label?: string | null; created_at?: string | null }
@@ -44,10 +45,10 @@ export default function MyPageClientWrapper({
   daily?: Daily;
   profile?: Profile;
 }) {
-  /* ---------- Supabase クライアント（CSR） ---------- */
+  /* ---------- Supabase クライアント ---------- */
   const supabase = useMemo(() => createClientComponentClient(), []);
 
-  /* ---------- ユーザー情報（id / profiles） ---------- */
+  /* ---------- ユーザー情報 ---------- */
   const [user, setUser] = useState<UserMeta>(null);
   useEffect(() => {
     (async () => {
@@ -84,9 +85,7 @@ export default function MyPageClientWrapper({
         const r = await fetch('/api/theme', { cache: 'no-store' });
         const j = await r.json();
         setTheme(String(j?.scope ?? 'LIFE').toUpperCase());
-      } catch {
-        /* noop */
-      }
+      } catch {}
     })();
   }, []);
 
@@ -113,9 +112,7 @@ export default function MyPageClientWrapper({
           setQuickModel((n.model ?? null) as 'EVΛƎ' | 'EΛVƎ' | null);
           setQuickLabel(n.label);
         }
-      } catch {
-        /* noop */
-      }
+      } catch {}
     })();
   }, []);
 
@@ -127,9 +124,7 @@ export default function MyPageClientWrapper({
         const r = await fetch('/api/mypage/daily-latest', { cache: 'no-store' });
         const j = await r.json();
         if (j?.ok) setDaily(j.item);
-      } catch {
-        /* noop */
-      }
+      } catch {}
     })();
   }, []);
 
@@ -141,18 +136,17 @@ export default function MyPageClientWrapper({
         const r = await fetch('/api/mypage/profile-latest', { cache: 'no-store' });
         const j = await r.json();
         if (j?.ok) setProfile(j.item);
-      } catch {
-        /* noop */
-      }
+      } catch {}
     })();
   }, []);
 
-  /* ---------- MyPageShell へ受け渡し ---------- */
+  /* ---------- Shell へ ---------- */
   return (
     <MyPageShell
       data={{
         user: user
           ? {
+              id: user.id,                                 // ← id を追加
               name: user.name ?? undefined,
               displayId: user.display_id ?? undefined,
               avatarUrl: user.avatar_url ?? undefined,
@@ -165,7 +159,7 @@ export default function MyPageClientWrapper({
         daily: daily ?? undefined,
         profile: profile ?? undefined,
       }}
-      userId={user?.id}
+      userId={user?.id}   // ← こちらも渡す
     />
   );
 }

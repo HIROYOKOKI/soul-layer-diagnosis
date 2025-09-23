@@ -309,7 +309,7 @@ export async function POST(req: Request) {
     const evla: EVLA = { slot: b.slot, mode: "EVΛƎ", E, V, Lambda, Epsilon, NextV };
 
     // 3) スコア（朝3/昼2/夜1 → ×0.1）
-    const score = Math.round(rankPoint * 10) / 100; // rankPoint×0.1 を小数2桁に丸め
+    const score = Math.round((rankPoint * 0.1) * 100) / 100; // 小数誤差対策
 
     // 4) 保存（ベストエフォート）
     const created_at = new Date().toISOString();

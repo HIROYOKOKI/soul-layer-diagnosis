@@ -1,4 +1,3 @@
-// app/mypage/MyPageClientWrapper.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -18,13 +17,32 @@ type UserMeta = {
   avatar_url?: string | null;
 } | null;
 
+type Daily = {
+  comment?: string | null;
+  advice?: string | null;
+  affirm?: string | null;
+  score?: number | null;
+  created_at?: string | null;
+} | null;
+
+type Profile = {
+  fortune?: string | null;
+  personality?: string | null;
+  partner?: string | null;
+  created_at?: string | null;
+} | null;
+
 /* ===== コンポーネント ===== */
 export default function MyPageClientWrapper({
   theme: ssrTheme,
   quick: ssrQuick,
+  daily: ssrDaily,
+  profile: ssrProfile,
 }: {
   theme?: string | null;
   quick?: QuickAny;
+  daily?: Daily;
+  profile?: Profile;
 }) {
   /* ---------- Supabase クライアント（CSR） ---------- */
   const supabase = useMemo(() => createClientComponentClient(), []);
@@ -58,7 +76,7 @@ export default function MyPageClientWrapper({
     })();
   }, [supabase]);
 
-  /* ---------- テーマ：SSR → CSR 上書き（既存方針） ---------- */
+  /* ---------- テーマ ---------- */
   const [theme, setTheme] = useState<string>((ssrTheme ?? 'LIFE').toUpperCase());
   useEffect(() => {
     (async () => {
@@ -72,16 +90,16 @@ export default function MyPageClientWrapper({
     })();
   }, []);
 
-  /* ---------- Quick：SSR初期値 → CSRで再取得（既存方針） ---------- */
-  const normalize = (q: QuickAny | undefined | null) => {
-    const model = (q as any)?.model ?? (q as any)?.type_key ?? null; // 'EVΛƎ' | 'EΛVƎ' | null
+  /* ---------- Quick ---------- */
+  const normalizeQuick = (q: QuickAny | undefined | null) => {
+    const model = (q as any)?.model ?? (q as any)?.type_key ?? null;
     const labelRaw = (q as any)?.label ?? (q as any)?.type_label ?? undefined;
     const label =
       labelRaw ?? (model === 'EVΛƎ' ? '未来志向型' : model === 'EΛVƎ' ? '現実思考型' : undefined);
     return { model, label };
   };
 
-  const initQuick = normalize(ssrQuick);
+  const initQuick = normalizeQuick(ssrQuick);
   const [quickModel, setQuickModel] = useState<'EVΛƎ' | 'EΛVƎ' | null>(initQuick.model ?? null);
   const [quickLabel, setQuickLabel] = useState<string | undefined>(initQuick.label);
 
@@ -91,10 +109,38 @@ export default function MyPageClientWrapper({
         const r = await fetch('/api/mypage/quick-latest', { cache: 'no-store' });
         const j = await r.json();
         if (j?.ok) {
-          const n = normalize(j.item);
+          const n = normalizeQuick(j.item);
           setQuickModel((n.model ?? null) as 'EVΛƎ' | 'EΛVƎ' | null);
           setQuickLabel(n.label);
         }
+      } catch {
+        /* noop */
+      }
+    })();
+  }, []);
+
+  /* ---------- Daily ---------- */
+  const [daily, setDaily] = useState<Daily>(ssrDaily ?? null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/mypage/daily-latest', { cache: 'no-store' });
+        const j = await r.json();
+        if (j?.ok) setDaily(j.item);
+      } catch {
+        /* noop */
+      }
+    })();
+  }, []);
+
+  /* ---------- Profile ---------- */
+  const [profile, setProfile] = useState<Profile>(ssrProfile ?? null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/mypage/profile-latest', { cache: 'no-store' });
+        const j = await r.json();
+        if (j?.ok) setProfile(j.item);
       } catch {
         /* noop */
       }
@@ -105,7 +151,6 @@ export default function MyPageClientWrapper({
   return (
     <MyPageShell
       data={{
-        // ユーザー行（名前/表示ID/アバターURL）
         user: user
           ? {
               name: user.name ?? undefined,
@@ -113,16 +158,13 @@ export default function MyPageClientWrapper({
               avatarUrl: user.avatar_url ?? undefined,
             }
           : undefined,
-        // 見出し Quick（型だけ）
-        quick:
-          quickModel
-            ? { model: quickModel, label: quickLabel, created_at: undefined }
-            : undefined,
-        // テーマ（上段の小見出し）
+        quick: quickModel
+          ? { model: quickModel, label: quickLabel, created_at: undefined }
+          : undefined,
         theme: { name: theme, updated_at: null },
-        // 将来: daily / charts などは Shell 内で個別 fetch （現状の方針に合わせる）
+        daily: daily ?? undefined,
+        profile: profile ?? undefined,
       }}
-      // アバターアップロード用に userId も渡せるようにしておく
       userId={user?.id}
     />
   );

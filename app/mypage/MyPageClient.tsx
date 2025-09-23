@@ -4,6 +4,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { RadarEVAE, type EVAEVector } from "@/components/charts/Charts";
+import {
+  ResponsiveContainer,
+  RadarChart as RcRadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  Tooltip,
+} from "recharts";
 
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
@@ -220,19 +229,45 @@ export default function MyPageClient({
         <AvatarUpload userId={userId} />
       </div>
 
-     {/* Radar（ダミーデータ強制表示） */}
+    {/* Radar（ダミーデータ直書き・動作確認用） */}
 <section className="rounded-2xl border border-white/10 bg-black/60 p-4">
   <div className="flex items-center justify-between mb-3">
     <h2 className="text-sm text-white/70">現在のバランス（Radar）</h2>
     <span className="text-xs text-white/50">テスト表示</span>
   </div>
 
-  <RadarEVAE
-    vector={{ E: 0.8, V: 0.6, "Λ": 0.4, "Ǝ": 0.7 }}
-    order={["E", "V", "Λ", "Ǝ"]}
-    size={300}
-  />
+  <div style={{ width: "100%", maxWidth: 320 }}>
+    <ResponsiveContainer width="100%" height={300}>
+      <RcRadarChart
+        data={[
+          { key: "E", label: "E", value: 0.8 },
+          { key: "V", label: "V", value: 0.6 },
+          { key: "Λ", label: "Λ", value: 0.4 },
+          { key: "Ǝ", label: "Ǝ", value: 0.7 },
+        ]}
+        outerRadius="78%"
+      >
+        <PolarGrid gridType="polygon" />
+        <PolarAngleAxis dataKey="label" tick={{ fill: "white", fontSize: 12 }} />
+        <PolarRadiusAxis angle={90} domain={[0, 1]} tick={{ fill: "white", fontSize: 10 }} tickCount={6} />
+        <Tooltip
+          formatter={(v: number, _n, p) => [`${(v * 100).toFixed(0)}%`, p.payload.key]}
+          contentStyle={{ background: "rgba(0,0,0,0.8)", border: "1px solid #222", borderRadius: 8 }}
+          labelStyle={{ color: "#fff" }}
+        />
+        <Radar
+          name="EVΛƎ"
+          dataKey="value"
+          stroke="#FF4500"
+          fill="#FF4500"
+          strokeOpacity={0.9}
+          fillOpacity={0.18}
+        />
+      </RcRadarChart>
+    </ResponsiveContainer>
+  </div>
 </section>
+
 
 
       {/* デイリー診断カード */}

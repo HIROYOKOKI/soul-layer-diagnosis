@@ -1,4 +1,3 @@
-// app/mypage/MyPageClient.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -9,8 +8,25 @@ type User = {
   avatarUrl?: string | null;
 };
 
+type Daily = {
+  comment?: string | null;
+  advice?: string | null;
+  affirm?: string | null;
+  score?: number | null;
+  created_at?: string | null;
+};
+
+type Profile = {
+  fortune?: string | null;
+  personality?: string | null;
+  partner?: string | null;
+  created_at?: string | null;
+};
+
 type MyPageData = {
   user?: User | null;
+  daily?: Daily | null;
+  profile?: Profile | null;
 };
 
 export default function MyPageClient({
@@ -72,7 +88,8 @@ export default function MyPageClient({
 
   // --- メインUI ---
   return (
-    <div className="p-4">
+    <div className="p-4 space-y-6">
+      {/* ユーザー情報 */}
       <div className="flex items-center gap-4">
         <AvatarImage src={data.user?.avatarUrl} />
         <div>
@@ -81,9 +98,46 @@ export default function MyPageClient({
         </div>
       </div>
 
-      <div className="mt-2">
+      <div>
         <AvatarUpload userId={userId} />
       </div>
+
+      {/* デイリー診断カード */}
+      <section className="rounded-2xl border border-white/10 bg-black/60 p-4">
+        <h2 className="text-sm text-white/70 mb-2">デイリー診断（最新）</h2>
+        {data.daily ? (
+          <div className="space-y-2 text-white/90">
+            <p><strong>コメント：</strong>{data.daily.comment}</p>
+            <p><strong>アドバイス：</strong>{data.daily.advice}</p>
+            <p><strong>アファ：</strong>{data.daily.affirm}</p>
+            <p className="text-white/70">
+              <strong>スコア：</strong>{Number(data.daily.score ?? 0).toFixed(1)}
+            </p>
+            {data.daily.created_at && (
+              <p className="text-xs text-white/50">日時: {new Date(data.daily.created_at).toLocaleString()}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-white/60">まだデイリー診断がありません。</p>
+        )}
+      </section>
+
+      {/* プロフィール診断カード */}
+      <section className="rounded-2xl border border-white/10 bg-black/60 p-4">
+        <h2 className="text-sm text-white/70 mb-2">プロフィール診断（最新）</h2>
+        {data.profile ? (
+          <div className="space-y-1 text-white/90">
+            <p><strong>運勢：</strong>{data.profile.fortune}</p>
+            <p><strong>性格：</strong>{data.profile.personality}</p>
+            <p><strong>理想：</strong>{data.profile.partner}</p>
+            {data.profile.created_at && (
+              <p className="text-xs text-white/50">日時: {new Date(data.profile.created_at).toLocaleString()}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-white/60">プロフィール診断は未実施です。</p>
+        )}
+      </section>
     </div>
   );
 }

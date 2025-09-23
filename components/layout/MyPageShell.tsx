@@ -1,3 +1,4 @@
+// components/layout/MyPageShell.tsx
 'use client'
 
 import type { ReactNode } from 'react'
@@ -11,7 +12,22 @@ export type MyPageData = {
   // 見出し用（型とラベルのみ）
   quick?: { model?: 'EVΛƎ' | 'EΛVƎ' | null; label?: string | null; created_at?: string | null } | null
   theme?: { name?: string | null; updated_at?: string | null } | null
-  daily?: { code?: EV | null; comment?: string | null; created_at?: string | null } | null
+  // ← daily を拡張（UI表示要件：コメント/アドバイス/アファ/スコア）
+  daily?: {
+    code?: EV | null
+    comment?: string | null
+    advice?: string | null
+    affirm?: string | null
+    score?: number | null
+    created_at?: string | null
+  } | null
+  // 任意：最新プロフィール（渡されなければカード非表示）
+  profile?: {
+    fortune?: string | null
+    personality?: string | null
+    partner?: string | null
+    created_at?: string | null
+  } | null
 } | null
 
 const EMPTY_DATA: Readonly<MyPageData> = Object.freeze({})
@@ -47,7 +63,6 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
   const rawLabel = (d?.quick?.label ?? fallback).trim()
 
   const cleanedLabel = (() => {
-    // 例: "EVΛƎ（未来志向型）" / "EVΛƎ型（未来志向型）" → "未来志向型"
     const re = new RegExp(`^${model}(型)?（(.+?)）$`)
     const m = rawLabel.match(re)
     if (m) return m[2]
@@ -58,21 +73,19 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
   })()
 
   const modelColor = model === 'EVΛƎ' ? '#FF4500' : '#B833F5' // 指定色
-  // テーマ（プロフィール直下）
   const themeName = (d?.theme?.name ?? 'LOVE').toString().toUpperCase()
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:py-10 bg-black min-h-screen font-sans">
-      {/* ===== ヘッダー（左揃え：MY PAGE + 型名(小さく色付き) + サブコピー） ===== */}
+      {/* ===== ヘッダー ===== */}
       <div className="mb-4">
         <div className="flex items-baseline gap-3">
           <div className="text-[22px] md:text-3xl font-extrabold text-white tracking-wide">
             MY PAGE
           </div>
-          {/* 型名は従来見出しの約50%サイズ・色分け */}
           <div
             className="font-extrabold tracking-wide"
-            style={{ color: modelColor, fontSize: '14px' }} // だいたい 50% 縮小
+            style={{ color: modelColor, fontSize: '14px' }}
           >
             {model}（{cleanedLabel}）
           </div>
@@ -82,7 +95,7 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
         </div>
       </div>
 
-      {/* ===== プロフィール行（設定ボタンは右端＝元位置） ===== */}
+      {/* ===== プロフィール行 ===== */}
       <div className="mb-1 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center">
@@ -94,13 +107,11 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            {/* 指示：ID の下に名前 */}
             <div className="text-xs text-neutral-400">ID: {idText}</div>
             <div className="text-lg md:text-xl font-semibold text-white truncate">{nameText}</div>
           </div>
         </div>
 
-        {/* 設定ボタン（元の位置） */}
         <button
           type="button"
           aria-label="設定"
@@ -110,27 +121,48 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
         </button>
       </div>
 
-      {/* ===== テーマ（プロフィールの下に戻す）＋ 日時（右端：元位置） ===== */}
+      {/* ===== テーマ ＋ 時刻 ===== */}
       <div className="mt-2 mb-6 flex items-center justify-between">
         <div className="text-sm text-white">テーマ: {themeName}</div>
         <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
       </div>
 
-      {/* ===== カードグリッド（他は触らない） ===== */}
+      {/* ===== カードグリッド ===== */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* デイリー（最新） */}
-        <Card title="デイリー（最新）">
+        <Card
+          title="デイリー（最新）"
+          right={
+            d?.daily?.created_at ? (
+              <span className="text-[11px] px-2 py-1 rounded-md bg-white/5 border border-white/10 text-white/70">
+                {formatJP(d.daily.created_at)}
+              </span>
+            ) : null
+          }
+        >
           {d?.daily?.code ? (
             <>
               <p className="text-sm text-neutral-200 leading-relaxed">
-                {d.daily?.comment ?? 'コメントはまだありません。'}
+                <span className="text-white/60 mr-2">コメント</span>
+                {d.daily?.comment ?? '—'}
               </p>
-              <div className="mt-3 text-xs text-neutral-400">
-                {d.daily?.created_at ? `更新: ${formatJP(d.daily.created_at)}` : ''}
+              <p className="mt-2 text-sm text-neutral-200 leading-relaxed">
+                <span className="text-white/60 mr-2">アドバイス</span>
+                {d.daily?.advice ?? '—'}
+              </p>
+              <p className="mt-2 text-sm text-neutral-200">
+                <span className="text-white/60 mr-2">アファ</span>
+                {d.daily?.affirm ?? '—'}
+              </p>
+              <div className="mt-3 text-sm text-white/80 flex items-center gap-2">
+                <span className="text-white/60">スコア</span>
+                <strong className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10">
+                  {Number(d.daily?.score ?? 0).toFixed(1)}
+                </strong>
               </div>
             </>
           ) : (
-            <p className="text-xs text-neutral-500">未取得</p>
+            <p className="text-xs text-neutral-500">まだデイリー診断がありません。</p>
           )}
         </Card>
 
@@ -157,6 +189,24 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
             </button>
           </div>
         </Card>
+
+        {/* 任意：プロフィール（最新）カード（データが来た時だけ表示） */}
+        {d?.profile ? (
+          <Card
+            title="プロフィール（最新）"
+            right={
+              d.profile.created_at ? (
+                <span className="text-[11px] px-2 py-1 rounded-md bg-white/5 border border-white/10 text-white/70">
+                  {formatJP(d.profile.created_at)}
+                </span>
+              ) : null
+            }
+          >
+            <p className="text-sm text-neutral-200"><span className="text-white/60 mr-2">運勢</span>{d.profile.fortune ?? '—'}</p>
+            <p className="mt-2 text-sm text-neutral-200"><span className="text-white/60 mr-2">性格</span>{d.profile.personality ?? '—'}</p>
+            <p className="mt-2 text-sm text-neutral-200"><span className="text-white/60 mr-2">理想</span>{d.profile.partner ?? '—'}</p>
+          </Card>
+        ) : null}
 
         {children}
       </div>

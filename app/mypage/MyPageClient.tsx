@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { RadarEVAE, type EVAEVector } from "@/components/charts/Charts";
 
+
 type EV = "E" | "V" | "Λ" | "Ǝ";
 
 type User = {
@@ -219,20 +220,20 @@ export default function MyPageClient({
         <AvatarUpload userId={userId} />
       </div>
 
-      {/* Radar（1d:001 / latest に基づく） */}
-      <section className="rounded-2xl border border-white/10 bg-black/60 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm text-white/70">現在のバランス（Radar）</h2>
-          <span className="text-xs text-white/50">
-            {loadingDaily ? "読み込み中…" : data.daily?.created_at ? fmtJST(data.daily.created_at) : "—"}
-          </span>
-        </div>
-        {radarVector ? (
-          <RadarEVAE vector={radarVector} order={["E", "V", "Λ", "Ǝ"]} size={300} />
-        ) : (
-          <p className="text-white/60">表示できるレコードが見つかりません。</p>
-        )}
-      </section>
+     {/* Radar（ダミーデータ強制表示） */}
+<section className="rounded-2xl border border-white/10 bg-black/60 p-4">
+  <div className="flex items-center justify-between mb-3">
+    <h2 className="text-sm text-white/70">現在のバランス（Radar）</h2>
+    <span className="text-xs text-white/50">テスト表示</span>
+  </div>
+
+  <RadarEVAE
+    vector={{ E: 0.8, V: 0.6, "Λ": 0.4, "Ǝ": 0.7 }}
+    order={["E", "V", "Λ", "Ǝ"]}
+    size={300}
+  />
+</section>
+
 
       {/* デイリー診断カード */}
       <section className="rounded-2xl border border-white/10 bg-black/60 p-4">

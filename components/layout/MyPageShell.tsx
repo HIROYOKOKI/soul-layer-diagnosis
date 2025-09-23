@@ -2,26 +2,27 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { useState } from 'react'
 import { formatJP } from './date'
 import ClockJST from './ClockJST'
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
 export type MyPageData = {
-  user?: { name?: string | null; displayId?: string | null; avatarUrl?: string | null } | null
-  // 見出し用（型とラベルのみ）
+  user?: { name?: string | null; displayId?: string | null; avatarUrl?: string | null; id?: string | null } | null
   quick?: { model?: 'EVΛƎ' | 'EΛVƎ' | null; label?: string | null; created_at?: string | null } | null
   theme?: { name?: string | null; updated_at?: string | null } | null
-  // ← daily を拡張（UI表示要件：コメント/アドバイス/アファ/スコア）
   daily?: {
+    id?: string | null                  // 例: daily-2025-09-23-morning（保存に使う）
     code?: EV | null
     comment?: string | null
     advice?: string | null
     affirm?: string | null
     score?: number | null
     created_at?: string | null
+    nextv?: { id: string; label: string }[] | null   // 次の一手（任意）
+    nextv_selected?: string | null                   // その日選択済み（任意）
   } | null
-  // 任意：最新プロフィール（渡されなければカード非表示）
   profile?: {
     fortune?: string | null
     personality?: string | null
@@ -47,21 +48,25 @@ export function Card({
   )
 }
 
-export type MyPageShellProps = { data?: MyPageData | null; children?: ReactNode }
+export type MyPageShellProps = {
+  data?: MyPageData | null
+  children?: ReactNode
+  userId?: string | null   // ある場合は NextV 保存に使用
+}
 
 /* ===== 本体レイアウト ===== */
-export default function MyPageShell({ data, children }: MyPageShellProps) {
+export default function MyPageShell({ data, children, userId }: MyPageShellProps) {
   const d = (data ?? EMPTY_DATA) as MyPageData
 
   const avatar = d?.user?.avatarUrl ?? ''
   const idText = d?.user?.displayId ?? '0001'
   const nameText = d?.user?.name ?? 'Hiro'
+  const uid = userId ?? d?.user?.id ?? null
 
-  // ===== 見出し（型名の重複除去＆色分け・50%縮小） =====
+  // 見出し（型）
   const model = (d?.quick?.model ?? 'EVΛƎ') as 'EVΛƎ' | 'EΛVƎ'
   const fallback = model === 'EVΛƎ' ? '未来志向型' : '現実思考型'
   const rawLabel = (d?.quick?.label ?? fallback).trim()
-
   const cleanedLabel = (() => {
     const re = new RegExp(`^${model}(型)?（(.+?)）$`)
     const m = rawLabel.match(re)
@@ -71,9 +76,38 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
     if (rawLabel === 'EVΛƎ' || rawLabel === 'EΛVƎ') return fallback
     return rawLabel
   })()
-
-  const modelColor = model === 'EVΛƎ' ? '#FF4500' : '#B833F5' // 指定色
+  const modelColor = model === 'EVΛƎ' ? '#FF4500' : '#B833F5'
   const themeName = (d?.theme?.name ?? 'LOVE').toString().toUpperCase()
+
+  // モーダル開閉 & NextV 選択済み（その日だけ有効）
+  const [openDaily, setOpenDaily] = useState(false)
+  const [selectedNextV, setSelectedNextV] = useState<string | null>(d?.daily?.nextv_selected ?? null)
+  const nextVList = d?.daily?.nextv ?? null
+
+  async function saveNextV(nextvId: string, nextvLabel: string) {
+    if (selectedNextV || !uid || !d?.daily?.id) return
+    try {
+      const res = await fetch('/api/daily/nextv/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: uid,
+          daily_id: d.daily.id,
+          nextv_id: nextvId,
+          nextv_label: nextvLabel,
+        }),
+      })
+      const j = await res.json()
+      if (j?.ok) {
+        setSelectedNextV(nextvId)
+        alert(`「${nextvLabel}」を記録しました`)
+      } else {
+        alert('保存失敗: ' + (j?.error ?? 'unknown'))
+      }
+    } catch (e) {
+      alert('保存に失敗しました')
+    }
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:py-10 bg-black min-h-screen font-sans">
@@ -83,20 +117,15 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
           <div className="text-[22px] md:text-3xl font-extrabold text-white tracking-wide">
             MY PAGE
           </div>
-          <div
-            className="font-extrabold tracking-wide"
-            style={{ color: modelColor, fontSize: '14px' }}
-          >
+          <div className="font-extrabold tracking-wide" style={{ color: modelColor, fontSize: '14px' }}>
             {model}（{cleanedLabel}）
           </div>
         </div>
-        <div className="mt-1 text-xs text-neutral-400">
-          あなたの軌跡と、いまを映す
-        </div>
+        <div className="mt-1 text-xs text-neutral-400">あなたの軌跡と、いまを映す</div>
       </div>
 
       {/* ===== プロフィール行 ===== */}
-      <div className="mb-1 flex items-center justify-between rounded-none border-0 bg-transparent p-0 shadow-none">
+      <div className="mb-1 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-full bg-neutral-800 overflow-hidden flex items-center justify-center">
             {avatar ? (
@@ -112,16 +141,12 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
           </div>
         </div>
 
-        <button
-          type="button"
-          aria-label="設定"
-          className="text-xl text-neutral-300 hover:text-white transition-colors"
-        >
+        <button type="button" aria-label="設定" className="text-xl text-neutral-300 hover:text-white transition-colors">
           ⚙️
         </button>
       </div>
 
-      {/* ===== テーマ ＋ 時刻 ===== */}
+      {/* ===== テーマ ＋ 時計 ===== */}
       <div className="mt-2 mb-6 flex items-center justify-between">
         <div className="text-sm text-white">テーマ: {themeName}</div>
         <ClockJST className="text-xs text-neutral-400 whitespace-nowrap tabular-nums" />
@@ -129,9 +154,9 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
 
       {/* ===== カードグリッド ===== */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* デイリー（最新） */}
+        {/* 今日のアファ（ボタン → モーダル） */}
         <Card
-          title="デイリー（最新）"
+          title="今日のアファメーション"
           right={
             d?.daily?.created_at ? (
               <span className="text-[11px] px-2 py-1 rounded-md bg-white/5 border border-white/10 text-white/70">
@@ -140,33 +165,19 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
             ) : null
           }
         >
-          {d?.daily?.code ? (
-            <>
-              <p className="text-sm text-neutral-200 leading-relaxed">
-                <span className="text-white/60 mr-2">コメント</span>
-                {d.daily?.comment ?? '—'}
-              </p>
-              <p className="mt-2 text-sm text-neutral-200 leading-relaxed">
-                <span className="text-white/60 mr-2">アドバイス</span>
-                {d.daily?.advice ?? '—'}
-              </p>
-              <p className="mt-2 text-sm text-neutral-200">
-                <span className="text-white/60 mr-2">アファ</span>
-                {d.daily?.affirm ?? '—'}
-              </p>
-              <div className="mt-3 text-sm text-white/80 flex items-center gap-2">
-                <span className="text-white/60">スコア</span>
-                <strong className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10">
-                  {Number(d.daily?.score ?? 0).toFixed(1)}
-                </strong>
-              </div>
-            </>
+          {d?.daily?.affirm ? (
+            <button
+              onClick={() => setOpenDaily(true)}
+              className="w-full px-4 py-3 rounded-xl bg-neutral-800 text-white font-medium hover:bg-neutral-700 transition"
+            >
+              {d.daily.affirm}
+            </button>
           ) : (
-            <p className="text-xs text-neutral-500">まだデイリー診断がありません。</p>
+            <p className="text-xs text-neutral-500">まだ診断がありません。</p>
           )}
         </Card>
 
-        {/* 構造バランス（レーダー枠） */}
+        {/* 構造バランス（プレースホルダ） */}
         <Card title="構造バランス">
           <div className="h-48 flex items-center justify-center text-neutral-500">
             [Radar Chart Placeholder]
@@ -190,7 +201,7 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
           </div>
         </Card>
 
-        {/* 任意：プロフィール（最新）カード（データが来た時だけ表示） */}
+        {/* プロフィール（任意） */}
         {d?.profile ? (
           <Card
             title="プロフィール（最新）"
@@ -210,6 +221,77 @@ export default function MyPageShell({ data, children }: MyPageShellProps) {
 
         {children}
       </div>
+
+      {/* ===== モーダル（デイリー詳細） ===== */}
+      {openDaily && d?.daily && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+          onClick={() => setOpenDaily(false)}
+        >
+          <div
+            className="bg-black rounded-2xl p-6 max-w-md w-full border border-white/10 text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-3">
+              <h2 className="text-lg font-bold">今日の診断詳細</h2>
+              <button
+                aria-label="閉じる"
+                className="text-white/70 hover:text-white"
+                onClick={() => setOpenDaily(false)}
+              >
+                ✖️
+              </button>
+            </div>
+
+            <p className="text-sm text-white/90 mb-3">
+              <span className="text-white/60">コメント：</span>{d.daily.comment}
+            </p>
+            <p className="text-sm text-white/90 mb-3">
+              <span className="text-white/60">アドバイス：</span>{d.daily.advice}
+            </p>
+            <p className="text-sm text-white/90">
+              <span className="text-white/60">スコア：</span>{Number(d.daily.score ?? 0).toFixed(1)}
+            </p>
+
+            {/* 次の一手（タップで保存） */}
+            {nextVList && nextVList.length > 0 && (
+              <div className="mt-4">
+                <p className="text-white/70 mb-2">次の一手を選ぶ</p>
+                <ul className="space-y-2">
+                  {nextVList.map((n) => (
+                    <li key={n.id}>
+                      <button
+                        onClick={() => {
+                          if (!selectedNextV) saveNextV(n.id, n.label)
+                        }}
+                        disabled={!!selectedNextV}
+                        className={`w-full px-3 py-2 rounded-lg border text-sm transition
+                          ${
+                            selectedNextV === n.id
+                              ? 'bg-green-800 border-green-500 text-white cursor-default'
+                              : 'bg-neutral-800 border-white/10 text-white/90 hover:bg-neutral-700'
+                          }`}
+                      >
+                        {n.label} {selectedNextV === n.id ? '✓' : ''}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-white/50">
+                  ※ 選択はその日のみ有効。翌日になるとリセットされます。
+                </p>
+              </div>
+            )}
+
+            <button
+              onClick={() => setOpenDaily(false)}
+              className="mt-5 w-full px-4 py-2 bg-neutral-700 text-white rounded-lg"
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

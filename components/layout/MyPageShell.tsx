@@ -2,7 +2,6 @@
 'use client'
 
 import { useState, useRef, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
 import { formatJP } from './date'
 import ClockJST from './ClockJST'
 
@@ -62,7 +61,6 @@ export type MyPageShellProps = {
 /* ===== 本体レイアウト ===== */
 export default function MyPageShell({ data, children, userId }: MyPageShellProps) {
   const d = (data ?? EMPTY_DATA) as MyPageData
-  const router = useRouter()
 
   // プロフィール基本情報
   const [avatar, setAvatar] = useState(d?.user?.avatarUrl ?? '')
@@ -91,7 +89,12 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !uid) return
+    if (!file) return
+    if (!uid) {
+      alert('ログイン情報が確認できません。いったん再ログインしてからお試しください。')
+      e.target.value = ''
+      return
+    }
     setUploading(true)
 
     const fd = new FormData()
@@ -156,14 +159,16 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
             ⚙️
           </button>
           {menuOpen && (
-            <div className="absolute right-0 mt-2 w-48 rounded-md border border-white/10 bg-neutral-900 shadow-lg z-50">
+            <div className="absolute right-0 mt-2 w-56 rounded-md border border-white/10 bg-neutral-900 shadow-lg z-50">
+              {/* デバッグ用 uid 表示（落ち着いたら削除OK） */}
+              <div className="px-4 py-2 text-[11px] text-neutral-500 border-b border-white/10">
+                uid: {uid ?? 'null'}
+              </div>
               <button
                 type="button"
                 onClick={handleAvatarChange}
-                disabled={!uid || uploading}
-                className={`block w-full text-left px-4 py-2 text-sm ${
-                  uid ? 'text-white hover:bg-white/5' : 'text-neutral-500 cursor-not-allowed'
-                }`}
+                disabled={uploading}  // ← uidが無くても押せる。選択後にチェック
+                className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/5"
               >
                 {uploading ? '画像を変更中…' : '画像を変更'}
               </button>

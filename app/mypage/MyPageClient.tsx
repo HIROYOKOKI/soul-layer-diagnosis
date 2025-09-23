@@ -118,4 +118,134 @@ export default function MyPageClient({
         fd.append("file", file);
         fd.append("user_id", userId);
 
-        const r
+        const res = await fetch("/api/profile/avatar", { method: "POST", body: fd });
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok || !json?.ok) {
+          throw new Error(json?.error || `Upload failed (${res.status})`);
+        }
+
+        // 直後にUIへ反映
+        setData((prev) => ({
+          ...prev,
+          user: { ...(prev.user ?? {}), avatarUrl: json.url as string },
+        }));
+      } catch (err: any) {
+        console.error(err);
+        alert("アップロードに失敗しました：" + (err?.message || "unknown error"));
+      } finally {
+        setBusy(false);
+        // 同じファイル選択でも onChange が発火するように
+        e.target.value = "";
+      }
+    };
+
+    return (
+      <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-white/80">
+        <span className="px-2 py-1 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 transition">
+          画像を選ぶ
+        </span>
+        <input type="file" accept="image/*" className="hidden" onChange={onChange} />
+        {busy && <span className="text-white/60">アップロード中…</span>}
+      </label>
+    );
+  };
+
+  // ====== UI ======
+  return (
+    <div className="p-4 space-y-6">
+      {/* ユーザー行 */}
+      <div className="flex items-center gap-4">
+        <AvatarImage src={data.user?.avatarUrl} />
+        <div className="min-w-0">
+          <div className="text-base font-semibold truncate">{userName}</div>
+          <div className="text-xs text-white/60">ID: {dispId}</div>
+        </div>
+      </div>
+
+      {/* 画像アップロード */}
+      <div>
+        <AvatarUpload userId={userId} />
+      </div>
+
+      {/* （任意）Radar：データが繋がったら表示 */}
+      {/* {radarVector && (
+        <section className="rounded-2xl border border-white/10 bg-black/60 p-4">
+          <h2 className="text-sm text-white/70 mb-3">現在のバランス（Radar）</h2>
+          <RadarEVAE vector={radarVector} order={["E", "V", "Λ", "Ǝ"]} size={300} />
+          <p className="mt-2 text-xs text-white/50">※ β版は仮ベクトル。正式接続後に更新されます。</p>
+        </section>
+      )} */}
+
+      {/* デイリー診断カード */}
+      <section className="rounded-2xl border border-white/10 bg-black/60 p-4">
+        <h2 className="text-sm text-white/70 mb-2">デイリー診断（最新）</h2>
+        {data.daily ? (
+          <div className="space-y-2 text-white/90">
+            {data.daily.comment && (
+              <p>
+                <strong>コメント：</strong>
+                <span className="align-middle">{data.daily.comment}</span>
+              </p>
+            )}
+            {data.daily.advice && (
+              <p>
+                <strong>アドバイス：</strong>
+                <span className="align-middle">{data.daily.advice}</span>
+              </p>
+            )}
+            {data.daily.affirm && (
+              <p>
+                <strong>アファ：</strong>
+                <span className="align-middle">{data.daily.affirm}</span>
+              </p>
+            )}
+            <p className="text-white/70">
+              <strong>スコア：</strong>
+              {typeof data.daily.score === "number"
+                ? data.daily.score.toFixed(1)
+                : "—"}
+            </p>
+            {data.daily.created_at && (
+              <p className="text-xs text-white/50">日時: {fmtJST(data.daily.created_at)}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-white/60">まだデイリー診断がありません。</p>
+        )}
+      </section>
+
+      {/* プロフィール診断カード */}
+      <section className="rounded-2xl border border-white/10 bg-black/60 p-4">
+        <h2 className="text-sm text-white/70 mb-2">プロフィール診断（最新）</h2>
+        {data.profile ? (
+          <div className="space-y-2 text-white/90">
+            {data.profile.fortune && (
+              <p>
+                <strong>運勢：</strong>
+                <span className="align-middle">{data.profile.fortune}</span>
+              </p>
+            )}
+            {data.profile.personality && (
+              <p>
+                <strong>性格：</strong>
+                <span className="align-middle">{data.profile.personality}</span>
+              </p>
+            )}
+            {data.profile.partner && (
+              <p>
+                <strong>理想：</strong>
+                <span className="align-middle">{data.profile.partner}</span>
+              </p>
+            )}
+            {data.profile.created_at && (
+              <p className="text-xs text-white/50">日時: {fmtJST(data.profile.created_at)}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-white/60">プロフィール診断は未実施です。</p>
+        )}
+      </section>
+    </div>
+  );
+}

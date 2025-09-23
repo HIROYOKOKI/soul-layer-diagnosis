@@ -3,6 +3,7 @@
 
 import type { ReactNode } from 'react'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { formatJP } from './date'
 import ClockJST from './ClockJST'
 
@@ -57,6 +58,7 @@ export type MyPageShellProps = {
 /* ===== 本体レイアウト ===== */
 export default function MyPageShell({ data, children, userId }: MyPageShellProps) {
   const d = (data ?? EMPTY_DATA) as MyPageData
+  const router = useRouter()
 
   const avatar = d?.user?.avatarUrl ?? ''
   const idText = d?.user?.displayId ?? '0001'
@@ -104,7 +106,7 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
       } else {
         alert('保存失敗: ' + (j?.error ?? 'unknown'))
       }
-    } catch (e) {
+    } catch {
       alert('保存に失敗しました')
     }
   }
@@ -167,6 +169,7 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
         >
           {d?.daily?.affirm ? (
             <button
+              type="button"
               onClick={() => setOpenDaily(true)}
               className="w-full px-4 py-3 rounded-xl bg-neutral-800 text-white font-medium hover:bg-neutral-700 transition"
             >
@@ -184,16 +187,22 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
           </div>
         </Card>
 
-        {/* 次の一歩 */}
+        {/* 次の一歩（修正：クリックで /daily へ遷移） */}
         <Card title="次の一歩を選んでください">
           <div className="flex gap-4">
-            <button className="flex-1 px-4 py-3 rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600">
+            <button
+              type="button"
+              onClick={() => router.push('/daily')}
+              className="flex-1 px-4 py-3 rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600 hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-white/30"
+            >
               デイリー診断
               <div className="text-xs text-neutral-400">1問 / 今日のゆらぎ</div>
             </button>
             <button
-              className="flex-1 px-4 py-3 rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600"
+              type="button"
+              aria-disabled="true"
               disabled
+              className="flex-1 px-4 py-3 rounded-xl bg-neutral-800/60 text-white/60 text-sm font-medium border border-neutral-700 cursor-not-allowed"
             >
               診断タイプを選ぶ
               <div className="text-xs text-neutral-400">Weekly / Monthly (予定)</div>
@@ -204,7 +213,7 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
         {/* プロフィール（任意） */}
         {d?.profile ? (
           <Card
-            title="プロフィール（最新）"
+            title="プロフィール"
             right={
               d.profile.created_at ? (
                 <span className="text-[11px] px-2 py-1 rounded-md bg-white/5 border border-white/10 text-white/70">
@@ -261,6 +270,7 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
                   {nextVList.map((n) => (
                     <li key={n.id}>
                       <button
+                        type="button"
                         onClick={() => {
                           if (!selectedNextV) saveNextV(n.id, n.label)
                         }}
@@ -284,6 +294,7 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
             )}
 
             <button
+              type="button"
               onClick={() => setOpenDaily(false)}
               className="mt-5 w-full px-4 py-2 bg-neutral-700 text-white rounded-lg"
             >

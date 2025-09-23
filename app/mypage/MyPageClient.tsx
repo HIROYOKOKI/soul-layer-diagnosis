@@ -1,10 +1,11 @@
 // app/mypage/MyPageClient.tsx
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-// Radar を後で入れるなら ↓ を有効化（βでは未接続でもOK）
-// import { RadarEVAE, type EVAEVector } from "@/components/charts/Charts";
+import { RadarEVAE, type EVAEVector } from "@/components/charts/Charts";
+
+type EV = "E" | "V" | "Λ" | "Ǝ";
 
 type User = {
   name?: string | null;
@@ -13,10 +14,14 @@ type User = {
 };
 
 type Daily = {
+  code?: EV | null;
   comment?: string | null;
   advice?: string | null;
   affirm?: string | null;
-  score?: number | null;        // 0..100 想定
+  score?: number | null;        // 0..100 想定（0..1でも可：正規化で吸収）
+  evla?: Partial<Record<EV | "L" | "Eexists", number>> | null; // "Λ"/"Ǝ" 互換キーも許容
+  slot?: "morning" | "noon" | "night" | null;
+  theme?: string | null;
   created_at?: string | null;   // ISO
 };
 
@@ -40,13 +45,14 @@ export default function MyPageClient({
   initialData: MyPageData;
   userId: string;
 }) {
-  // ====== state / memo ======
+  // ====== state ======
   const [data, setData] = useState<MyPageData>(initialData ?? {});
+  const [loadingDaily, setLoadingDaily] = useState(false);
 
   const userName = data.user?.name?.trim() || "No Name";
   const dispId = data.user?.displayId?.trim() || userId;
 
-  // JST表示（Asia/Tokyo）
+  // ====== utils ======
   const fmtJST = (iso?: string | null) => {
     if (!iso) return "";
     try {
@@ -63,14 +69,62 @@ export default function MyPageClient({
     }
   };
 
-  // βではダミー計算を避け、Radarは “データ接続できたら表示” 方針
-  // const radarVector: EVAEVector | null = useMemo(() => {
-  //   if (typeof data?.daily?.score === "number") {
-  //     const v = Math.max(0, Math.min(1, data.daily.score / 100));
-  //     return { E: v, V: 0.5, "Λ": 0.5, "Ǝ": 0.5 }; // 仮配置：本接続時に差し替え
-  //   }
-  //   return null;
-  // }, [data?.daily?.score]);
+  // 0..100 でも 0..1 でも受け取り、0..1に正規化
+  const norm01 = (v: unknown) => {
+    if (typeof v !== "number" || !Number.isFinite(v)) return 0;
+    const n = v > 1 ? v / 100 : v;
+    return Math.max(0, Math.min(1, n));
+  };
+
+  // ====== fetch daily: 1d:001 → だめなら latest ======
+  useEffect(() => {
+    let aborted = false;
+    const run = async () => {
+      setLoadingDaily(true);
+      try {
+        // 1) ID指定（1d:001）
+        const r1 = await fetch("/api/daily/get?id=" + encodeURIComponent("1d:001"));
+        const j1 = await r1.json().catch(() => ({} as any));
+        if (!aborted && j1?.ok && j1.item) {
+          setData((p) => ({ ...p, daily: j1.item as Daily }));
+          return;
+        }
+        // 2) フォールバック：最新
+        const r2 = await fetch("/api/mypage/daily-latest");
+        const j2 = await r2.json().catch(() => ({} as any));
+        if (!aborted && j2?.ok) {
+          setData((p) => ({ ...p, daily: j2.item as Daily }));
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        !aborted && setLoadingDaily(false);
+      }
+    };
+    run();
+    return () => {
+      aborted = true;
+    };
+  }, []);
+
+  // ====== Radar用ベクトル（evla 優先／無ければ code+score から推定） ======
+  const radarVector: EVAEVector | null = useMemo(() => {
+    const ev = data.daily?.evla || null;
+    if (ev) {
+      return {
+        E: norm01(ev.E ?? 0),
+        V: norm01(ev.V ?? 0),
+        "Λ": norm01((ev as any)["Λ"] ?? (ev as any).L ?? 0),
+        "Ǝ": norm01((ev as any)["Ǝ"] ?? (ev as any).Eexists ?? 0),
+      };
+    }
+    // evlaが無い場合：codeを強め・scoreを反映した簡易ベクトル
+    const base: EVAEVector = { E: 0.25, V: 0.25, "Λ": 0.25, "Ǝ": 0.25 };
+    const code = data.daily?.code as EV | undefined;
+    const s = norm01(data.daily?.score ?? 0.6);
+    if (code) base[code] = Math.max(base[code] ?? 0.25, s);
+    return data.daily ? base : null;
+  }, [data.daily]);
 
   // ====== sub components ======
   const AvatarImage = ({
@@ -102,7 +156,6 @@ export default function MyPageClient({
       const file = e.target.files?.[0];
       if (!file) return;
 
-      // 軽いバリデーション
       if (!file.type.startsWith("image/")) {
         alert("画像ファイルを選択してください。");
         return;
@@ -125,7 +178,6 @@ export default function MyPageClient({
           throw new Error(json?.error || `Upload failed (${res.status})`);
         }
 
-        // 直後にUIへ反映
         setData((prev) => ({
           ...prev,
           user: { ...(prev.user ?? {}), avatarUrl: json.url as string },
@@ -135,7 +187,6 @@ export default function MyPageClient({
         alert("アップロードに失敗しました：" + (err?.message || "unknown error"));
       } finally {
         setBusy(false);
-        // 同じファイル選択でも onChange が発火するように
         e.target.value = "";
       }
     };
@@ -168,14 +219,20 @@ export default function MyPageClient({
         <AvatarUpload userId={userId} />
       </div>
 
-      {/* （任意）Radar：データが繋がったら表示 */}
-      {/* {radarVector && (
-        <section className="rounded-2xl border border-white/10 bg-black/60 p-4">
-          <h2 className="text-sm text-white/70 mb-3">現在のバランス（Radar）</h2>
+      {/* Radar（1d:001 / latest に基づく） */}
+      <section className="rounded-2xl border border-white/10 bg-black/60 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm text-white/70">現在のバランス（Radar）</h2>
+          <span className="text-xs text-white/50">
+            {loadingDaily ? "読み込み中…" : data.daily?.created_at ? fmtJST(data.daily.created_at) : "—"}
+          </span>
+        </div>
+        {radarVector ? (
           <RadarEVAE vector={radarVector} order={["E", "V", "Λ", "Ǝ"]} size={300} />
-          <p className="mt-2 text-xs text-white/50">※ β版は仮ベクトル。正式接続後に更新されます。</p>
-        </section>
-      )} */}
+        ) : (
+          <p className="text-white/60">表示できるレコードが見つかりません。</p>
+        )}
+      </section>
 
       {/* デイリー診断カード */}
       <section className="rounded-2xl border border-white/10 bg-black/60 p-4">
@@ -202,9 +259,7 @@ export default function MyPageClient({
             )}
             <p className="text-white/70">
               <strong>スコア：</strong>
-              {typeof data.daily.score === "number"
-                ? data.daily.score.toFixed(1)
-                : "—"}
+              {typeof data.daily.score === "number" ? data.daily.score.toFixed(1) : "—"}
             </p>
             {data.daily.created_at && (
               <p className="text-xs text-white/50">日時: {fmtJST(data.daily.created_at)}</p>

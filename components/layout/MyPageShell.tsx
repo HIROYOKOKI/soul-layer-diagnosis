@@ -3,6 +3,7 @@
 
 import type { ReactNode } from 'react'
 import { useState } from 'react'
+import Link from 'next/link'                // ★ 追加
 import { formatJP } from './date'
 import ClockJST from './ClockJST'
 
@@ -13,15 +14,15 @@ export type MyPageData = {
   quick?: { model?: 'EVΛƎ' | 'EΛVƎ' | null; label?: string | null; created_at?: string | null } | null
   theme?: { name?: string | null; updated_at?: string | null } | null
   daily?: {
-    id?: string | null                  // 例: daily-2025-09-23-morning（保存に使う）
+    id?: string | null
     code?: EV | null
     comment?: string | null
     advice?: string | null
     affirm?: string | null
     score?: number | null
     created_at?: string | null
-    nextv?: { id: string; label: string }[] | null   // 次の一手（任意）
-    nextv_selected?: string | null                   // その日選択済み（任意）
+    nextv?: { id: string; label: string }[] | null
+    nextv_selected?: string | null
   } | null
   profile?: {
     fortune?: string | null
@@ -51,7 +52,7 @@ export function Card({
 export type MyPageShellProps = {
   data?: MyPageData | null
   children?: ReactNode
-  userId?: string | null   // ある場合は NextV 保存に使用
+  userId?: string | null
 }
 
 /* ===== 本体レイアウト ===== */
@@ -63,7 +64,6 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
   const nameText = d?.user?.name ?? 'Hiro'
   const uid = userId ?? d?.user?.id ?? null
 
-  // 見出し（型）
   const model = (d?.quick?.model ?? 'EVΛƎ') as 'EVΛƎ' | 'EΛVƎ'
   const fallback = model === 'EVΛƎ' ? '未来志向型' : '現実思考型'
   const rawLabel = (d?.quick?.label ?? fallback).trim()
@@ -79,7 +79,6 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
   const modelColor = model === 'EVΛƎ' ? '#FF4500' : '#B833F5'
   const themeName = (d?.theme?.name ?? 'LOVE').toString().toUpperCase()
 
-  // モーダル開閉 & NextV 選択済み（その日だけ有効）
   const [openDaily, setOpenDaily] = useState(false)
   const [selectedNextV, setSelectedNextV] = useState<string | null>(d?.daily?.nextv_selected ?? null)
   const nextVList = d?.daily?.nextv ?? null
@@ -90,12 +89,7 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
       const res = await fetch('/api/daily/nextv/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: uid,
-          daily_id: d.daily.id,
-          nextv_id: nextvId,
-          nextv_label: nextvLabel,
-        }),
+        body: JSON.stringify({ user_id: uid, daily_id: d.daily.id, nextv_id: nextvId, nextv_label: nextvLabel }),
       })
       const j = await res.json()
       if (j?.ok) {
@@ -104,7 +98,7 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
       } else {
         alert('保存失敗: ' + (j?.error ?? 'unknown'))
       }
-    } catch (e) {
+    } catch {
       alert('保存に失敗しました')
     }
   }
@@ -114,9 +108,7 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
       {/* ===== ヘッダー ===== */}
       <div className="mb-4">
         <div className="flex items-baseline gap-3">
-          <div className="text-[22px] md:text-3xl font-extrabold text-white tracking-wide">
-            MY PAGE
-          </div>
+          <div className="text-[22px] md:text-3xl font-extrabold text-white tracking-wide">MY PAGE</div>
           <div className="font-extrabold tracking-wide" style={{ color: modelColor, fontSize: '14px' }}>
             {model}（{cleanedLabel}）
           </div>
@@ -179,18 +171,23 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
 
         {/* 構造バランス（プレースホルダ） */}
         <Card title="構造バランス">
-          <div className="h-48 flex items-center justify-center text-neutral-500">
-            [Radar Chart Placeholder]
-          </div>
+          <div className="h-48 flex items-center justify-center text-neutral-500">[Radar Chart Placeholder]</div>
         </Card>
 
         {/* 次の一歩 */}
         <Card title="次の一歩を選んでください">
           <div className="flex gap-4">
-            <button className="flex-1 px-4 py-3 rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600">
-              デイリー診断
+            {/* ★ 確実に遷移するよう Link に変更（絶対パス） */}
+            <Link
+              href="/daily"
+              className="flex-1 rounded-xl border border-neutral-600 bg-neutral-800 px-4 py-3
+                         text-white text-sm font-medium hover:bg-neutral-700 transition
+                         outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            >
+              <div>デイリー診断</div>
               <div className="text-xs text-neutral-400">1問 / 今日のゆらぎ</div>
-            </button>
+            </Link>
+
             <button
               className="flex-1 px-4 py-3 rounded-xl bg-neutral-800 text-white text-sm font-medium border border-neutral-600"
               disabled
@@ -253,7 +250,6 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
               <span className="text-white/60">スコア：</span>{Number(d.daily.score ?? 0).toFixed(1)}
             </p>
 
-            {/* 次の一手（タップで保存） */}
             {nextVList && nextVList.length > 0 && (
               <div className="mt-4">
                 <p className="text-white/70 mb-2">次の一手を選ぶ</p>
@@ -261,32 +257,23 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
                   {nextVList.map((n) => (
                     <li key={n.id}>
                       <button
-                        onClick={() => {
-                          if (!selectedNextV) saveNextV(n.id, n.label)
-                        }}
+                        onClick={() => { if (!selectedNextV) saveNextV(n.id, n.label) }}
                         disabled={!!selectedNextV}
                         className={`w-full px-3 py-2 rounded-lg border text-sm transition
-                          ${
-                            selectedNextV === n.id
+                          ${selectedNextV === n.id
                               ? 'bg-green-800 border-green-500 text-white cursor-default'
-                              : 'bg-neutral-800 border-white/10 text-white/90 hover:bg-neutral-700'
-                          }`}
+                              : 'bg-neutral-800 border-white/10 text-white/90 hover:bg-neutral-700'}`}
                       >
                         {n.label} {selectedNextV === n.id ? '✓' : ''}
                       </button>
                     </li>
                   ))}
                 </ul>
-                <p className="mt-2 text-xs text-white/50">
-                  ※ 選択はその日のみ有効。翌日になるとリセットされます。
-                </p>
+                <p className="mt-2 text-xs text-white/50">※ 選択はその日のみ有効。翌日になるとリセットされます。</p>
               </div>
             )}
 
-            <button
-              onClick={() => setOpenDaily(false)}
-              className="mt-5 w-full px-4 py-2 bg-neutral-700 text-white rounded-lg"
-            >
+            <button onClick={() => setOpenDaily(false)} className="mt-5 w-full px-4 py-2 bg-neutral-700 text-white rounded-lg">
               閉じる
             </button>
           </div>

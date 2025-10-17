@@ -32,8 +32,8 @@ const FALLBACK: Record<Slot, Choice[]> = {
 };
 
 /* ================== JST スロット判定 ================== */
-// JST = UTC+9
 function getJstSlot(now = new Date()): Slot {
+  // JST = UTC+9
   const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
   const h = jst.getUTCHours(); // jst へ補正後の時で判定
   // 朝=5:00-11:59 / 昼=12:00-17:59 / 夜=18:00-4:59
@@ -56,19 +56,21 @@ export async function GET() {
   const createdAt = new Date().toISOString();
   const seed = hashUUIDtoInt(questionId);
 
-  // フロントが期待する theme を返す（暫定は固定でOK。将来Cookie/DBから復元可）
+  // フロントが期待する theme（必要なら Cookie/DB から復元）
   const theme: Theme = "WORK";
 
-  // cookieに直近のquestionId/slot/themeを軽く保持（診断APIの互換用）
+  // 診断API（/daily/diagnose）の互換用 Cookie
   const jar = cookies();
   jar.set("daily_question_id", questionId, { httpOnly: true, sameSite: "lax", path: "/" });
   jar.set("daily_slot", slot, { httpOnly: true, sameSite: "lax", path: "/" });
   jar.set("daily_theme", theme, { httpOnly: true, sameSite: "lax", path: "/" });
 
   try {
-    /* ========== OpenAIで質問＋選択肢生成（失敗時はフォールバック） ========== */
+    /* ========== OpenAI で質問＋選択肢を生成（失敗時は 500 を返す） ========== */
     const openai = getOpenAI();
-    if (!openai) throw new Error("openai_env_missing");
+    if (!openai) {
+      return NextResponse.json({ ok: false, error: "openai_env_missing" }, { status: 500 });
+    }
 
     const sys = [
       "あなたは『ルネア（Lunea）』。観測型のナビAIとして、短くやさしい日本語で話す。",
@@ -116,13 +118,17 @@ export async function GET() {
       response_format: { type: "json_object" },
     });
 
-    const json = JSON.parse(resp.choices[0].message.content || "{}");
+    const content = resp.choices[0]?.message?.content;
+    if (!content) {
+      return NextResponse.json({ ok: false, error: "empty_openai_response" }, { status: 500 });
+    }
+
+    const json = JSON.parse(content);
     let choices: Choice[] = Array.isArray(json.choices) ? json.choices.slice(0, choiceCount) : [];
 
     // 過不足対応＆キー/順の補正
     const keys: EV[] = ["E", "V", "Λ", "Ǝ"];
-    const need = choiceCount - choices.length;
-    if (need > 0) {
+    if (choices.length < choiceCount) {
       const fb = FALLBACK[slot];
       for (const c of fb) {
         if (choices.length >= choiceCount) break;
@@ -134,39 +140,22 @@ export async function GET() {
       label: String(c.label ?? "").slice(0, 50),
     }));
 
-    // ===== フロント仕様に合わせて返す =====
     return NextResponse.json({
       ok: true,
-      question_id: questionId, // 参考
-      seed,                    // ★ フロントが期待（number）
+      question_id: questionId,
+      seed,                 // number
       slot,
-      theme,                   // ★ フロントが期待
+      theme,                // WORK/LOVE/FUTURE/LIFE
       question: String(json.question || "今日の一歩を選んでください。").slice(0, 100),
-      choices: choices.map((c) => ({ id: c.key, label: c.label })), // ★ key→id
+      choices: choices.map((c) => ({ id: c.key, label: c.label })), // key→id
       created_at: createdAt,
       env: "prod",
     });
-  } catch {
-    // ===== 失敗時フォールバック（同じ返却形）=====
-    const fb = FALLBACK[slot].slice(0, choiceCount);
+  } catch (e: any) {
+    // 失敗理由を見える化（フロントは phase:error 表示に遷移）
     return NextResponse.json(
-      {
-        ok: true,
-        question_id: questionId,
-        seed,       // ★
-        slot,
-        theme,      // ★
-        question:
-          slot === "morning"
-            ? "今朝のあなたに合う始め方はどれ？（直感で選んで大丈夫）"
-            : slot === "noon"
-            ? "このあと数時間、どの方向で進めたい？"
-            : "今日はどんな締めくくりがしっくり来る？",
-        choices: fb.map((c) => ({ id: c.key, label: c.label })), // ★
-        created_at: createdAt,
-        env: "dev",
-      },
-      { status: 200 }
+      { ok: false, error: e?.message ?? "openai_request_failed" },
+      { status: 500 }
     );
   }
 }

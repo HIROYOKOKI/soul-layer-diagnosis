@@ -83,13 +83,7 @@ export default function DailyPage() {
     }
   }
 
-  // 結果表示後に自動で /mypage へ戻す
-  useEffect(() => {
-    if (phase === 'result') {
-      const t = setTimeout(() => router.push('/mypage'), 2500);
-      return () => clearTimeout(t);
-    }
-  }, [phase, router]);
+
 
   const header = useMemo(() => {
     const s = slot==='morning'?'朝':slot==='noon'?'昼':slot==='night'?'夜':'';
@@ -161,9 +155,9 @@ export default function DailyPage() {
 
           {/* 保存ステータス & マイページへ */}
           <div className="text-sm opacity-70">
-            {result.save_error
-              ? <span className="text-red-400">保存に失敗しました：{result.save_error}</span>
-              : <span>自動保存しました。数秒後にマイページへ戻ります…</span>}
+           {result.save_error
+            ? <span className="text-red-400">保存に失敗しました：{result.save_error}</span>
+            : <span>自動保存しました。下のボタンからマイページへ戻れます。</span>}
           </div>
 
           <div className="pt-2 flex gap-3">

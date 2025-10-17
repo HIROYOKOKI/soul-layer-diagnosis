@@ -3,12 +3,13 @@
 
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import Link from 'next/link'                // ★ 追加
+import Link from 'next/link'
 import { formatJP } from './date'
 import ClockJST from './ClockJST'
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
+/* ====== 型 ====== */
 export type MyPageData = {
   user?: { name?: string | null; displayId?: string | null; avatarUrl?: string | null; id?: string | null } | null
   quick?: { model?: 'EVΛƎ' | 'EΛVƎ' | null; label?: string | null; created_at?: string | null } | null
@@ -19,8 +20,17 @@ export type MyPageData = {
     comment?: string | null
     advice?: string | null
     affirm?: string | null
+    /** 互換用：APIが affirmation で返す場合も拾う */
+    affirmation?: string | null
+    /** 互換用：名言等をアファメーション代替にしている場合 */
+    quote?: string | null
+    /** JST当日判定が API 側で渡ってくる場合 */
+    is_today_jst?: boolean | null
+    /** 補足 */
     score?: number | null
     created_at?: string | null
+    slot?: string | null
+    theme?: string | null
     nextv?: { id: string; label: string }[] | null
     nextv_selected?: string | null
   } | null
@@ -33,6 +43,31 @@ export type MyPageData = {
 } | null
 
 const EMPTY_DATA: Readonly<MyPageData> = Object.freeze({})
+
+/* ===== ユーティリティ ===== */
+const toJstDateString = (d: string | Date) =>
+  new Date(new Date(d).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })).toDateString()
+
+/** Daily表示用テキストの決定（空文字は除外して trim） */
+function pickDailyText(daily?: MyPageData['daily'] | null): string {
+  if (!daily) return ''
+  const t =
+    daily.affirm?.trim() ??
+    daily.affirmation?.trim() ??
+    daily.quote?.trim() ??
+    daily.advice?.trim() ??
+    daily.comment?.trim() ??
+    ''
+  return t
+}
+
+/** JSTの今日判定（APIから is_today_jst が来ればそれを優先） */
+function isTodayJST(daily?: MyPageData['daily'] | null): boolean {
+  if (!daily) return false
+  if (typeof daily.is_today_jst === 'boolean') return daily.is_today_jst
+  if (!daily.created_at) return true // created_at 無い時は寛容に表示
+  return toJstDateString(daily.created_at) === toJstDateString(new Date())
+}
 
 /* ===== 共通カード ===== */
 export function Card({
@@ -103,6 +138,10 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
     }
   }
 
+  /* ====== 表示用決定（ここが今回の修正ポイント） ====== */
+  const dailyText = pickDailyText(d?.daily)
+  const showDaily = Boolean(dailyText) && isTodayJST(d?.daily)
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:py-10 bg-black min-h-screen font-sans">
       {/* ===== ヘッダー ===== */}
@@ -124,7 +163,7 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatar} alt="avatar" className="h-full w-full object-cover" />
             ) : (
-              <span className="text-neutral-500 text-6xl leading-none">🙂</span>
+              <span className="text-neutral-500 text-6xl leading-none">👤</span>
             )}
           </div>
           <div className="min-w-0 flex-1">
@@ -157,12 +196,12 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
             ) : null
           }
         >
-          {d?.daily?.affirm ? (
+          {showDaily ? (
             <button
               onClick={() => setOpenDaily(true)}
               className="w-full px-4 py-3 rounded-xl bg-neutral-800 text-white font-medium hover:bg-neutral-700 transition"
             >
-              {d.daily.affirm}
+              {dailyText}
             </button>
           ) : (
             <p className="text-xs text-neutral-500">まだ診断がありません。</p>
@@ -177,7 +216,7 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
         {/* 次の一歩 */}
         <Card title="次の一歩を選んでください">
           <div className="flex gap-4">
-            {/* ★ 確実に遷移するよう Link に変更（絶対パス） */}
+            {/* 確実に遷移するよう Link */}
             <Link
               href="/daily"
               className="flex-1 rounded-xl border border-neutral-600 bg-neutral-800 px-4 py-3
@@ -240,15 +279,22 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
               </button>
             </div>
 
-            <p className="text-sm text-white/90 mb-3">
-              <span className="text-white/60">コメント：</span>{d.daily.comment}
-            </p>
-            <p className="text-sm text-white/90 mb-3">
-              <span className="text-white/60">アドバイス：</span>{d.daily.advice}
-            </p>
-            <p className="text-sm text-white/90">
-              <span className="text-white/60">スコア：</span>{Number(d.daily.score ?? 0).toFixed(1)}
-            </p>
+            {/* 詳細は元レコードをそのまま見せる */}
+            {d.daily.comment && (
+              <p className="text-sm text-white/90 mb-3">
+                <span className="text-white/60">コメント：</span>{d.daily.comment}
+              </p>
+            )}
+            {d.daily.advice && (
+              <p className="text-sm text-white/90 mb-3">
+                <span className="text-white/60">アドバイス：</span>{d.daily.advice}
+              </p>
+            )}
+            {typeof d.daily.score === 'number' && (
+              <p className="text-sm text-white/90">
+                <span className="text-white/60">スコア：</span>{Number(d.daily.score ?? 0).toFixed(1)}
+              </p>
+            )}
 
             {nextVList && nextVList.length > 0 && (
               <div className="mt-4">

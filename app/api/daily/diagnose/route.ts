@@ -137,7 +137,7 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
 
   const resp = await openai.chat.completions.create({
     model: "gpt-5-mini",
-    temperature: 0.6,
+ 
     messages: [
       { role: "system", content: sys },
       { role: "user", content: user },

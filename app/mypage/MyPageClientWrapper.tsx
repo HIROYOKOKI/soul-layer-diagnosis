@@ -1,11 +1,8 @@
 // app/mypage/MyPageClientWrapper.tsx
 'use client';
 
-'use client';
-
 import { useEffect, useMemo, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { useRouter } from 'next/navigation';
 import MyPageShell from '../../components/layout/MyPageShell';
 
 /* ===== 型 ===== */
@@ -48,7 +45,6 @@ export default function MyPageClientWrapper({
   daily?: Daily;
   profile?: Profile;
 }) {
-  const router = useRouter();
   const supabase = useMemo(() => createClientComponentClient(), []);
 
   /* ---------- ユーザー情報 ---------- */
@@ -59,11 +55,13 @@ export default function MyPageClientWrapper({
         const { data } = await supabase.auth.getUser();
         const uid = data?.user?.id;
         if (!uid) return;
+
         const { data: prof, error } = await supabase
           .from('profiles')
           .select('name, display_id, avatar_url')
           .eq('id', uid)
           .maybeSingle();
+
         if (!error && prof) {
           setUser({
             id: uid,
@@ -86,8 +84,8 @@ export default function MyPageClientWrapper({
         const r = await fetch('/api/theme', { cache: 'no-store' });
         const j = await r.json();
         if (j?.scope) setTheme(String(j.scope).toUpperCase());
-      } catch (e) {
-        console.warn('theme fetch failed');
+      } catch {
+        /* noop */
       }
     })();
   }, []);
@@ -116,7 +114,7 @@ export default function MyPageClientWrapper({
           setQuickLabel(n.label);
         }
       } catch {
-        console.warn('quick fetch failed');
+        /* noop */
       }
     })();
   }, []);
@@ -130,7 +128,7 @@ export default function MyPageClientWrapper({
         const j = await r.json();
         if (j?.ok) setDaily(j.item);
       } catch {
-        console.warn('daily fetch failed');
+        /* noop */
       }
     })();
   }, []);
@@ -144,43 +142,18 @@ export default function MyPageClientWrapper({
         const j = await r.json();
         if (j?.ok) setProfile(j.item);
       } catch {
-        console.warn('profile fetch failed');
+        /* noop */
       }
     })();
   }, []);
 
-  /* ---------- デバッグボタン（クリック確認用） ---------- */
-  function handleDebugClick() {
-    alert('MyPage Button Clicked ✅');
-  }
-
   /* ---------- Shell へ ---------- */
   return (
-    <div className="relative z-10 p-6 text-gray-100">
+    <div className="relative z-10 p-6 text-gray-100 pointer-events-auto">
+      {/* h1 はここだけ（Shell 側は h2/h3 に） */}
       <h1 className="text-2xl font-semibold mb-4">My Page</h1>
 
-      <div className="flex flex-col gap-3 mb-8">
-        <button
-          onClick={handleDebugClick}
-          className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20"
-        >
-          🔧 Debug Click（クリック反応テスト）
-        </button>
-        <button
-          onClick={() => router.push('/daily')}
-          className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20"
-        >
-          🌀 デイリー診断をはじめる
-        </button>
-        <button
-          onClick={() => router.push('/profile')}
-          className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20"
-        >
-          🔮 プロフィール診断を見る
-        </button>
-      </div>
-
-      {/* MyPageShell（レイアウト・カード表示） */}
+      {/* 余計な上部の3ボタンは削除済み。操作は MyPageShell 内の「デイリー診断」だけに集約 */}
       <MyPageShell
         data={{
           user: user

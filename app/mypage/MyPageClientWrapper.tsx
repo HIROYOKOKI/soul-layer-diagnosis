@@ -18,12 +18,28 @@ type UserMeta = {
   avatar_url?: string | null;
 } | null;
 
-type Daily = {
+type DailyRaw = {
   comment?: string | null;
   advice?: string | null;
   affirm?: string | null;
+  affirmation?: string | null; // 互換プロパティ
   score?: number | null;
   created_at?: string | null;
+  slot?: string | null;
+  theme?: string | null;
+  is_today_jst?: boolean;
+} | null;
+
+type Daily = {
+  comment?: string | null;
+  advice?: string | null;
+  affirm?: string | null;       // 本命
+  affirmation?: string | null;  // 互換
+  score?: number | null;
+  created_at?: string | null;
+  slot?: string | null;
+  theme?: string | null;
+  is_today_jst?: boolean;
 } | null;
 
 type Profile = {
@@ -32,6 +48,30 @@ type Profile = {
   partner?: string | null;
   created_at?: string | null;
 } | null;
+
+/* ===== Utils ===== */
+const toJstDateString = (d: string | Date) =>
+  new Date(new Date(d).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })).toDateString();
+
+const normalizeDaily = (raw: DailyRaw): Daily => {
+  if (!raw) return null;
+  const affirm = raw.affirm ?? raw.affirmation ?? null;
+  return {
+    comment: raw.comment ?? null,
+    advice: raw.advice ?? null,
+    affirm,
+    affirmation: affirm, // 両方持たせて互換
+    score: raw.score ?? null,
+    created_at: raw.created_at ?? null,
+    slot: raw.slot ?? null,
+    theme: raw.theme ?? null,
+    is_today_jst:
+      raw.is_today_jst ??
+      (raw.created_at
+        ? toJstDateString(raw.created_at) === toJstDateString(new Date())
+        : false),
+  };
+};
 
 /* ===== コンポーネント ===== */
 export default function MyPageClientWrapper({
@@ -42,7 +82,7 @@ export default function MyPageClientWrapper({
 }: {
   theme?: string | null;
   quick?: QuickAny;
-  daily?: Daily;
+  daily?: DailyRaw;
   profile?: Profile;
 }) {
   const supabase = useMemo(() => createClientComponentClient(), []);
@@ -120,13 +160,13 @@ export default function MyPageClientWrapper({
   }, []);
 
   /* ---------- Daily ---------- */
-  const [daily, setDaily] = useState<Daily>(ssrDaily ?? null);
+  const [daily, setDaily] = useState<Daily>(normalizeDaily(ssrDaily ?? null));
   useEffect(() => {
     (async () => {
       try {
         const r = await fetch('/api/mypage/daily-latest', { cache: 'no-store' });
         const j = await r.json();
-        if (j?.ok) setDaily(j.item);
+        if (j?.ok) setDaily(normalizeDaily(j.item ?? null));
       } catch {
         /* noop */
       }
@@ -150,10 +190,7 @@ export default function MyPageClientWrapper({
   /* ---------- Shell へ ---------- */
   return (
     <div className="relative z-10 p-6 text-gray-100 pointer-events-auto">
-      {/* h1 はここだけ（Shell 側は h2/h3 に） */}
       <h1 className="text-2xl font-semibold mb-4">My Page</h1>
-
-      {/* 余計な上部の3ボタンは削除済み。操作は MyPageShell 内の「デイリー診断」だけに集約 */}
       <MyPageShell
         data={{
           user: user
@@ -168,6 +205,7 @@ export default function MyPageClientWrapper({
             ? { model: quickModel, label: quickLabel, created_at: undefined }
             : undefined,
           theme: { name: theme, updated_at: null },
+          // ここで affirm / affirmation の両対応を維持したまま渡す
           daily: daily ?? undefined,
           profile: profile ?? undefined,
         }}

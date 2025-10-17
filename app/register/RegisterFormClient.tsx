@@ -1,21 +1,7 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { createClient, type SupabaseClient } from "@supabase/supabase-js"
-
-// ★ ここがポイント：SSRでは実行されないよう遅延生成＋windowガード
-let __sb__: SupabaseClient | null = null
-function getBrowserSupabase(): SupabaseClient {
-  if (typeof window === "undefined") {
-    throw new Error("supabase_client_on_server") // SSRで誤実行を防止
-  }
-  if (!__sb__) {
-    const url  = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    __sb__ = createClient(url, anon)
-  }
-  return __sb__
-}
+import { useState } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 type IssueResp = {
   ok: boolean
@@ -24,41 +10,97 @@ type IssueResp = {
 }
 
 export default function RegisterFormClient() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  // ====== 状態管理 ======
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [issued, setIssued] = useState<{ code: string; tier: string } | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
 
+  // Supabase クライアント生成（ブラウザ専用）
+  const supabase = createClientComponentClient()
+
+  // ====== 登録処理 ======
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
     setIssued(null)
-    try {
-      const supabase = getBrowserSupabase() // ★ ここで取得（初回のみ生成）
-      const { data: sign, error: e1 } = await supabase.auth.signUp({ email, password })
-      if (e1) throw e1
-      const userId = sign.user?.id
-      if (!userId) throw new Error("user_not_created")
+    setMessage(null)
 
-      const res = await fetch("/api/membership/issue", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, tier: "beta" }),
+    try {
+      // リダイレクト先URLを自動的に現在originに合わせる
+      const origin =
+        typeof window !== 'undefined'
+          ? window.location.origin
+          : process.env.NEXT_PUBLIC_SITE_URL ?? 'https://soul-layer-diagnosis.vercel.app'
+
+      // サインアップ処理（メール確認付き）
+      const { data, error: signErr } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${origin}/auth/callback`, // ←ここが超重要
+        },
+      })
+      if (signErr) throw signErr
+
+      const userId = data.user?.id
+      if (!userId) {
+        setMessage('確認メールを送信しました。メールのリンクを開いて登録を完了してください。')
+        setLoading(false)
+        return
+      }
+
+      // 任意：登録完了後にメンバーコードを発行
+      const res = await fetch('/api/membership/issue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, tier: 'beta' }),
       })
       const j = (await res.json()) as IssueResp
-      if (!j.ok || !j.item) throw new Error(j.error || "issue_failed")
+      if (!j.ok || !j.item) throw new Error(j.error || 'issue_failed')
+
       setIssued({ code: `β-${j.item.code}`, tier: j.item.tier })
     } catch (err: any) {
-      setError(err?.message || "unknown_error")
+      console.error(err)
+      setError(err?.message || 'unknown_error')
     } finally {
       setLoading(false)
     }
   }
 
+  // ====== メール再送 ======
+  async function resendEmail() {
+    if (!email) return
+    setLoading(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const origin =
+        typeof window !== 'undefined'
+          ? window.location.origin
+          : process.env.NEXT_PUBLIC_SITE_URL ?? 'https://soul-layer-diagnosis.vercel.app'
+
+      const { error: resendErr } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: `${origin}/auth/callback` },
+      })
+      if (resendErr) throw resendErr
+      setMessage('確認メールを再送しました。迷惑メール・プロモーションタブも確認してください。')
+    } catch (err: any) {
+      setError(err?.message || 'resend_failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ====== UI ======
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {/* ====== メールアドレス ====== */}
       <div>
         <label className="block text-sm mb-1">メールアドレス</label>
         <input
@@ -66,9 +108,12 @@ export default function RegisterFormClient() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full rounded-xl bg-zinc-900/60 px-4 py-2 ring-1 ring-white/10 focus:outline-none focus:ring-2"
+          className="w-full rounded-xl bg-zinc-900/60 px-4 py-2 ring-1 ring-white/10
+                     focus:outline-none focus:ring-2 focus:ring-emerald-400"
         />
       </div>
+
+      {/* ====== パスワード ====== */}
       <div>
         <label className="block text-sm mb-1">パスワード</label>
         <input
@@ -76,19 +121,38 @@ export default function RegisterFormClient() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="w-full rounded-xl bg-zinc-900/60 px-4 py-2 ring-1 ring-white/10 focus:outline-none focus:ring-2"
+          minLength={6}
+          className="w-full rounded-xl bg-zinc-900/60 px-4 py-2 ring-1 ring-white/10
+                     focus:outline-none focus:ring-2 focus:ring-emerald-400"
         />
       </div>
+
+      {/* ====== 登録ボタン ====== */}
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-2xl bg-white/10 backdrop-blur px-4 py-2 hover:bg-white/15 transition"
+        className="w-full rounded-2xl bg-white/10 backdrop-blur px-4 py-2
+                   hover:bg-white/15 transition disabled:opacity-60"
       >
-        {loading ? "登録中…" : "登録してコード発行"}
+        {loading ? '登録中…' : '登録してコード発行'}
       </button>
 
+      {/* ====== 再送ボタン ====== */}
+      <button
+        type="button"
+        onClick={resendEmail}
+        disabled={loading || !email}
+        className="w-full rounded-2xl bg-emerald-800/30 backdrop-blur px-4 py-2
+                   text-emerald-300 text-sm hover:bg-emerald-700/40 transition disabled:opacity-40"
+      >
+        確認メールを再送する
+      </button>
+
+      {/* ====== メッセージ／エラー表示 ====== */}
+      {message && <div className="rounded-xl bg-emerald-900/40 px-4 py-2 text-sm">{message}</div>}
       {error && <div className="rounded-xl bg-red-900/40 px-4 py-2 text-sm">{error}</div>}
 
+      {/* ====== 発行結果 ====== */}
       {issued && (
         <div className="mt-4 rounded-2xl bg-zinc-900/60 ring-1 ring-white/10 p-4">
           <div className="text-xs tracking-widest text-zinc-400">YOUR MEMBERSHIP CODE</div>

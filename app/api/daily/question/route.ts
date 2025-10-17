@@ -6,10 +6,13 @@ import { getOpenAI } from "@/lib/openai";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/* ================== 型 ================== */
 type EV = "E" | "V" | "Λ" | "Ǝ";
 type Slot = "morning" | "noon" | "night";
 type Choice = { key: EV; label: string };
+type Theme = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 
+/* ================== フォールバック選択肢 ================== */
 const FALLBACK: Record<Slot, Choice[]> = {
   morning: [
     { key: "E", label: "直感で素早く動く" },
@@ -28,15 +31,21 @@ const FALLBACK: Record<Slot, Choice[]> = {
   ],
 };
 
-// JST スロット判定
+/* ================== JST スロット判定 ================== */
+// JST = UTC+9
 function getJstSlot(now = new Date()): Slot {
-  // JST = UTC+9
   const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const h = jst.getUTCHours();
+  const h = jst.getUTCHours(); // jst へ補正後の時で判定
   // 朝=5:00-11:59 / 昼=12:00-17:59 / 夜=18:00-4:59
   if (h >= 5 && h < 12) return "morning";
   if (h >= 12 && h < 18) return "noon";
   return "night";
+}
+
+/* ================== UUID→数値seed 変換（簡易） ================== */
+function hashUUIDtoInt(uuid: string): number {
+  const head = uuid.replace(/-/g, "").slice(0, 8);
+  return Number.parseInt(head, 16) >>> 0; // 0〜2^32-1
 }
 
 export async function GET() {
@@ -45,14 +54,19 @@ export async function GET() {
 
   const questionId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
+  const seed = hashUUIDtoInt(questionId);
 
-  // cookieに直近のquestionIdとslotを軽く保持（任意）
+  // フロントが期待する theme を返す（暫定は固定でOK。将来Cookie/DBから復元可）
+  const theme: Theme = "WORK";
+
+  // cookieに直近のquestionId/slot/themeを軽く保持（診断APIの互換用）
   const jar = cookies();
   jar.set("daily_question_id", questionId, { httpOnly: true, sameSite: "lax", path: "/" });
   jar.set("daily_slot", slot, { httpOnly: true, sameSite: "lax", path: "/" });
+  jar.set("daily_theme", theme, { httpOnly: true, sameSite: "lax", path: "/" });
 
-  // OpenAIで質問＋選択肢を生成（失敗時はフォールバック）
   try {
+    /* ========== OpenAIで質問＋選択肢生成（失敗時はフォールバック） ========== */
     const openai = getOpenAI();
     if (!openai) throw new Error("openai_env_missing");
 
@@ -103,11 +117,9 @@ export async function GET() {
     });
 
     const json = JSON.parse(resp.choices[0].message.content || "{}");
-    let choices: Choice[] = Array.isArray(json.choices)
-      ? json.choices.slice(0, choiceCount)
-      : [];
+    let choices: Choice[] = Array.isArray(json.choices) ? json.choices.slice(0, choiceCount) : [];
 
-    // 過不足対応＆キーの重複/順の補正
+    // 過不足対応＆キー/順の補正
     const keys: EV[] = ["E", "V", "Λ", "Ǝ"];
     const need = choiceCount - choices.length;
     if (need > 0) {
@@ -122,28 +134,35 @@ export async function GET() {
       label: String(c.label ?? "").slice(0, 50),
     }));
 
+    // ===== フロント仕様に合わせて返す =====
     return NextResponse.json({
       ok: true,
-      question_id: questionId,
+      question_id: questionId, // 参考
+      seed,                    // ★ フロントが期待（number）
       slot,
+      theme,                   // ★ フロントが期待
       question: String(json.question || "今日の一歩を選んでください。").slice(0, 100),
-      choices,
+      choices: choices.map((c) => ({ id: c.key, label: c.label })), // ★ key→id
       created_at: createdAt,
-      env: "prod", // 本番運用時。テストは diagnose 側で theme:"dev" を付けて分離
+      env: "prod",
     });
   } catch {
+    // ===== 失敗時フォールバック（同じ返却形）=====
+    const fb = FALLBACK[slot].slice(0, choiceCount);
     return NextResponse.json(
       {
         ok: true,
         question_id: questionId,
+        seed,       // ★
         slot,
+        theme,      // ★
         question:
           slot === "morning"
             ? "今朝のあなたに合う始め方はどれ？（直感で選んで大丈夫）"
             : slot === "noon"
             ? "このあと数時間、どの方向で進めたい？"
             : "今日はどんな締めくくりがしっくり来る？",
-        choices: FALLBACK[slot].slice(0, choiceCount),
+        choices: fb.map((c) => ({ id: c.key, label: c.label })), // ★
         created_at: createdAt,
         env: "dev",
       },

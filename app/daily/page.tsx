@@ -7,14 +7,21 @@ type Theme = 'WORK' | 'LOVE' | 'FUTURE' | 'LIFE';
 type Phase = 'ask' | 'result' | 'error';
 
 type DailyQuestionResponse = {
-  ok: boolean; error?: string;
-  slot: Slot; theme: Theme; seed: number;
-  question: string; choices: { id: string; label: string }[];
+  ok: boolean;
+  error?: string;
+  slot: Slot;
+  theme: Theme;
+  seed: number; // APIで number を返す実装に合わせる
+  question: string;
+  choices: { id: string; label: string }[];
 };
 
 type DailyAnswerResponse = {
-  ok: boolean; error?: string;
-  comment: string; advice?: string; affirm?: string;
+  ok: boolean;
+  error?: string;
+  comment: string;
+  advice?: string;
+  affirm?: string;
   score?: number;
 };
 
@@ -23,46 +30,70 @@ export default function DailyPage() {
   const [loading, setLoading] = useState(false);
   const [slot, setSlot] = useState<Slot | null>(null);
   const [theme, setTheme] = useState<Theme>('WORK');
-  const [seed, setSeed] = useState<number>(0);
+  const [seed, setSeed] = useState<number | null>(null); // ★ 初期値を null に
   const [question, setQuestion] = useState('');
   const [choices, setChoices] = useState<{ id: string; label: string }[]>([]);
   const [result, setResult] = useState<DailyAnswerResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  async function loadQuestion() {
+    setLoading(true);
+    setErr(null);
+    try {
+      const r = await fetch('/api/daily/question', { cache: 'no-store' });
+      const json = (await r.json()) as DailyQuestionResponse;
+      if (!json.ok) throw new Error(json.error || 'failed_to_load');
+      setSlot(json.slot);
+      setTheme(json.theme);
+      setSeed(typeof json.seed === 'number' ? json.seed : null);
+      setQuestion(json.question);
+      setChoices(json.choices ?? []);
+      setPhase('ask');
+    } catch (e: any) {
+      setErr(e?.message ?? 'failed_to_load');
+      setPhase('error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const r = await fetch('/api/daily/question', { cache: 'no-store' });
-        const json = (await r.json()) as DailyQuestionResponse;
-        if (!json.ok) throw new Error(json.error);
-        setSlot(json.slot); setTheme(json.theme); setSeed(json.seed);
-        setQuestion(json.question); setChoices(json.choices);
-        setPhase('ask');
-      } catch (e: any) { setErr(e?.message ?? 'failed_to_load'); setPhase('error'); }
-      finally { setLoading(false); }
-    })();
+    loadQuestion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function onChoose(choiceId: string) {
-    if (!seed) return;
+    if (seed === null) {
+      setErr('seed_not_initialized');
+      setPhase('error');
+      return;
+    }
     setLoading(true);
+    setErr(null);
     try {
-      const r = await fetch('/api/daily/answer', {
-        method:'POST', headers:{'Content-Type':'application/json'},
+      // ★ エンドポイントを diagnose に統一（サーバは後方互換で受ける）
+      const r = await fetch('/api/daily/diagnose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // 旧プロトコルのまま送る（サーバ側の互換レイヤが補完）
         body: JSON.stringify({ seed, choiceId, theme }),
       });
       const json = (await r.json()) as DailyAnswerResponse;
       if (!json.ok) throw new Error(json?.error ?? 'failed');
-      setResult(json); setPhase('result');
-    } catch (e:any) { setErr(e?.message ?? 'failed_to_answer'); setPhase('error'); }
-    finally { setLoading(false); }
+      setResult(json);
+      setPhase('result');
+    } catch (e: any) {
+      setErr(e?.message ?? 'failed_to_answer');
+      setPhase('error');
+    } finally {
+      setLoading(false);
+    }
   }
 
   const header = useMemo(() => {
-    const s = slot==='morning'?'朝':slot==='noon'?'昼':slot==='night'?'夜':'';
-    const t = theme==='WORK'?'仕事':theme==='LOVE'?'愛':theme==='FUTURE'?'未来':'生活';
-    return `デイリー診断${s||t ? `（${[s,t].filter(Boolean).join(' × ')}）` : ''}`;
+    const s = slot === 'morning' ? '朝' : slot === 'noon' ? '昼' : slot === 'night' ? '夜' : '';
+    const t = theme === 'WORK' ? '仕事' : theme === 'LOVE' ? '愛' : theme === 'FUTURE' ? '未来' : '生活';
+    return `デイリー診断${s || t ? `（${[s, t].filter(Boolean).join(' × ')}）` : ''}`;
   }, [slot, theme]);
 
   return (
@@ -70,18 +101,38 @@ export default function DailyPage() {
       <h1 className="text-2xl font-semibold mb-6">{header}</h1>
 
       {loading && <p className="opacity-80">読み込み中…</p>}
-      {phase === 'error' && <p className="text-red-400">エラー：{err}</p>}
+
+      {phase === 'error' && !loading && (
+        <div className="space-y-3">
+          <p className="text-red-400">エラー：{err}</p>
+          <button
+            type="button"
+            className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20"
+            onClick={loadQuestion}
+          >
+            もう一度読み込む
+          </button>
+        </div>
+      )}
 
       {phase === 'ask' && !loading && (
         <div className="space-y-4">
           <p className="opacity-90">{question}</p>
           <div className="grid gap-3 mt-4">
             {choices.map((c) => (
-              <button key={c.id} className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left"
-                      onClick={() => onChoose(c.id)} disabled={loading}>
+              <button
+                key={c.id}
+                type="button"
+                className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left disabled:opacity-60"
+                onClick={() => onChoose(c.id)}
+                disabled={loading}
+              >
                 {c.label}
               </button>
             ))}
+            {choices.length === 0 && (
+              <div className="text-sm opacity-70">選択肢が取得できませんでした。</div>
+            )}
           </div>
         </div>
       )}
@@ -104,6 +155,16 @@ export default function DailyPage() {
               <p className="font-medium">{result.affirm}</p>
             </div>
           )}
+
+          <div className="pt-2">
+            <button
+              type="button"
+              className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20"
+              onClick={loadQuestion}
+            >
+              最初からもう一度
+            </button>
+          </div>
         </div>
       )}
     </div>

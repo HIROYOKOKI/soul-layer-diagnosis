@@ -110,7 +110,6 @@ export async function GET() {
 
     const resp = await openai.chat.completions.create({
       model: "gpt-5-mini",
-      temperature: 0.7,
       messages: [
         { role: "system", content: sys },
         { role: "user", content: user },

@@ -2,31 +2,28 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 type Slot = 'morning' | 'noon' | 'night';
 type Theme = 'WORK' | 'LOVE' | 'FUTURE' | 'LIFE';
 type Phase = 'ask' | 'result' | 'error';
 
 type DailyQuestionResponse = {
-  ok: boolean;
-  error?: string;
-  slot: Slot;
-  theme: Theme;
-  seed: number;
-  question: string;
-  choices: { id: string; label: string }[];
+  ok: boolean; error?: string;
+  slot: Slot; theme: Theme; seed: number;
+  question: string; choices: { id: string; label: string }[];
 };
 
 type DailyAnswerResponse = {
-  ok: boolean;
-  error?: string;
-  comment: string;
-  advice?: string;
-  affirm?: string;
+  ok: boolean; error?: string;
+  comment: string; advice?: string; affirm?: string;
   score?: number;
+  save_error?: string | null;   // ★ 追加：保存結果を見る
 };
 
 export default function DailyPage() {
+  const router = useRouter();
+
   const [phase, setPhase] = useState<Phase>('ask');
   const [loading, setLoading] = useState(false);
   const [slot, setSlot] = useState<Slot | null>(null);
@@ -37,7 +34,7 @@ export default function DailyPage() {
   const [result, setResult] = useState<DailyAnswerResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  /* ---------- 質問の読み込み ---------- */
+  // 質問のロード
   async function loadQuestion() {
     setLoading(true);
     setErr(null);
@@ -59,17 +56,12 @@ export default function DailyPage() {
     }
   }
 
-  useEffect(() => {
-    loadQuestion();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => { loadQuestion(); }, []);
 
-  /* ---------- 選択肢クリック ---------- */
+  // 選択→診断
   async function onChoose(choiceId: string) {
     if (seed === null) {
-      setErr('seed_not_initialized');
-      setPhase('error');
-      return;
+      setErr('seed_not_initialized'); setPhase('error'); return;
     }
     setLoading(true);
     setErr(null);
@@ -77,41 +69,34 @@ export default function DailyPage() {
       const r = await fetch('/api/daily/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // ★ 本番AIモード（env:'prod'）を送る！
-        body: JSON.stringify({
-          seed,
-          choiceId,
-          theme,
-          env: 'prod', // ← ここを追加
-        }),
+        // 本番AIとして扱う（互換レイヤが吸収）
+        body: JSON.stringify({ seed, choiceId, theme, env: 'prod' }),
       });
       const json = (await r.json()) as DailyAnswerResponse;
       if (!json.ok) throw new Error(json?.error ?? 'failed');
       setResult(json);
       setPhase('result');
     } catch (e: any) {
-      setErr(e?.message ?? 'failed_to_answer');
-      setPhase('error');
+      setErr(e?.message ?? 'failed_to_answer'); setPhase('error');
     } finally {
       setLoading(false);
     }
   }
 
-  /* ---------- 見出し ---------- */
+  // 結果表示後に自動で /mypage へ戻す
+  useEffect(() => {
+    if (phase === 'result') {
+      const t = setTimeout(() => router.push('/mypage'), 2500);
+      return () => clearTimeout(t);
+    }
+  }, [phase, router]);
+
   const header = useMemo(() => {
-    const s = slot === 'morning' ? '朝' : slot === 'noon' ? '昼' : slot === 'night' ? '夜' : '';
-    const t =
-      theme === 'WORK'
-        ? '仕事'
-        : theme === 'LOVE'
-        ? '愛'
-        : theme === 'FUTURE'
-        ? '未来'
-        : '生活';
-    return `デイリー診断${s || t ? `（${[s, t].filter(Boolean).join(' × ')}）` : ''}`;
+    const s = slot==='morning'?'朝':slot==='noon'?'昼':slot==='night'?'夜':'';
+    const t = theme==='WORK'?'仕事':theme==='LOVE'?'愛':theme==='FUTURE'?'未来':'生活';
+    return `デイリー診断（${[s,t].filter(Boolean).join(' × ')}）`;
   }, [slot, theme]);
 
-  /* ---------- 描画 ---------- */
   return (
     <div className="max-w-xl mx-auto px-4 py-10 text-gray-100">
       <h1 className="text-2xl font-semibold mb-6">{header}</h1>
@@ -174,13 +159,27 @@ export default function DailyPage() {
             </div>
           )}
 
-          <div className="pt-2">
+          {/* 保存ステータス & マイページへ */}
+          <div className="text-sm opacity-70">
+            {result.save_error
+              ? <span className="text-red-400">保存に失敗しました：{result.save_error}</span>
+              : <span>自動保存しました。数秒後にマイページへ戻ります…</span>}
+          </div>
+
+          <div className="pt-2 flex gap-3">
             <button
               type="button"
               className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20"
               onClick={loadQuestion}
             >
               最初からもう一度
+            </button>
+            <button
+              type="button"
+              className="px-4 py-2 rounded-lg bg-blue-600/80 hover:bg-blue-600 text-white"
+              onClick={() => router.push('/mypage')}
+            >
+              マイページへ
             </button>
           </div>
         </div>

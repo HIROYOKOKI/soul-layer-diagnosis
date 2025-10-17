@@ -1,3 +1,4 @@
+// app/daily/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -11,7 +12,7 @@ type DailyQuestionResponse = {
   error?: string;
   slot: Slot;
   theme: Theme;
-  seed: number; // APIで number を返す実装に合わせる
+  seed: number;
   question: string;
   choices: { id: string; label: string }[];
 };
@@ -30,12 +31,13 @@ export default function DailyPage() {
   const [loading, setLoading] = useState(false);
   const [slot, setSlot] = useState<Slot | null>(null);
   const [theme, setTheme] = useState<Theme>('WORK');
-  const [seed, setSeed] = useState<number | null>(null); // ★ 初期値を null に
+  const [seed, setSeed] = useState<number | null>(null);
   const [question, setQuestion] = useState('');
   const [choices, setChoices] = useState<{ id: string; label: string }[]>([]);
   const [result, setResult] = useState<DailyAnswerResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  /* ---------- 質問の読み込み ---------- */
   async function loadQuestion() {
     setLoading(true);
     setErr(null);
@@ -62,6 +64,7 @@ export default function DailyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ---------- 選択肢クリック ---------- */
   async function onChoose(choiceId: string) {
     if (seed === null) {
       setErr('seed_not_initialized');
@@ -71,12 +74,16 @@ export default function DailyPage() {
     setLoading(true);
     setErr(null);
     try {
-      // ★ エンドポイントを diagnose に統一（サーバは後方互換で受ける）
       const r = await fetch('/api/daily/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // 旧プロトコルのまま送る（サーバ側の互換レイヤが補完）
-        body: JSON.stringify({ seed, choiceId, theme }),
+        // ★ 本番AIモード（env:'prod'）を送る！
+        body: JSON.stringify({
+          seed,
+          choiceId,
+          theme,
+          env: 'prod', // ← ここを追加
+        }),
       });
       const json = (await r.json()) as DailyAnswerResponse;
       if (!json.ok) throw new Error(json?.error ?? 'failed');
@@ -90,12 +97,21 @@ export default function DailyPage() {
     }
   }
 
+  /* ---------- 見出し ---------- */
   const header = useMemo(() => {
     const s = slot === 'morning' ? '朝' : slot === 'noon' ? '昼' : slot === 'night' ? '夜' : '';
-    const t = theme === 'WORK' ? '仕事' : theme === 'LOVE' ? '愛' : theme === 'FUTURE' ? '未来' : '生活';
+    const t =
+      theme === 'WORK'
+        ? '仕事'
+        : theme === 'LOVE'
+        ? '愛'
+        : theme === 'FUTURE'
+        ? '未来'
+        : '生活';
     return `デイリー診断${s || t ? `（${[s, t].filter(Boolean).join(' × ')}）` : ''}`;
   }, [slot, theme]);
 
+  /* ---------- 描画 ---------- */
   return (
     <div className="max-w-xl mx-auto px-4 py-10 text-gray-100">
       <h1 className="text-2xl font-semibold mb-6">{header}</h1>
@@ -143,12 +159,14 @@ export default function DailyPage() {
             <div className="text-sm uppercase tracking-wider opacity-60 mb-2">コメント</div>
             <p>{result.comment}</p>
           </div>
+
           {result.advice && (
             <div className="rounded-2xl p-4 border border-white/10 bg-white/5">
               <div className="text-sm uppercase tracking-wider opacity-60 mb-2">アドバイス</div>
               <p>{result.advice}</p>
             </div>
           )}
+
           {result.affirm && (
             <div className="rounded-2xl p-4 border border-white/10 bg-white/5">
               <div className="text-sm uppercase tracking-wider opacity-60 mb-2">アファメーション</div>

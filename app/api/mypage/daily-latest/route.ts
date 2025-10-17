@@ -8,7 +8,9 @@ export const dynamic = "force-dynamic";
 
 function toJstDateString(d: string | Date) {
   const dt = new Date(d);
-  return new Date(dt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })).toDateString();
+  return new Date(
+    dt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })
+  ).toDateString();
 }
 
 export async function GET() {
@@ -19,7 +21,7 @@ export async function GET() {
       error: userErr,
     } = await sb.auth.getUser();
 
-    // 未ログインは空
+    // 未ログインは空返し（UI側で「まだ診断がありません」表示）
     if (userErr || !user) {
       return NextResponse.json(
         { ok: true, item: null, unauthenticated: true },
@@ -27,11 +29,12 @@ export async function GET() {
       );
     }
 
+    // 最新1件
     const { data, error } = await sb
       .from("daily_results")
       .select(
-        // DBの列名に合わせて必要なら alias を変更
-        "slot, scope, code, comment, advice, affirm, score, created_at"
+        // 必要に応じて列名を合わせてください（例：affirmation列なら affirm:affirmation に）
+        "slot, scope, code, comment, advice, affirm, quote, score, created_at"
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -39,23 +42,27 @@ export async function GET() {
       .maybeSingle();
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 500 }
+      );
     }
 
     const item = data
       ? {
           slot: data.slot,
-          theme: data.scope, // scope → theme に統一
+          theme: data.scope,               // scope → theme に統一
           code: data.code,
           comment: data.comment,
           advice: data.advice,
-          affirm: data.affirm ?? null,
-          // 互換のため両方持たせる（MyPageShell が affirmation を参照しても表示される）
-          affirmation: data.affirm ?? null,
+          quote: data.quote ?? null,
+          affirm: data.affirm ?? null,     // DBが affirmation なら: data.affirmation
+          affirmation: data.affirm ?? null, // 互換プロパティを併記
           score: data.score ?? null,
           created_at: data.created_at,
           is_today_jst:
-            toJstDateString(data.created_at) === toJstDateString(new Date()),
+            toJstDateString(data.created_at) ===
+            toJstDateString(new Date()),
         }
       : null;
 

@@ -1,5 +1,6 @@
 // app/api/daily/diagnose/route.ts
 import { NextResponse } from "next/server";
+import { cookies as headerCookies } from "next/headers";
 import { getOpenAI } from "@/lib/openai";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -12,13 +13,13 @@ type Slot = "morning" | "noon" | "night";
 type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 
 type Body = {
-  id: string;                     // 例: daily-YYYY-MM-DD-morning
+  id: string;   // 例: daily-YYYY-MM-DD-morning
   slot: Slot;
-  choice: EV;                     // 選択コード
-  scope?: Scope;                  // 既定: LIFE
+  choice: EV;   // 選択コード（E/V/Λ/Ǝ）
+  scope?: Scope;        // 既定: LIFE
   env?: "dev" | "prod";
   theme?: "dev" | "prod";
-  ts?: string;                    // 任意: クライアント時刻
+  ts?: string;          // 任意: クライアント時刻
 };
 
 type EVLA = {
@@ -31,7 +32,7 @@ type EVLA = {
   NextV: { id: string; label: string }[];
 };
 
-/* ================== スコープ説明 ================== */
+/* ================== ユーティリティ ================== */
 const SCOPE_HINT: Record<Scope, string> = {
   WORK:   "仕事・学び・成果・チーム連携・自己効率",
   LOVE:   "恋愛・対人関係・信頼・距離感・感情のやり取り",
@@ -39,7 +40,15 @@ const SCOPE_HINT: Record<Scope, string> = {
   LIFE:   "生活全般・習慣・健康・心身の整え・日々の選択",
 };
 
-/* ================== 文字数ユーティリティ ================== */
+// JST = UTC+9
+function getJstSlot(now = new Date()): Slot {
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const h = jst.getUTCHours();
+  if (h >= 5 && h < 12) return "morning";
+  if (h >= 12 && h < 18) return "noon";
+  return "night";
+}
+
 const jpLen = (s: string) => Array.from(s ?? "").length;
 
 const clampToRange = (text: string, _min: number, max: number) => {
@@ -60,7 +69,7 @@ const inRange = (s: string, min: number, max: number) => {
   return n >= min && n <= max;
 };
 
-/* ================== 仕様（文字数） ================== */
+/* ========== 文字数仕様 ========== */
 const LEN = {
   commentMin: 100,
   commentMax: 150,
@@ -70,7 +79,7 @@ const LEN = {
   affirmMax: 30,
 } as const;
 
-/* ================== アファメーション検査/補正 ================== */
+/* ========== アファメーション検査/補正 ========== */
 const isAffirmation = (s: string) => {
   const t = (s || "").trim();
   if (!/^(私は|わたしは)/.test(t)) return false;
@@ -93,7 +102,7 @@ const normalizeAffirmation = (code: EV, s: string): string => {
   return clampToRange(t, LEN.affirmMin, LEN.affirmMax);
 };
 
-/* ================== フォールバック文言 ================== */
+/* ========== フォールバック文言 ========== */
 const FB_COMMENT: Record<EV, string> = {
   E: `今は内側の熱が静かに満ちる時期。小さな確定を一つ重ねれば、惰性はほどけていく。視線を近くに置き、今日できる最短の一歩を形にしよう。`,
   V: `頭の中の未来像を、現実の手触りに寄せていく段階。理想は曖昧なままで良い。輪郭を一筆だけ濃くして、届く距離に引き寄せていこう。`,
@@ -115,14 +124,14 @@ const FB_AFFIRM: Record<EV, string> = {
   Ǝ: `私は静けさの中で答えを見る`,
 };
 
-/* ================== スロット → ランク点 ================== */
+/* ========== スロット → ランク点 ========== */
 const rankPointsBySlot: Record<Slot, number[]> = {
   morning: [3, 2, 1, 0], // 4択
   noon: [2, 1, 0],       // 3択
   night: [1, 0],         // 2択
 };
 
-/* ================== EVΛƎ 生成ユーティリティ（MVP） ================== */
+/* ========== EVΛƎ 生成ユーティリティ（MVP） ========== */
 function extractE(slot: Slot, code: EV): EVLA["E"] {
   const goal = code === "E" ? "前進" : code === "V" ? "構想" : code === "Λ" ? "選択" : "観測";
   const urgency = slot === "morning" ? 0.6 : slot === "noon" ? 0.4 : 0.2;
@@ -139,7 +148,6 @@ function generateCandidates(E: EVLA["E"], n: number, slot: Slot): EVLA["V"] {
   return seeds.slice(0, n).map((label, i) => ({
     id: String.fromCharCode(65 + i), // A,B,C...
     label,
-    // 浮動小数の見た目対策で丸め
     risk: Number((0.1 + i * 0.1).toFixed(2)),
     cost: Number((0.1 + i * 0.1).toFixed(2)),
   }));
@@ -169,7 +177,7 @@ function generateNextV(slot: Slot): EVLA["NextV"] {
   return pool.slice(0, 3).map((label, i) => ({ id: `N${i + 1}`, label }));
 }
 
-/* ================== OpenAI 生成（コメント/アドバイス/アファ） ================== */
+/* ========== OpenAI 生成（コメント/アドバイス/アファ） ========== */
 async function genWithAI(code: EV, slot: Slot, scope: Scope) {
   const openai = getOpenAI();
   if (!openai) throw new Error("openai_env_missing");
@@ -200,7 +208,6 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
     },
   });
 
-  // 1st try
   const resp = await openai.chat.completions.create({
     model: "gpt-5-mini",
     temperature: 0.7,
@@ -228,19 +235,12 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
     !inRange(first.affirm || "", LEN.affirmMin, LEN.affirmMax);
 
   if (violate) {
-    // 2nd try（厳しめ）
     const resp2 = await openai.chat.completions.create({
       model: "gpt-5-mini",
       temperature: 0.4,
       messages: [
         { role: "system", content: sys },
-        {
-          role: "user",
-          content: JSON.stringify({
-            ...JSON.parse(user),
-            note: "前回は制約外。厳守して再出力（JSONのみ）。",
-          }),
-        },
+        { role: "user", content: JSON.stringify({ ...JSON.parse(user), note: "前回は制約外。厳守して再出力（JSONのみ）。" }) },
       ],
       response_format: { type: "json_object" },
     });
@@ -263,9 +263,40 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
 /* ================== ハンドラ ================== */
 export async function POST(req: Request) {
   try {
-    const b = (await req.json()) as Body | null;
-    if (!b?.id || !b.slot || !b.choice) {
-      return NextResponse.json({ ok: false, error: "bad_request" }, { status: 400 });
+    const raw = (await req.json()) as any;
+
+    // ---- 互換レイヤ：旧ペイロード {seed, choiceId, theme} を許容 ----
+    const isLegacy = raw && (typeof raw.seed !== "undefined" || typeof raw.choiceId !== "undefined");
+
+    let b: Body | null = null;
+
+    if (isLegacy) {
+      const c = headerCookies();
+      const cookieSlot = c.get("daily_slot")?.value as Slot | undefined;
+      const cookieTheme = (c.get("daily_theme")?.value as Scope | undefined) || "LIFE";
+      const slot = (cookieSlot ?? getJstSlot()) as Slot;
+
+      // id は daily-YYYY-MM-DD-slot（JST基準）
+      const jst = new Date(Date.now() + 9 * 3600 * 1000);
+      const y = jst.getUTCFullYear();
+      const m = String(jst.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(jst.getUTCDate()).padStart(2, "0");
+      const id = `daily-${y}-${m}-${d}-${slot}`;
+
+      const choice = String(raw.choiceId || "").toUpperCase() as EV;
+      const scope = (String(raw.theme || cookieTheme || "LIFE").toUpperCase()) as Scope;
+
+      if (!"EVΛƎ".includes(choice)) {
+        return NextResponse.json({ ok: false, error: "bad_choice" }, { status: 400 });
+      }
+      b = { id, slot, choice, scope, env: "dev", theme: "dev", ts: new Date().toISOString() };
+    } else {
+      // 新形式をそのまま利用
+      const nb = raw as Body | null;
+      if (!nb?.id || !nb.slot || !nb.choice) {
+        return NextResponse.json({ ok: false, error: "bad_request" }, { status: 400 });
+      }
+      b = nb;
     }
 
     const env = b.env ?? "dev";
@@ -309,7 +340,7 @@ export async function POST(req: Request) {
     const evla: EVLA = { slot: b.slot, mode: "EVΛƎ", E, V, Lambda, Epsilon, NextV };
 
     // 3) スコア（朝3/昼2/夜1 → ×0.1）
-    const score = Math.round((rankPoint * 0.1) * 100) / 100; // 小数誤差対策
+    const score = Math.round((rankPoint * 0.1) * 100) / 100;
 
     // 4) 保存（ベストエフォート）
     const created_at = new Date().toISOString();
@@ -337,27 +368,31 @@ export async function POST(req: Request) {
       save_error = e?.message ?? "save_failed";
     }
 
-    // 5) 返却（UI最小＋保存用）
-    return NextResponse.json({
-      ok: true,
-      result: { comment, advice, affirm, score }, // UI表示はこれだけ
-      item: {
-        id: b.id,
-        slot: b.slot,
-        scope,
-        code,
-        comment,
-        advice,
-        affirm,
-        score,
-        env,
-        theme,
-        client_ts: b.ts ?? null,
-        created_at,
-        evla, // 将来の可視化/学習用
-      },
-      save_error, // null なら保存成功
-    });
+    // 5) 返却（後方互換：旧→フラット／新→構造化）
+    if (isLegacy) {
+      return NextResponse.json({ ok: true, comment, advice, affirm, score });
+    } else {
+      return NextResponse.json({
+        ok: true,
+        result: { comment, advice, affirm, score },
+        item: {
+          id: b.id,
+          slot: b.slot,
+          scope,
+          code,
+          comment,
+          advice,
+          affirm,
+          score,
+          env,
+          theme,
+          client_ts: b.ts ?? null,
+          created_at,
+          evla,
+        },
+        save_error,
+      });
+    }
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e?.message ?? "internal_error" },

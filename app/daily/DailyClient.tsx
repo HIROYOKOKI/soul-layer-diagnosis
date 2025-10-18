@@ -1,3 +1,4 @@
+// app/daily/DailyClient.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
@@ -8,26 +9,42 @@ type Phase = "ask" | "result" | "error";
 export default function DailyClient() {
   const [phase, setPhase] = useState<Phase>("ask");
   const [loading, setLoading] = useState(false);
+
   const [slot, setSlot] = useState<Slot | null>(null);
-  const [theme, setTheme] = useState<Theme>("WORK");
+
+  // ★ MyPage と同じテーマを“ソース・オブ・トゥルース”にする
+  const [theme, setTheme] = useState<Theme>("LOVE");
+
   const [seed, setSeed] = useState<number>(0);
   const [question, setQuestion] = useState("");
   const [choices, setChoices] = useState<{ id: string; label: string }[]>([]);
   const [result, setResult] = useState<DailyAnswerResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  // ---- 初期ロード：① /api/theme → ② /api/daily/question の順で必ず取得
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const r = await fetch(`/api/daily/question`, { cache: "no-store" });
-        const json = (await r.json()) as DailyQuestionResponse;
-        if (!json.ok) throw new Error(json.error);
-        setSlot(json.slot);
-        setTheme(json.theme);
-        setSeed(json.seed);
-        setQuestion(json.question);
-        setChoices(json.choices);
+        // ① テーマを MyPage と同じに固定
+        try {
+          const rt = await fetch(`/api/theme`, { cache: "no-store" });
+          const jt = await rt.json();
+          const t = String(jt?.scope ?? jt?.theme ?? "LOVE").toUpperCase() as Theme;
+          setTheme(t);
+        } catch {
+          setTheme("LOVE");
+        }
+
+        // ② 質問取得（レスポンスの theme は採用しない）
+        const rq = await fetch(`/api/daily/question`, { cache: "no-store" });
+        const jq = (await rq.json()) as DailyQuestionResponse;
+        if (!jq.ok) throw new Error(jq.error || "failed_to_load");
+
+        setSlot(jq.slot);
+        setSeed(jq.seed);
+        setQuestion(jq.question);
+        setChoices(jq.choices);
         setPhase("ask");
       } catch (e: any) {
         setErr(e?.message ?? "failed_to_load");
@@ -42,6 +59,7 @@ export default function DailyClient() {
     if (!seed) return;
     setLoading(true);
     try {
+      // ★ 回答送信時も “固定したテーマ” を常に送る
       const r = await fetch(`/api/daily/answer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -1,4 +1,4 @@
-// app/daily/result/ResultClient.tsx など（あなたが貼ってくれたファイルの置き換え先に合わせて保存）
+// app/daily/result/ResultClient.tsx
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -13,18 +13,17 @@ type Env = "dev" | "prod";
 
 type Item = {
   question_id?: string;
-  mode?: Slot | null;        // = slot
-  scope?: Scope | null;      // テーマ
+  mode?: Slot | null;
+  scope?: Scope | null;
   code: EV;
   comment: string;
   advice?: string | null;
-  affirm?: string | null;    // ← 正規化後はここに入れる
-  quote?: string | null;     // 名言（互換）
+  affirm?: string | null;
+  quote?: string | null;
   created_at?: string | null;
   env?: Env | null;
 };
 
-// ===== JSTスロット判定（朝=4-10, 昼=11-16, 夜=その他） =====
 function getJstSlot(): Slot {
   const now = new Date();
   const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -40,13 +39,14 @@ export default function ResultClient() {
 
   const [currentScope, setCurrentScope] = useState<Scope | null>(null);
   const [item, setItem] = useState<Item | null>(null);
+  const [empty, setEmpty] = useState(false);        // ← 追加：空状態
+  const [unauth, setUnauth] = useState(false);      // ← 追加：未ログイン
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  // === 初期ロード ===
   useEffect(() => {
     (async () => {
       try {
@@ -60,19 +60,21 @@ export default function ResultClient() {
           if (["WORK", "LOVE", "FUTURE", "LIFE"].includes(scopeVal)) {
             setCurrentScope(scopeVal as Scope);
           }
-        } catch {
-          /* noop */
-        }
+        } catch {/* noop */}
 
-        // 最新デイリーを取得
-        const r = await fetch(`/api/mypage/daily-latest?env=dev`, { cache: "no-store" });
+        // 最新デイリー取得（envフィルタなしに変更）
+        const r = await fetch(`/api/mypage/daily-latest`, { cache: "no-store" });
         if (!r.ok) throw new Error(`/api/mypage/daily-latest failed (${r.status})`);
         const j = await r.json();
 
+        if (j?.unauthenticated) {
+          setUnauth(true);
+          setEmpty(true);
+          return;
+        }
+
         if (j?.ok && j.item) {
           const raw = j.item as any;
-
-          // ★ 正規化：affirmation/quote を affirm に吸収、slot を mode に吸収
           const normalized: Item = {
             question_id: raw?.question_id ?? null,
             mode: (raw?.mode ?? raw?.slot ?? null) as Slot | null,
@@ -83,13 +85,13 @@ export default function ResultClient() {
             affirm: raw?.affirm ?? raw?.affirmation ?? raw?.quote ?? null,
             quote: raw?.quote ?? null,
             created_at: raw?.created_at ?? null,
-            env: (raw?.env ?? "dev") as Env,
+            env: (raw?.env ?? null) as Env | null,
           };
-
           setItem(normalized);
           setStep(1);
         } else {
-          setItem(null);
+          // データが無い → 空状態に切り替え（Loadingは出さない）
+          setEmpty(true);
         }
       } catch (e: any) {
         setErr(e?.message || "result_fetch_failed");
@@ -118,7 +120,6 @@ export default function ResultClient() {
     });
   }, [hasAdvice]);
 
-  // ===== 保存処理 =====
   async function onSave() {
     if (!item || saving) return;
     setSaving(true);
@@ -151,7 +152,7 @@ export default function ResultClient() {
         score: null as number | null,
         comment: item.comment,
         advice: item.advice ?? null,
-        affirm: item.affirm ?? null, // ← 正規化後の値
+        affirm: item.affirm ?? null,
         quote: item.quote ?? null,
         evla: null as Record<string, number> | null,
       };
@@ -173,7 +174,7 @@ export default function ResultClient() {
     }
   }
 
-  // ====== UI ======
+  // ===== UI =====
   if (err) {
     return (
       <div className="min-h-[60vh] grid place-items-center bg-black text-white">
@@ -182,6 +183,34 @@ export default function ResultClient() {
     );
   }
 
+  // 空状態（未ログイン or レコードなし）
+  if (empty && !item) {
+    return (
+      <div className="min-h-[60vh] grid place-items-center bg-black text-white">
+        <div className="text-center space-y-4">
+          <div className="opacity-80 text-sm">
+            {unauth ? "ログイン後にデイリー診断を実行してください。" : "まだ診断がありません。/daily から診断を実行してください。"}
+          </div>
+          <div className="flex gap-3 justify-center">
+            {unauth ? (
+              <a href="/login?next=/daily/result" className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5">
+                ログインへ
+              </a>
+            ) : (
+              <a href="/daily" className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5">
+                デイリーへ
+              </a>
+            )}
+            <a href="/mypage" className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5">
+              マイページへ
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 通常表示
   if (!item) {
     return (
       <div className="min-h-[60vh] grid place-items-center bg-black text-white">
@@ -193,13 +222,11 @@ export default function ResultClient() {
   return (
     <div className="min-h-[70vh] bg-black text-white px-5 sm:px-6 py-10 grid place-items-center">
       <div className="w-full max-w-2xl space-y-6">
-        {/* 日付＆テーマ表示 */}
         <div className="flex items-center justify-between text-xs opacity-70">
           <span>{item.created_at && new Date(item.created_at).toLocaleString("ja-JP")}</span>
           <span>テーマ: {item.scope ?? currentScope ?? "—"} / スロット: {item.mode ?? "—"}</span>
         </div>
 
-        {/* コメント */}
         {step >= 1 && (
           <LuneaBubble
             text={`《コメント》\n${item.comment}`}
@@ -209,7 +236,6 @@ export default function ResultClient() {
           />
         )}
 
-        {/* アドバイス */}
         {step >= 2 && hasAdvice && (
           <div className="translate-y-1 opacity-95">
             <LuneaBubble
@@ -220,14 +246,12 @@ export default function ResultClient() {
           </div>
         )}
 
-        {/* アファメーション（affirmation/quoteもここに正規化済み） */}
         {step >= 3 && hasAffirm && (
           <div className="translate-y-1 opacity-90">
             <LuneaBubble text={`《アファメーション》\n${item.affirm}`} speed={80} />
           </div>
         )}
 
-        {/* 操作 */}
         <div className="pt-4 flex flex-wrap gap-3">
           {step < 3 && (
             <button

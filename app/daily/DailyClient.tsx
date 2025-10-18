@@ -1,4 +1,3 @@
-// app/daily/DailyClient.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
@@ -6,13 +5,36 @@ import type { DailyQuestionResponse, DailyAnswerResponse, Slot, Theme } from "@/
 
 type Phase = "ask" | "result" | "error";
 
+const FALLBACK: Record<Slot, { id: string; label: string }[]> = {
+  morning: [
+    { id: "E", label: "直感で素早く動く" },
+    { id: "V", label: "理想のイメージから始める" },
+    { id: "Λ", label: "条件を決めて選ぶ" },
+    { id: "Ǝ", label: "一拍置いて様子を見る" },
+  ],
+  noon: [
+    { id: "E", label: "勢いで一歩進める" },
+    { id: "V", label: "可能性を広げる選択をする" },
+    { id: "Λ", label: "目的に沿って最短を選ぶ" },
+  ],
+  night: [
+    { id: "Ǝ", label: "今日は観測と整理に徹する" },
+    { id: "V", label: "明日に向けて静かに構想する" },
+  ],
+};
+
+function needCount(slot: Slot | null) {
+  if (slot === "morning") return 4;
+  if (slot === "noon") return 3;
+  return 2; // night or null
+}
+
 export default function DailyClient() {
   const [phase, setPhase] = useState<Phase>("ask");
   const [loading, setLoading] = useState(false);
-
   const [slot, setSlot] = useState<Slot | null>(null);
 
-  // ★ MyPage と同じテーマを“ソース・オブ・トゥルース”にする
+  // MyPage と同期するテーマ（/api/theme から取得）
   const [theme, setTheme] = useState<Theme>("LOVE");
 
   const [seed, setSeed] = useState<number>(0);
@@ -21,12 +43,11 @@ export default function DailyClient() {
   const [result, setResult] = useState<DailyAnswerResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  // ---- 初期ロード：① /api/theme → ② /api/daily/question の順で必ず取得
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        // ① テーマを MyPage と同じに固定
+        // 1) テーマを固定（MyPage と一致）
         try {
           const rt = await fetch(`/api/theme`, { cache: "no-store" });
           const jt = await rt.json();
@@ -36,15 +57,36 @@ export default function DailyClient() {
           setTheme("LOVE");
         }
 
-        // ② 質問取得（レスポンスの theme は採用しない）
+        // 2) 質問を取得
         const rq = await fetch(`/api/daily/question`, { cache: "no-store" });
         const jq = (await rq.json()) as DailyQuestionResponse;
         if (!jq.ok) throw new Error(jq.error || "failed_to_load");
 
-        setSlot(jq.slot);
+        const s = jq.slot ?? "morning";
+        setSlot(s);
+
         setSeed(jq.seed);
-        setQuestion(jq.question);
-        setChoices(jq.choices);
+        setQuestion(jq.question || (s === "morning"
+          ? "今のあなたに必要な最初の一歩はどれ？"
+          : s === "noon"
+          ? "このあと数時間で進めたい進路は？"
+          : "今日はどんな締めくくりが心地いい？"));
+
+        // 3) ★ 強制フォールバック（必ず 2〜4 件にする）
+        const need = needCount(s);
+        let arr = Array.isArray(jq.choices) ? jq.choices.filter(c => c && c.label) : [];
+        if (arr.length < need) {
+          const fb = FALLBACK[s as Slot];
+          // 既にある id を避けて補完
+          const have = new Set(arr.map(c => c.id));
+          for (const c of fb) {
+            if (arr.length >= need) break;
+            if (!have.has(c.id)) arr.push(c);
+          }
+        }
+        if (arr.length === 0) arr = FALLBACK[s as Slot].slice(0, need);
+        setChoices(arr);
+
         setPhase("ask");
       } catch (e: any) {
         setErr(e?.message ?? "failed_to_load");
@@ -59,11 +101,10 @@ export default function DailyClient() {
     if (!seed) return;
     setLoading(true);
     try {
-      // ★ 回答送信時も “固定したテーマ” を常に送る
       const r = await fetch(`/api/daily/answer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seed, choiceId, theme }),
+        body: JSON.stringify({ seed, choiceId, theme }), // ← 固定したテーマを送る
       });
       const json = (await r.json()) as DailyAnswerResponse;
       if (!("ok" in json) || !json.ok) throw new Error((json as any)?.error ?? "failed");
@@ -94,18 +135,22 @@ export default function DailyClient() {
       {phase === "ask" && !loading && (
         <div className="space-y-4">
           <p className="opacity-90">{question}</p>
-          <div className="grid gap-3 mt-4">
-            {choices.map((c) => (
-              <button
-                key={c.id}
-                disabled={loading}
-                className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left"
-                onClick={() => onChoose(c.id)}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
+          {choices.length > 0 ? (
+            <div className="grid gap-3 mt-4">
+              {choices.map((c) => (
+                <button
+                  key={c.id}
+                  disabled={loading}
+                  className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left"
+                  onClick={() => onChoose(c.id)}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="opacity-70">選択肢が取得できませんでした。</p>
+          )}
         </div>
       )}
 
@@ -130,9 +175,11 @@ export default function DailyClient() {
         </div>
       )}
 
+      {/* デバッグ補助 */}
       <div className="mt-8 opacity-70 text-sm">
         <details>
           <summary>上級者トグル（内部ログは保存のみ／UI非表示の方針）</summary>
+          <pre className="mt-2 text-xs opacity-60">{JSON.stringify({ slot, theme, seed, choices }, null, 2)}</pre>
         </details>
         <p className="mt-2">E/V/Λ/Ǝ/NextV は <code>daily_results.evla</code> に保存されています。</p>
       </div>

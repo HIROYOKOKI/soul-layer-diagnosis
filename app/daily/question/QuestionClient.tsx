@@ -1,120 +1,190 @@
-"use client";
+'use client';
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import LuneaBubble from "@/components/LuneaBubble";
+import type { Slot, Theme, DailyQuestionResponse, DailyAnswerResponse } from "@/lib/types";
 
-type EV = "E" | "V" | "Λ" | "Ǝ";
-type Option = { key: EV; label: string };
-type GenResp = {
-  ok: boolean;
-  id: string;
-  slot: "morning" | "noon" | "night";
-  env: "dev" | "prod";
-  text: string;
-  options: Option[];
-  ts: string;
-  theme?: string;
-  error?: string;
+type Phase = "ask" | "result" | "error";
+
+/* ===== ローカル強制フォールバック ===== */
+const FALLBACK: Record<Slot, { id: string; label: string }[]> = {
+  morning: [
+    { id: "E", label: "直感で素早く動く" },
+    { id: "V", label: "理想のイメージから始める" },
+    { id: "Λ", label: "条件を決めて選ぶ" },
+    { id: "Ǝ", label: "一拍置いて様子を見る" },
+  ],
+  noon: [
+    { id: "E", label: "勢いで一歩進める" },
+    { id: "V", label: "可能性を広げる選択をする" },
+    { id: "Λ", label: "目的に沿って最短を選ぶ" },
+  ],
+  night: [
+    { id: "Ǝ", label: "今日は観測と整理に徹する" },
+    { id: "V", label: "明日に向けて静かに構想する" },
+  ],
 };
 
-function detectSlot(): GenResp["slot"] {
-  const h = new Date().getHours();
-  if (h >= 5 && h < 12) return "morning"; // 朝=4択
-  if (h >= 12 && h < 18) return "noon";   // 昼=3択
-  return "night";                          // 夜=2択
+const needCount = (slot: Slot) => (slot === "morning" ? 4 : slot === "noon" ? 3 : 2);
+
+/* JSTでの現在スロット（クライアントで再判定） */
+function getJstSlotClient(date = new Date()): Slot {
+  const h = Number(
+    new Intl.DateTimeFormat("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      hour: "numeric",
+      hour12: false,
+    }).format(date)
+  );
+  if (h >= 5 && h < 12) return "morning";
+  if (h >= 12 && h < 18) return "noon";
+  return "night";
 }
 
-export default function QuestionClient() {
-  const router = useRouter();
-  const [resp, setResp] = useState<GenResp | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [picked, setPicked] = useState<EV | null>(null);
+export default function QuestionClient({ initialTheme }: { initialTheme: Theme }) {
+  const [phase, setPhase] = useState<Phase>("ask");
+  const [loading, setLoading] = useState(false);
 
-  // 初回に設問を生成
+  // ヘッダ表示とフォールバックに使う“信頼できる”スロット
+  const [slot, setSlot] = useState<Slot>(getJstSlotClient());
+
+  // MyPageから渡されたテーマで固定（APIのthemeは無視）
+  const [theme, setTheme] = useState<Theme>(initialTheme);
+
+  const [seed, setSeed] = useState<number>(0);
+  const [question, setQuestion] = useState("");
+  const [choices, setChoices] = useState<{ id: string; label: string }[]>([]);
+  const [result, setResult] = useState<DailyAnswerResponse | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
-      setErr(null);
       try {
-        const slot = detectSlot();
-        const env: "dev" | "prod" = "prod";
-        const theme = "self";
-        const r = await fetch("/api/daily/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slot, theme, env }),
-        });
-        const j = (await r.json()) as GenResp;
-        if (!j.ok) throw new Error(j.error || "generate_failed");
-        setResp(j);
-        // confirm/result 用に保存
-        sessionStorage.setItem("daily:pending", JSON.stringify(j));
+        // /api/daily/question を叩く（レスポンスの slot / theme は採用しない）
+        const rq = await fetch(`/api/daily/question`, { cache: "no-store" });
+        const jq = (await rq.json()) as DailyQuestionResponse;
+        if (!jq.ok) throw new Error(jq.error || "failed_to_load");
+
+        // スロットはクライアントで再計算したものを使う
+        const s = getJstSlotClient();
+        setSlot(s);
+
+        setSeed(jq.seed || 0);
+        setQuestion(
+          jq.question ||
+            (s === "morning"
+              ? "今のあなたに必要な最初の一歩はどれ？"
+              : s === "noon"
+              ? "このあと数時間で進めたい進路は？"
+              : "今日はどんな締めくくりが心地いい？")
+        );
+
+        // 強制フォールバック：必ず 2〜4 件にする
+        const need = needCount(s);
+        let arr =
+          Array.isArray(jq.choices) && jq.choices.length
+            ? jq.choices.filter((c) => c && c.label)
+            : [];
+
+        if (arr.length < need) {
+          const have = new Set(arr.map((c) => c.id));
+          for (const c of FALLBACK[s]) {
+            if (arr.length >= need) break;
+            if (!have.has(c.id)) arr.push(c);
+          }
+        }
+        if (arr.length === 0) arr = FALLBACK[s].slice(0, need);
+        setChoices(arr);
+
+        setPhase("ask");
       } catch (e: any) {
-        setErr(e?.message || "generate_failed");
+        setErr(e?.message ?? "failed_to_load");
+        setPhase("error");
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [initialTheme]);
 
-  const whenHint = useMemo(() => {
-    if (!resp) return "";
-    return resp.slot === "morning" ? "（朝 / 4択）"
-         : resp.slot === "noon" ? "（昼 / 3択）"
-         : "（夜 / 2択）";
-  }, [resp?.slot]);
+  async function onChoose(choiceId: string) {
+    if (!seed) return;
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/daily/answer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // 固定したテーマを送る（MyPageと一致）
+        body: JSON.stringify({ seed, choiceId, theme }),
+      });
+      const json = (await r.json()) as DailyAnswerResponse;
+      if (!("ok" in json) || !json.ok) throw new Error((json as any)?.error ?? "failed");
+      setResult(json);
+      setPhase("result");
+    } catch (e: any) {
+      setErr(e?.message ?? "failed_to_answer");
+      setPhase("error");
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  const onSubmit = () => {
-    if (!resp || !picked) return;
-    // 確認ページで初期選択させるための一時保存
-    sessionStorage.setItem("daily:pre_choice", picked);
-    router.push("/daily/confirm");
-  };
+  const header = useMemo(() => {
+    const slotJp = slot === "morning" ? "朝" : slot === "noon" ? "昼" : "夜";
+    const themeJp =
+      theme === "WORK" ? "仕事" : theme === "LOVE" ? "愛" : theme === "FUTURE" ? "未来" : "生活";
+    return `デイリー診断（${slotJp} × ${themeJp}）`;
+  }, [slot, theme]);
 
   return (
-    <div className="space-y-6">
-      {/* 状態 */}
-      {err && <div className="text-red-600 text-sm">エラー：{err}</div>}
-      {loading && <div className="rounded-xl border p-4">設問を用意中…</div>}
+    <>
+      <h2 className="text-base font-semibold mb-4 text-white">{header}</h2>
 
-      {/* 設問 */}
-      {resp && (
-        <>
-          <LuneaBubble key={resp.id} text={`${resp.text} ${whenHint}`} speed={16} />
+      {loading && <p className="opacity-80">読み込み中…</p>}
+      {phase === "error" && <p className="text-red-400">エラー：{err}</p>}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            {resp.options?.map((o) => {
-              const active = picked === o.key;
-              return (
+      {phase === "ask" && !loading && (
+        <div className="space-y-4">
+          <p className="opacity-90">{question}</p>
+
+          {choices.length > 0 ? (
+            <div className="grid gap-3 mt-4">
+              {choices.map((c) => (
                 <button
-                  key={o.key}
-                  type="button"
-                  onClick={() => setPicked(o.key)}
-                  className={`w-full rounded-2xl px-5 py-4 border transition
-                    ${active ? "border-indigo-500 ring-2 ring-indigo-200"
-                             : "border-white/10 hover:bg-white/5"}`}
+                  key={c.id}
+                  disabled={loading}
+                  className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left"
+                  onClick={() => onChoose(c.id)}
                 >
-                  <span className="font-mono mr-2">{o.key}</span>
-                  <span>{o.label}</span>
+                  {c.label}
                 </button>
-              );
-            })}
-          </div>
-
-          <div>
-            <button
-              type="button"
-              onClick={onSubmit}
-              disabled={!picked}
-              className="mt-2 rounded-xl px-5 py-2.5 border shadow-sm disabled:opacity-50"
-            >
-              回答を送信（確認へ）
-            </button>
-          </div>
-        </>
+              ))}
+            </div>
+          ) : (
+            <p className="opacity-70">選択肢が取得できませんでした。</p>
+          )}
+        </div>
       )}
-    </div>
+
+      {phase === "result" && result && "ok" in result && result.ok && (
+        <div className="mt-6 space-y-4">
+          <div className="rounded-2xl p-4 border border-white/10 bg-white/5">
+            <div className="text-sm uppercase tracking-wider opacity-60 mb-2">コメント</div>
+            <p>{(result as any).comment}</p>
+          </div>
+          <div className="rounded-2xl p-4 border border-white/10 bg-white/5">
+            <div className="text-sm uppercase tracking-wider opacity-60 mb-2">アドバイス</div>
+            <p>{(result as any).advice}</p>
+          </div>
+          <div className="rounded-2xl p-4 border border-white/10 bg-white/5">
+            <div className="text-sm uppercase tracking-wider opacity-60 mb-2">アファメーション</div>
+            <p className="font-medium">{(result as any).affirm}</p>
+          </div>
+          <div className="rounded-2xl p-4 border border-white/10 bg-white/5 flex items-center justify-between">
+            <span className="text-sm uppercase tracking-wider opacity-60">スコア</span>
+            <span className="text-xl font-semibold">{(result as any).score}</span>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

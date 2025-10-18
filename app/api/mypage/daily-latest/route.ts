@@ -19,7 +19,7 @@ export async function GET() {
       error: userErr,
     } = await sb.auth.getUser();
 
-    // 未ログインは空返し（UI側で「まだ診断がありません」表示）
+    // 未ログイン → 空返し
     if (userErr || !user) {
       return NextResponse.json(
         { ok: true, item: null, unauthenticated: true },
@@ -27,23 +27,20 @@ export async function GET() {
       );
     }
 
-    // 最新1件を取得（affirmation という列名でも拾えるよう alias を併用）
+    // ★ 実在するカラムだけを明示
     const { data, error } = await sb
       .from("daily_results")
       .select(
         [
           "question_id",
           "slot",
-          "mode",
           "scope",
+          "theme",
           "code",
           "comment",
-          "advice",           // 現行
-          "guidance",         // 旧キー吸収用（存在しなくてもOK）
-          "tip",              // 旧キー吸収用
-          "affirm",           // 現行
-          "affirmation",      // 旧キー
-          "quote",            // 名言として保持している場合
+          "advice",
+          "affirm",
+          "quote",
           "score",
           "env",
           "created_at",
@@ -61,42 +58,39 @@ export async function GET() {
       );
     }
 
-    // ---- 正規化（欠落キーの吸収）----
-    const adviceNormalized =
-      (data as any)?.advice ??
-      (data as any)?.guidance ??
-      (data as any)?.tip ??
-      null;
+    // レコードなし
+    if (!data) {
+      return NextResponse.json(
+        { ok: true, item: null },
+        { status: 200, headers: { "cache-control": "no-store" } }
+      );
+    }
 
-    const affirmNormalized =
-      (data as any)?.affirm ??
-      (data as any)?.affirmation ??
-      (data as any)?.quote ??
-      null;
+    // ---- 正規化（安全に存在チェック）----
+    const any = data as Record<string, any>;
+    // advice はそのまま（旧スキーマでも guidance/tip があっても、このselectには無い＝undefined）
+    const adviceNormalized = any.advice ?? null;
+    // affirm は affirmation/quote を吸収（selectに無くても undefined → ?? で無害）
+    const affirmNormalized = any.affirm ?? any.affirmation ?? any.quote ?? null;
 
-    const item = data
-      ? {
-          question_id: (data as any)?.question_id ?? null,
-          slot: (data as any)?.slot ?? null,
-          mode: (data as any)?.mode ?? (data as any)?.slot ?? null,
-          // 互換のため theme と scope の両方を持たせる（UIはどちらかを参照）
-          theme: (data as any)?.scope ?? null,
-          scope: (data as any)?.scope ?? null,
-          code: (data as any)?.code ?? null,
-          comment: (data as any)?.comment ?? null,
-          advice: adviceNormalized,              // ← 正規化済み
-          affirm: affirmNormalized,              // ← 正規化済み
-          affirmation: affirmNormalized,         // ← 互換プロパティ
-          quote: (data as any)?.quote ?? null,
-          score: (data as any)?.score ?? null,
-          env: (data as any)?.env ?? null,
-          created_at: (data as any)?.created_at ?? null,
-          is_today_jst:
-            (data as any)?.created_at
-              ? toJstDateString((data as any).created_at) === toJstDateString(new Date())
-              : false,
-        }
-      : null;
+    const item = {
+      question_id: any.question_id ?? null,
+      slot: any.slot ?? null,
+      mode: any.slot ?? null,                 // ← UI互換
+      scope: any.scope ?? null,
+      theme: any.theme ?? any.scope ?? null,  // ← 互換（themeが無ければscope）
+      code: any.code ?? null,
+      comment: any.comment ?? null,
+      advice: adviceNormalized,
+      affirm: affirmNormalized,
+      quote: any.quote ?? null,
+      score: any.score ?? null,
+      env: any.env ?? null,
+      created_at: any.created_at ?? null,
+      is_today_jst: any.created_at
+        ? toJstDateString(any.created_at) === toJstDateString(new Date())
+        : false,
+    };
 
     return NextResponse.json(
       { ok: true, item },

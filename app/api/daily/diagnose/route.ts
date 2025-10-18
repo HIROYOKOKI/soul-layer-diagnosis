@@ -1,22 +1,22 @@
 // app/api/daily/diagnose/route.ts
 import { NextResponse } from "next/server";
 import { cookies as headerCookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"; // ★ 追加
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { getOpenAI } from "@/lib/openai";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// ...（型・ユーティリティ・フォールバック・genWithAI はそのまま）
+/* ===== ここまでの型/ユーティリティ/FB/genWithAI は既存のまま ===== */
 
 export async function POST(req: Request) {
   try {
     const raw = (await req.json()) as Partial<Body>;
     const isLegacy = typeof raw?.seed !== "undefined" || typeof raw?.choiceId !== "undefined";
 
-    // 入力正規化（既存のまま）
-    let id: string;
+    // 入力正規化
+    let id: string; // ← question_id として使う
     let slot: Slot;
     let choice: EV;
     let scope: Scope;
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     const themeTag = (raw?.theme ?? "prod") as "dev" | "prod";
     const client_ts = raw?.ts ?? null;
 
-    // === AI生成 ===
+    // === 生成 ===
     let comment: string | null = null;
     let advice: string | null = null;
     let affirm: string | null = null;
@@ -69,57 +69,53 @@ export async function POST(req: Request) {
       const sb = getSupabaseAdmin();
       if (!sb) throw new Error("supabase_env_missing");
 
-      // ★ ログイン中ユーザーIDを取得
-      const auth = createRouteHandlerClient({ cookies: headerCookies });
-      const { data: { user } } = await auth.auth.getUser();
-      const user_id = user?.id ?? null;
+      // ログインユーザーID取得（未ログインは null で匿名保存）
+      let user_id: string | null = null;
+      try {
+        const auth = createRouteHandlerClient({ cookies: headerCookies });
+        const { data } = await auth.auth.getUser();
+        user_id = data?.user?.id ?? null;
+      } catch { /* noop */ }
 
-      // ★ UPSERTで重複回避（ユニークキー: user_id, question_id, env）
+      // ★ PK衝突回避：idは送らない（DBに任せる）
+      const payload = {
+        question_id: id,
+        user_id,
+        slot,
+        scope,
+        code: choice,
+        comment,
+        advice,
+        affirm,
+        score: 0.3,
+        created_at,
+        env,
+        theme: themeTag,
+        client_ts,
+      };
+
+      // ★ ユニークキーでUPSERT（duplicate回避）
       await sb
         .from("daily_results")
-        .upsert(
-          {
-            id,                   // 使っているなら保持
-            question_id: id,      // 取得系と揃える
-            user_id,              // ★ 追加
-            slot,
-            scope,
-            code: choice,
-            comment,
-            advice,
-            affirm,
-            score: 0.3,
-            created_at,
-            env,
-            theme: themeTag,
-            client_ts,
-          },
-          { onConflict: "user_id,question_id,env" }
-        );
+        .upsert(payload, { onConflict: "user_id,question_id,env" });
     } catch (e: any) {
+      console.error("保存エラー:", e);
       save_error = e?.message ?? "save_failed";
     }
 
     // === レスポンス ===
-    const item = {
-      question_id: id,
-      slot,
-      scope,
-      code: choice,
-      comment,
-      advice,
-      affirm,
-      score: 0.3,
-      created_at,
-      env,
-    };
+    const item = { question_id: id, slot, scope, code: choice, comment, advice, affirm, score: 0.3, created_at, env };
 
     return NextResponse.json(
       { ok: true, item, comment, advice, affirm, score: 0.3, save_error },
-      { status: 200 }
+      { status: 200, headers: { "cache-control": "no-store" } }
     );
+
   } catch (e: any) {
     console.error("診断API失敗:", e);
-    return NextResponse.json({ ok: false, error: e?.message ?? "internal_error" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: e?.message ?? "internal_error" },
+      { status: 500, headers: { "cache-control": "no-store" } }
+    );
   }
 }

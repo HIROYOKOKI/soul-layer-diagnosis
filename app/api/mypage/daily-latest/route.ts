@@ -16,16 +16,13 @@ function toJstDateString(d: string | Date) {
 export async function GET() {
   try {
     const sb = createRouteHandlerClient({ cookies });
-    const {
-      data: { user },
-      error: userErr,
-    } = await sb.auth.getUser();
+    const { data: { user }, error: userErr } = await sb.auth.getUser();
 
     // 未ログインは空返し（UI側で「まだ診断がありません」表示）
     if (userErr || !user) {
       return NextResponse.json(
         { ok: true, item: null, unauthenticated: true },
-        { status: 200 }
+        { status: 200, headers: { "cache-control": "no-store" } }
       );
     }
 
@@ -33,7 +30,7 @@ export async function GET() {
     const { data, error } = await sb
       .from("daily_results")
       .select(
-        // 必要に応じて列名を合わせてください（例：affirmation列なら affirm:affirmation に）
+        // ※ DBの列が "affirmation" の場合は「affirm:affirmation」に書き換えてください
         "slot, scope, code, comment, advice, affirm, quote, score, created_at"
       )
       .eq("user_id", user.id)
@@ -44,33 +41,45 @@ export async function GET() {
     if (error) {
       return NextResponse.json(
         { ok: false, error: error.message },
-        { status: 500 }
+        { status: 500, headers: { "cache-control": "no-store" } }
       );
     }
 
+    const affirmNormalized =
+      (data as any)?.affirm ??
+      (data as any)?.affirmation ??   // 列名が affirmation のプロジェクト向け
+      (data as any)?.quote ??         // 名言をアファメとして使っていた旧実装向け
+      null;
+
     const item = data
       ? {
-          slot: data.slot,
-          theme: data.scope,               // scope → theme に統一
-          code: data.code,
-          comment: data.comment,
-          advice: data.advice,
-          quote: data.quote ?? null,
-          affirm: data.affirm ?? null,     // DBが affirmation なら: data.affirmation
-          affirmation: data.affirm ?? null, // 互換プロパティを併記
+          slot: data.slot ?? null,
+          // 互換のため theme と scope の両方を持たせる（UIはどちらかを参照）
+          theme: data.scope ?? null,
+          scope: data.scope ?? null,
+          code: data.code ?? null,
+          comment: data.comment ?? null,
+          advice: data.advice ?? null,
+          quote: (data as any)?.quote ?? null,
+          affirm: affirmNormalized,                 // ← 正規化済み
+          affirmation: affirmNormalized,            // ← 互換プロパティ
           score: data.score ?? null,
-          created_at: data.created_at,
+          created_at: data.created_at ?? null,
           is_today_jst:
-            toJstDateString(data.created_at) ===
-            toJstDateString(new Date()),
+            data?.created_at
+              ? toJstDateString(data.created_at) === toJstDateString(new Date())
+              : false,
         }
       : null;
 
-    return NextResponse.json({ ok: true, item }, { status: 200 });
+    return NextResponse.json(
+      { ok: true, item },
+      { status: 200, headers: { "cache-control": "no-store" } }
+    );
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e?.message ?? "internal_error" },
-      { status: 500 }
+      { status: 500, headers: { "cache-control": "no-store" } }
     );
   }
 }

@@ -14,7 +14,7 @@ type QApi = {
   ok: boolean;
   slot?: Slot;
   scope?: Scope;
-  theme?: Scope;                // ← 互換
+  theme?: Scope;                // 互換
   question_id?: string;
   question?: string;
   choices?: Array<{ key?: EV; id?: EV; label?: string }>;
@@ -148,14 +148,16 @@ export default function DailyQuestionPage() {
     setMsg("診断中…");
     setErr(null);
 
-    // MyPageと同じテーマ（q.scope）で固定して送る
+    // ★ 送信は seed / choiceId / scope|theme を確実に送る
     const body = {
       id: q.question_id,
+      seed: q.seed,                 // あるなら送る
       slot: q.slot,
-      choice,
-      scope: q.scope,       // ← 統一テーマ
-      env: "dev",
-      theme: "dev",
+      choice,                       // 旧API互換
+      choiceId: choice,             // 新API互換
+      scope: q.scope,               // 旧フィールド名
+      theme: q.scope,               // 新フィールド名（同じ値）
+      env: "prod",
     };
 
     try {
@@ -165,16 +167,25 @@ export default function DailyQuestionPage() {
         body: JSON.stringify(body),
       });
       if (!r1.ok) throw new Error(`/api/daily/diagnose failed (${r1.status})`);
-      const j1 = await r1.json();
-      const result = (j1 as any)?.item;
-      if (!result) throw new Error("diagnose_result_missing");
 
-      await fetch("/api/daily/save", {
+      const payload = await r1.json();
+
+      // ★ 受け取りは item / result / data / 直下 の順に拾う
+      const received =
+        payload?.item ?? payload?.result ?? payload?.data ?? payload;
+
+      if (!received || typeof received.comment !== "string") {
+        throw new Error("diagnose_result_missing");
+      }
+
+      // 保存はそのまま（失敗は致命でないので握る）
+      fetch("/api/daily/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...body, result }),
-      }).catch(() => { /* 非致命 */ });
+        body: JSON.stringify({ ...body, result: received }),
+      }).catch(() => {});
 
+      // 結果ページへ
       location.href = "/daily/result";
     } catch (e: any) {
       setErr(e?.message || "diagnose_failed");

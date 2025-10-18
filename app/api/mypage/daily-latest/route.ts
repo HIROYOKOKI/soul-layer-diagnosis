@@ -8,15 +8,16 @@ export const dynamic = "force-dynamic";
 
 function toJstDateString(d: string | Date) {
   const dt = new Date(d);
-  return new Date(
-    dt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })
-  ).toDateString();
+  return new Date(dt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })).toDateString();
 }
 
 export async function GET() {
   try {
     const sb = createRouteHandlerClient({ cookies });
-    const { data: { user }, error: userErr } = await sb.auth.getUser();
+    const {
+      data: { user },
+      error: userErr,
+    } = await sb.auth.getUser();
 
     // 未ログインは空返し（UI側で「まだ診断がありません」表示）
     if (userErr || !user) {
@@ -26,12 +27,27 @@ export async function GET() {
       );
     }
 
-    // 最新1件
+    // 最新1件を取得（affirmation という列名でも拾えるよう alias を併用）
     const { data, error } = await sb
       .from("daily_results")
       .select(
-        // ※ DBの列が "affirmation" の場合は「affirm:affirmation」に書き換えてください
-        "slot, scope, code, comment, advice, affirm, quote, score, created_at"
+        [
+          "question_id",
+          "slot",
+          "mode",
+          "scope",
+          "code",
+          "comment",
+          "advice",           // 現行
+          "guidance",         // 旧キー吸収用（存在しなくてもOK）
+          "tip",              // 旧キー吸収用
+          "affirm",           // 現行
+          "affirmation",      // 旧キー
+          "quote",            // 名言として保持している場合
+          "score",
+          "env",
+          "created_at",
+        ].join(",")
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -45,29 +61,39 @@ export async function GET() {
       );
     }
 
+    // ---- 正規化（欠落キーの吸収）----
+    const adviceNormalized =
+      (data as any)?.advice ??
+      (data as any)?.guidance ??
+      (data as any)?.tip ??
+      null;
+
     const affirmNormalized =
       (data as any)?.affirm ??
-      (data as any)?.affirmation ??   // 列名が affirmation のプロジェクト向け
-      (data as any)?.quote ??         // 名言をアファメとして使っていた旧実装向け
+      (data as any)?.affirmation ??
+      (data as any)?.quote ??
       null;
 
     const item = data
       ? {
-          slot: data.slot ?? null,
+          question_id: (data as any)?.question_id ?? null,
+          slot: (data as any)?.slot ?? null,
+          mode: (data as any)?.mode ?? (data as any)?.slot ?? null,
           // 互換のため theme と scope の両方を持たせる（UIはどちらかを参照）
-          theme: data.scope ?? null,
-          scope: data.scope ?? null,
-          code: data.code ?? null,
-          comment: data.comment ?? null,
-          advice: data.advice ?? null,
+          theme: (data as any)?.scope ?? null,
+          scope: (data as any)?.scope ?? null,
+          code: (data as any)?.code ?? null,
+          comment: (data as any)?.comment ?? null,
+          advice: adviceNormalized,              // ← 正規化済み
+          affirm: affirmNormalized,              // ← 正規化済み
+          affirmation: affirmNormalized,         // ← 互換プロパティ
           quote: (data as any)?.quote ?? null,
-          affirm: affirmNormalized,                 // ← 正規化済み
-          affirmation: affirmNormalized,            // ← 互換プロパティ
-          score: data.score ?? null,
-          created_at: data.created_at ?? null,
+          score: (data as any)?.score ?? null,
+          env: (data as any)?.env ?? null,
+          created_at: (data as any)?.created_at ?? null,
           is_today_jst:
-            data?.created_at
-              ? toJstDateString(data.created_at) === toJstDateString(new Date())
+            (data as any)?.created_at
+              ? toJstDateString((data as any).created_at) === toJstDateString(new Date())
               : false,
         }
       : null;

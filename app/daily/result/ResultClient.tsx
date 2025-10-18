@@ -1,3 +1,4 @@
+// app/daily/result/ResultClient.tsx など（あなたが貼ってくれたファイルの置き換え先に合わせて保存）
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -12,15 +13,15 @@ type Env = "dev" | "prod";
 
 type Item = {
   question_id?: string;
-  mode?: Slot;                 // = slot
-  scope?: Scope;               // ← テーマ
+  mode?: Slot | null;        // = slot
+  scope?: Scope | null;      // テーマ
   code: EV;
   comment: string;
   advice?: string | null;
-  affirm?: string | null;      // ✅ アファメーション専用を追加
-  quote?: string | null;       // 名言
-  created_at?: string;
-  env?: Env;
+  affirm?: string | null;    // ← 正規化後はここに入れる
+  quote?: string | null;     // 名言（互換）
+  created_at?: string | null;
+  env?: Env | null;
 };
 
 // ===== JSTスロット判定（朝=4-10, 昼=11-16, 夜=その他） =====
@@ -50,18 +51,42 @@ export default function ResultClient() {
     (async () => {
       try {
         setErr(null);
-        const themeRes = await fetch("/api/theme", { cache: "no-store" });
-        const themeJson = await themeRes.json().catch(() => null);
-        const scope: Scope | null = themeJson?.ok ? (themeJson.scope as Scope) : null;
-        setCurrentScope(scope);
 
-        const qs = scope ? `?env=dev&scope=${scope}` : `?env=dev`;
-        const r = await fetch(`/api/mypage/daily-latest${qs}`, { cache: "no-store" });
+        // テーマ取得（MyPageと同期）
+        try {
+          const themeRes = await fetch("/api/theme", { cache: "no-store" });
+          const themeJson = await themeRes.json().catch(() => null);
+          const scopeVal = String(themeJson?.scope ?? themeJson?.theme ?? "").toUpperCase();
+          if (["WORK", "LOVE", "FUTURE", "LIFE"].includes(scopeVal)) {
+            setCurrentScope(scopeVal as Scope);
+          }
+        } catch {
+          /* noop */
+        }
+
+        // 最新デイリーを取得
+        const r = await fetch(`/api/mypage/daily-latest?env=dev`, { cache: "no-store" });
         if (!r.ok) throw new Error(`/api/mypage/daily-latest failed (${r.status})`);
         const j = await r.json();
 
         if (j?.ok && j.item) {
-          setItem(j.item as Item);
+          const raw = j.item as any;
+
+          // ★ 正規化：affirmation/quote を affirm に吸収、slot を mode に吸収
+          const normalized: Item = {
+            question_id: raw?.question_id ?? null,
+            mode: (raw?.mode ?? raw?.slot ?? null) as Slot | null,
+            scope: (raw?.scope ?? null) as Scope | null,
+            code: (raw?.code ?? "E") as EV,
+            comment: String(raw?.comment ?? ""),
+            advice: raw?.advice ?? null,
+            affirm: raw?.affirm ?? raw?.affirmation ?? raw?.quote ?? null,
+            quote: raw?.quote ?? null,
+            created_at: raw?.created_at ?? null,
+            env: (raw?.env ?? "dev") as Env,
+          };
+
+          setItem(normalized);
           setStep(1);
         } else {
           setItem(null);
@@ -73,7 +98,7 @@ export default function ResultClient() {
   }, []);
 
   const hasAdvice = !!(item?.advice && item.advice.trim().length);
-  const hasAffirm = !!(item?.affirm && item.affirm.trim().length); // ✅ affirmをチェック
+  const hasAffirm = !!(item?.affirm && item.affirm.trim().length);
   const nextAfterComment = useMemo(() => (hasAdvice ? 2 : 3), [hasAdvice]);
 
   const handleCommentDone = useCallback(() => {
@@ -110,7 +135,7 @@ export default function ResultClient() {
       const slot: Slot = item.mode || getJstSlot();
       const scope: Scope = (item.scope as Scope) || currentScope || "LIFE";
       const theme = scope.toLowerCase();
-      const env: Env = item.env || "dev";
+      const env: Env = (item.env as Env) || "dev";
 
       const isoDate = new Date().toISOString().slice(0, 10);
       const question_id = item.question_id || `daily-${isoDate}-${slot}-${scope}`;
@@ -126,7 +151,7 @@ export default function ResultClient() {
         score: null as number | null,
         comment: item.comment,
         advice: item.advice ?? null,
-        affirm: item.affirm ?? null,   // ✅ affirmを保存
+        affirm: item.affirm ?? null, // ← 正規化後の値
         quote: item.quote ?? null,
         evla: null as Record<string, number> | null,
       };
@@ -170,12 +195,8 @@ export default function ResultClient() {
       <div className="w-full max-w-2xl space-y-6">
         {/* 日付＆テーマ表示 */}
         <div className="flex items-center justify-between text-xs opacity-70">
-          <span>
-            {item.created_at && new Date(item.created_at).toLocaleString("ja-JP")}
-          </span>
-          <span>
-            テーマ: {item.scope ?? currentScope ?? "—"} / スロット: {item.mode ?? "—"}
-          </span>
+          <span>{item.created_at && new Date(item.created_at).toLocaleString("ja-JP")}</span>
+          <span>テーマ: {item.scope ?? currentScope ?? "—"} / スロット: {item.mode ?? "—"}</span>
         </div>
 
         {/* コメント */}
@@ -199,7 +220,7 @@ export default function ResultClient() {
           </div>
         )}
 
-        {/* アファメーション */}
+        {/* アファメーション（affirmation/quoteもここに正規化済み） */}
         {step >= 3 && hasAffirm && (
           <div className="translate-y-1 opacity-90">
             <LuneaBubble text={`《アファメーション》\n${item.affirm}`} speed={80} />

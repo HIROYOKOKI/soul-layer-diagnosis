@@ -9,6 +9,7 @@ type Slot = "morning" | "noon" | "night";
 type Theme = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 type EV = "E" | "V" | "Λ" | "Ǝ";
 
+/* ===== フォールバック ===== */
 const FALLBACK: Record<Slot, { key: EV; label: string }[]> = {
   morning: [
     { key: "E", label: "直感で素早く動く" },
@@ -27,46 +28,56 @@ const FALLBACK: Record<Slot, { key: EV; label: string }[]> = {
   ],
 };
 
-function getOriginFrom(reqUrl: string) {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? new URL(reqUrl).origin;
-}
+const NEED = (slot: Slot) => (slot === "morning" ? 4 : slot === "noon" ? 3 : 2);
+
+const ORIGIN = (reqUrl: string) =>
+  process.env.NEXT_PUBLIC_SITE_URL ?? new URL(reqUrl).origin;
+
+/* ===== JSTスロット（Asia/Tokyoを厳密指定） ===== */
 function getJstSlot(now = new Date()): Slot {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const h = jst.getUTCHours();
+  const hourFmt = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    hour: "numeric",
+    hour12: false,
+  });
+  const h = Number(hourFmt.format(now)); // 0..23（JST）
   if (h >= 5 && h < 12) return "morning";
   if (h >= 12 && h < 18) return "noon";
   return "night";
 }
-function hashUUIDtoInt(uuid: string): number {
+
+function seedFromUUID(uuid: string): number {
   const head = uuid.replace(/-/g, "").slice(0, 8);
   return Number.parseInt(head, 16) >>> 0;
 }
 
 export async function GET(req: Request) {
+  const origin = ORIGIN(req.url);
   const jar = cookies();
-  const origin = getOriginFrom(req.url);
-  const slot = getJstSlot();
-  const needed = slot === "morning" ? 4 : slot === "noon" ? 3 : 2;
 
   // 1) テーマ（MyPageと同期）
   let theme: Theme = "LOVE";
   try {
-    const rt = await fetch(`${origin}/api/theme`, {
+    const r = await fetch(`${origin}/api/theme`, {
       cache: "no-store",
       headers: { cookie: (req.headers.get("cookie") ?? "") as string },
     });
-    if (rt.ok) {
-      const jt = await rt.json();
-      const t = String(jt?.scope ?? jt?.theme ?? "LOVE").toUpperCase();
-      if (["WORK", "LOVE", "FUTURE", "LIFE"].includes(t)) theme = t as Theme;
-    }
-  } catch { /* noop */ }
+    const j = await r.json().catch(() => ({}));
+    const t = String(j?.scope ?? j?.theme ?? "LOVE").toUpperCase();
+    if (["WORK", "LOVE", "FUTURE", "LIFE"].includes(t)) theme = t as Theme;
+  } catch {
+    /* noop */
+  }
 
-  // 2) generate に委譲
-  let genText = "";
-  let genOptions: { key?: string; label?: string }[] = [];
+  // 2) JSTスロット
+  const slot = getJstSlot();
+  const need = NEED(slot);
+
+  // 3) /api/daily/generate に委譲（Cookie引き継ぎ）
+  let text = "";
+  let options: { key?: string; label?: string }[] = [];
   try {
-    const rg = await fetch(`${origin}/api/daily/generate`, {
+    const r = await fetch(`${origin}/api/daily/generate`, {
       method: "POST",
       cache: "no-store",
       headers: {
@@ -75,51 +86,48 @@ export async function GET(req: Request) {
       },
       body: JSON.stringify({ slot, theme }),
     });
-    const jg = await rg.json();
-    if (rg.ok && jg?.ok) {
-      genText = String(jg.text ?? "");
-      genOptions = Array.isArray(jg.options) ? jg.options : [];
-      // API側で補正された theme が来たら揃えておく
-      if (jg.theme) {
-        const t = String(jg.theme).toUpperCase();
-        if (["WORK", "LOVE", "FUTURE", "LIFE"].includes(t)) theme = t as Theme;
-      }
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j?.ok) {
+      text = String(j.text ?? "");
+      options = Array.isArray(j.options) ? j.options : [];
+      const patched = String(j.theme ?? "").toUpperCase();
+      if (["WORK", "LOVE", "FUTURE", "LIFE"].includes(patched))
+        theme = patched as Theme;
     }
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
 
-  // 3) 強制フォールバック（必ず needed 件を満たす）
+  // 4) 強制フォールバック：必ず 2..4 件にする
   const keys: EV[] = ["E", "V", "Λ", "Ǝ"];
-  let choices = (genOptions || [])
-    .slice(0, needed)
+  let choices = (options || [])
+    .slice(0, need)
     .map((o, i) => {
       const k = keys.includes(o?.key as EV) ? (o!.key as EV) : (keys[i] as EV);
       const label = (o?.label ?? "").toString().trim();
       return { key: k, label };
     })
-    .filter((c) => c.label); // ラベル空は除外
+    .filter((c) => c.label);
 
-  // 足りない分は必ず埋める（重複キーがあってもラベル優先で上書き）
+  // 足りない分は FALLBACK で補完
   const have = new Set(choices.map((c) => c.key));
   for (const c of FALLBACK[slot]) {
-    if (choices.length >= needed) break;
+    if (choices.length >= need) break;
     if (!have.has(c.key)) {
       choices.push(c);
       have.add(c.key);
     }
   }
-  // それでもゼロなら丸ごと差し替え（最悪ケースの保険）
-  if (choices.length === 0) {
-    choices = FALLBACK[slot].slice(0, needed);
-  } else if (choices.length > needed) {
-    choices = choices.slice(0, needed);
-  }
+  // それでも空なら丸ごと差し替え
+  if (choices.length === 0) choices = FALLBACK[slot].slice(0, need);
+  if (choices.length > need) choices = choices.slice(0, need);
 
-  // 4) 旧レスポンス形に変換
+  // 5) 旧レスポンス形へ
   const questionId = crypto.randomUUID();
-  const seed = hashUUIDtoInt(questionId);
+  const seed = seedFromUUID(questionId);
   const createdAt = new Date().toISOString();
   const question =
-    genText?.trim() ||
+    text?.trim() ||
     (slot === "morning"
       ? "今のあなたに必要な最初の一歩はどれ？"
       : slot === "noon"
@@ -139,7 +147,7 @@ export async function GET(req: Request) {
       slot,
       theme,
       question: question.slice(0, 100),
-      choices: choices.map((c) => ({ id: c.key, label: c.label })), // ← 必ず 2〜4 件
+      choices: choices.map((c) => ({ id: c.key, label: c.label })), // 必ず 2..4 件
       created_at: createdAt,
       env: "prod",
       _proxied: true,
@@ -148,9 +156,8 @@ export async function GET(req: Request) {
   );
 }
 
-// POST も透過プロキシしておく（旧実装互換）
 export async function POST(req: Request) {
-  const origin = getOriginFrom(req.url);
+  const origin = ORIGIN(req.url);
   const bodyText = await req.text();
   const r = await fetch(`${origin}/api/daily/generate`, {
     method: "POST",

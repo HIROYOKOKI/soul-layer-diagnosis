@@ -10,9 +10,9 @@ type Phase = 'ask' | 'result' | 'error';
 
 type DailyQuestionResponse = {
   ok: boolean; error?: string;
-  slot: Slot; theme: Theme; seed: number;
-  question: string;
-  choices: { id: string; label: string }[];
+  slot?: Slot; theme?: Theme; seed?: number;
+  question?: string;
+  choices?: Array<{ id?: string; key?: string; label?: string }>;
 };
 
 type DailyAnswerResponse = {
@@ -22,14 +22,49 @@ type DailyAnswerResponse = {
   save_error?: string | null;
 };
 
+/* ===== クライアント側フォールバック ===== */
+const FALLBACK: Record<Slot, { id: 'E'|'V'|'Λ'|'Ǝ'; label: string }[]> = {
+  morning: [
+    { id: 'E', label: '直感で素早く動く' },
+    { id: 'V', label: '理想のイメージから始める' },
+    { id: 'Λ', label: '条件を決めて選ぶ' },
+    { id: 'Ǝ', label: '一拍置いて様子を見る' },
+  ],
+  noon: [
+    { id: 'E', label: '勢いで一歩進める' },
+    { id: 'V', label: '可能性を広げる選択をする' },
+    { id: 'Λ', label: '目的に沿って最短を選ぶ' },
+  ],
+  night: [
+    { id: 'Ǝ', label: '今日は観測と整理に徹する' },
+    { id: 'V', label: '明日に向けて静かに構想する' },
+  ],
+};
+
+const needCount = (s: Slot) => (s === 'morning' ? 4 : s === 'noon' ? 3 : 2);
+
+/* JST 現在スロット（Asia/Tokyo で厳密に） */
+function getJstSlot(): Slot {
+  const h = Number(new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    hour: 'numeric',
+    hour12: false,
+  }).format(new Date()));
+  if (h >= 5 && h < 12) return 'morning';
+  if (h >= 12 && h < 18) return 'noon';
+  return 'night';
+}
+
 export default function DailyPage() {
   const router = useRouter();
 
   const [phase, setPhase] = useState<Phase>('ask');
   const [loading, setLoading] = useState(false);
-  const [slot, setSlot] = useState<Slot | null>(null);
 
-  // ★ テーマ初期値を LOVE に統一（MyPage不取得時もズレない）
+  // 表示・フォールバック判定に使う “信頼できる” スロット（クライアントで再判定）
+  const [slot, setSlot] = useState<Slot>(getJstSlot());
+
+  // ★ テーマ初期値を LOVE に統一（取得失敗でもズレない）
   const [theme, setTheme] = useState<Theme>('LOVE');
 
   const [seed, setSeed] = useState<number | null>(null);
@@ -38,7 +73,7 @@ export default function DailyPage() {
   const [result, setResult] = useState<DailyAnswerResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  // ---- MyPageと同じテーマを取得 ----
+  /* ---- MyPage と同じテーマを取得 ---- */
   const fetchTheme = useCallback(async (): Promise<Theme> => {
     try {
       const r = await fetch('/api/theme', { cache: 'no-store' });
@@ -50,17 +85,18 @@ export default function DailyPage() {
     }
   }, []);
 
-  // ---- 質問のロード（POSTでthemeを渡す。失敗時はGETにフォールバック）----
+  /* ---- 質問のロード（POSTでthemeを渡す。失敗時はGETにフォールバック） ---- */
   const loadQuestion = useCallback(async () => {
     setLoading(true);
     setErr(null);
     setResult(null);
 
     try {
+      // 1) テーマを固定
       const t = await fetchTheme();
       setTheme(t);
 
-      // まずは POST で theme を渡す（サーバ側が対応していればこちらが採用される）
+      // 2) 質問取得（まず POST → ダメなら GET）
       let res: Response | null = null;
       try {
         res = await fetch('/api/daily/question', {
@@ -69,26 +105,51 @@ export default function DailyPage() {
           body: JSON.stringify({ theme: t }),
           cache: 'no-store',
         });
-      } catch {
-        /* noop */
-      }
-
-      // POST が無い／405 の場合は GET を使用
+      } catch { /* noop */ }
       if (!res || !res.ok) {
         res = await fetch('/api/daily/question', { cache: 'no-store' });
       }
 
-      const json = (await res.json()) as DailyQuestionResponse;
+      const json = (await res!.json()) as DailyQuestionResponse;
       if (!json.ok) throw new Error(json.error || 'failed_to_load');
 
-      // サーバが補正した theme が返ってきたらそれを採用（完全同期）
-      const fixedTheme = (json.theme || t) as Theme;
-      setTheme(fixedTheme);
+      // 3) スロットはサーバ値を使わず、クライアントで再判定して上書き
+      const s = getJstSlot();
+      setSlot(s);
 
-      setSlot(json.slot);
-      setSeed(typeof json.seed === 'number' ? json.seed : null);
-      setQuestion(json.question);
-      setChoices(json.choices ?? []);
+      // 4) seed / question
+      setSeed(typeof json.seed === 'number' ? json.seed : 0);
+      setQuestion(
+        (json.question ?? '').trim() ||
+          (s === 'morning'
+            ? '今のあなたに必要な最初の一歩はどれ？'
+            : s === 'noon'
+            ? 'このあと数時間で進めたい進路は？'
+            : '今日はどんな締めくくりが心地いい？')
+      );
+
+      // 5) choices 正規化（id or key → id）＋ 強制フォールバック
+      const need = needCount(s);
+      let arr: { id: string; label: string }[] = Array.isArray(json.choices)
+        ? json.choices
+            .map((c) => ({
+              id: String((c.id ?? c.key) ?? ''),
+              label: typeof c.label === 'string' ? c.label.trim() : '',
+            }))
+            .filter((c) => c.id && c.label)
+        : [];
+
+      if (arr.length < need) {
+        const have = new Set(arr.map((c) => c.id));
+        for (const fb of FALLBACK[s]) {
+          if (arr.length >= need) break;
+          if (!have.has(fb.id)) arr.push(fb);
+        }
+      }
+      if (arr.length === 0) arr = FALLBACK[s].slice(0, need);
+      if (arr.length > need) arr = arr.slice(0, need);
+      setChoices(arr);
+
       setPhase('ask');
     } catch (e: any) {
       setErr(e?.message ?? 'failed_to_load');
@@ -100,7 +161,7 @@ export default function DailyPage() {
 
   useEffect(() => { loadQuestion(); }, [loadQuestion]);
 
-  // ---- 選択→診断（必ず theme を同梱）----
+  /* ---- 選択→診断（必ず theme を同梱） ---- */
   async function onChoose(choiceId: string) {
     if (seed === null) {
       setErr('seed_not_initialized'); setPhase('error'); return;

@@ -5,6 +5,7 @@ import type { DailyQuestionResponse, DailyAnswerResponse, Slot, Theme } from "@/
 
 type Phase = "ask" | "result" | "error";
 
+/* ===== ローカル強制フォールバック ===== */
 const FALLBACK: Record<Slot, { id: string; label: string }[]> = {
   morning: [
     { id: "E", label: "直感で素早く動く" },
@@ -23,18 +24,30 @@ const FALLBACK: Record<Slot, { id: string; label: string }[]> = {
   ],
 };
 
-function needCount(slot: Slot | null) {
-  if (slot === "morning") return 4;
-  if (slot === "noon") return 3;
-  return 2; // night or null
+const needCount = (slot: Slot) => (slot === "morning" ? 4 : slot === "noon" ? 3 : 2);
+
+/* ===== JSTでの現在スロット（クライアントで再計算） ===== */
+function getJstSlotClient(date = new Date()): Slot {
+  const h = Number(
+    new Intl.DateTimeFormat("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      hour: "numeric",
+      hour12: false,
+    }).format(date)
+  );
+  if (h >= 5 && h < 12) return "morning";
+  if (h >= 12 && h < 18) return "noon";
+  return "night";
 }
 
 export default function DailyClient() {
   const [phase, setPhase] = useState<Phase>("ask");
   const [loading, setLoading] = useState(false);
-  const [slot, setSlot] = useState<Slot | null>(null);
 
-  // MyPage と同期するテーマ（/api/theme から取得）
+  // ヘッダ表示とフォールバック判定で使う“信頼できるスロット”
+  const [slot, setSlot] = useState<Slot>(getJstSlotClient());
+
+  // MyPageと同期するテーマ
   const [theme, setTheme] = useState<Theme>("LOVE");
 
   const [seed, setSeed] = useState<number>(0);
@@ -47,44 +60,48 @@ export default function DailyClient() {
     (async () => {
       setLoading(true);
       try {
-        // 1) テーマを固定（MyPage と一致）
+        // ① テーマを固定（/api/theme）
         try {
           const rt = await fetch(`/api/theme`, { cache: "no-store" });
           const jt = await rt.json();
           const t = String(jt?.scope ?? jt?.theme ?? "LOVE").toUpperCase() as Theme;
           setTheme(t);
-        } catch {
-          setTheme("LOVE");
-        }
+        } catch { /* LOVE のまま */ }
 
-        // 2) 質問を取得
+        // ② 質問取得
         const rq = await fetch(`/api/daily/question`, { cache: "no-store" });
         const jq = (await rq.json()) as DailyQuestionResponse;
         if (!jq.ok) throw new Error(jq.error || "failed_to_load");
 
-        const s = jq.slot ?? "morning";
-        setSlot(s);
+        // サーバが返す slot は無視して、クライアントでJST再判定した値を採用
+        const sClient = getJstSlotClient();
+        setSlot(sClient);
 
-        setSeed(jq.seed);
-        setQuestion(jq.question || (s === "morning"
-          ? "今のあなたに必要な最初の一歩はどれ？"
-          : s === "noon"
-          ? "このあと数時間で進めたい進路は？"
-          : "今日はどんな締めくくりが心地いい？"));
+        setSeed(jq.seed || 0);
+        setQuestion(
+          jq.question ||
+            (sClient === "morning"
+              ? "今のあなたに必要な最初の一歩はどれ？"
+              : sClient === "noon"
+              ? "このあと数時間で進めたい進路は？"
+              : "今日はどんな締めくくりが心地いい？")
+        );
 
-        // 3) ★ 強制フォールバック（必ず 2〜4 件にする）
-        const need = needCount(s);
-        let arr = Array.isArray(jq.choices) ? jq.choices.filter(c => c && c.label) : [];
+        // ③ 強制フォールバック：必ず 2〜4 件にする
+        const need = needCount(sClient);
+        let arr =
+          Array.isArray(jq.choices) && jq.choices.length
+            ? jq.choices.filter((c) => c && c.label)
+            : [];
+
         if (arr.length < need) {
-          const fb = FALLBACK[s as Slot];
-          // 既にある id を避けて補完
-          const have = new Set(arr.map(c => c.id));
-          for (const c of fb) {
+          const have = new Set(arr.map((c) => c.id));
+          for (const c of FALLBACK[sClient]) {
             if (arr.length >= need) break;
             if (!have.has(c.id)) arr.push(c);
           }
         }
-        if (arr.length === 0) arr = FALLBACK[s as Slot].slice(0, need);
+        if (arr.length === 0) arr = FALLBACK[sClient].slice(0, need);
         setChoices(arr);
 
         setPhase("ask");
@@ -104,7 +121,8 @@ export default function DailyClient() {
       const r = await fetch(`/api/daily/answer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seed, choiceId, theme }), // ← 固定したテーマを送る
+        // フロントで固定した theme を送る
+        body: JSON.stringify({ seed, choiceId, theme }),
       });
       const json = (await r.json()) as DailyAnswerResponse;
       if (!("ok" in json) || !json.ok) throw new Error((json as any)?.error ?? "failed");
@@ -119,9 +137,9 @@ export default function DailyClient() {
   }
 
   const header = useMemo(() => {
-    if (!slot) return "デイリー診断";
     const slotJp = slot === "morning" ? "朝" : slot === "noon" ? "昼" : "夜";
-    const themeJp = theme === "WORK" ? "仕事" : theme === "LOVE" ? "愛" : theme === "FUTURE" ? "未来" : "生活";
+    const themeJp =
+      theme === "WORK" ? "仕事" : theme === "LOVE" ? "愛" : theme === "FUTURE" ? "未来" : "生活";
     return `デイリー診断（${slotJp} × ${themeJp}）`;
   }, [slot, theme]);
 
@@ -135,6 +153,7 @@ export default function DailyClient() {
       {phase === "ask" && !loading && (
         <div className="space-y-4">
           <p className="opacity-90">{question}</p>
+
           {choices.length > 0 ? (
             <div className="grid gap-3 mt-4">
               {choices.map((c) => (
@@ -175,13 +194,12 @@ export default function DailyClient() {
         </div>
       )}
 
-      {/* デバッグ補助 */}
+      {/* デバッグ補助（必要なら残す） */}
       <div className="mt-8 opacity-70 text-sm">
         <details>
-          <summary>上級者トグル（内部ログは保存のみ／UI非表示の方針）</summary>
+          <summary>デバッグ</summary>
           <pre className="mt-2 text-xs opacity-60">{JSON.stringify({ slot, theme, seed, choices }, null, 2)}</pre>
         </details>
-        <p className="mt-2">E/V/Λ/Ǝ/NextV は <code>daily_results.evla</code> に保存されています。</p>
       </div>
     </>
   );

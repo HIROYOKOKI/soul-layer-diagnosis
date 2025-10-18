@@ -1,24 +1,25 @@
 // app/daily/page.tsx
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
-type Slot = 'morning' | 'noon' | 'night';
+type Slot  = 'morning' | 'noon' | 'night';
 type Theme = 'WORK' | 'LOVE' | 'FUTURE' | 'LIFE';
 type Phase = 'ask' | 'result' | 'error';
 
 type DailyQuestionResponse = {
   ok: boolean; error?: string;
   slot: Slot; theme: Theme; seed: number;
-  question: string; choices: { id: string; label: string }[];
+  question: string;
+  choices: { id: string; label: string }[];
 };
 
 type DailyAnswerResponse = {
   ok: boolean; error?: string;
   comment: string; advice?: string; affirm?: string;
   score?: number;
-  save_error?: string | null;   // ★ 追加：保存結果を見る
+  save_error?: string | null;
 };
 
 export default function DailyPage() {
@@ -27,23 +28,64 @@ export default function DailyPage() {
   const [phase, setPhase] = useState<Phase>('ask');
   const [loading, setLoading] = useState(false);
   const [slot, setSlot] = useState<Slot | null>(null);
-  const [theme, setTheme] = useState<Theme>('WORK');
+
+  // ★ テーマ初期値を LOVE に統一（MyPage不取得時もズレない）
+  const [theme, setTheme] = useState<Theme>('LOVE');
+
   const [seed, setSeed] = useState<number | null>(null);
   const [question, setQuestion] = useState('');
   const [choices, setChoices] = useState<{ id: string; label: string }[]>([]);
   const [result, setResult] = useState<DailyAnswerResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  // 質問のロード
-  async function loadQuestion() {
+  // ---- MyPageと同じテーマを取得 ----
+  const fetchTheme = useCallback(async (): Promise<Theme> => {
+    try {
+      const r = await fetch('/api/theme', { cache: 'no-store' });
+      const j = await r.json();
+      const t = String(j?.scope ?? j?.theme ?? 'LOVE').toUpperCase() as Theme;
+      return (['WORK','LOVE','FUTURE','LIFE'] as Theme[]).includes(t) ? t : 'LOVE';
+    } catch {
+      return 'LOVE';
+    }
+  }, []);
+
+  // ---- 質問のロード（POSTでthemeを渡す。失敗時はGETにフォールバック）----
+  const loadQuestion = useCallback(async () => {
     setLoading(true);
     setErr(null);
+    setResult(null);
+
     try {
-      const r = await fetch('/api/daily/question', { cache: 'no-store' });
-      const json = (await r.json()) as DailyQuestionResponse;
+      const t = await fetchTheme();
+      setTheme(t);
+
+      // まずは POST で theme を渡す（サーバ側が対応していればこちらが採用される）
+      let res: Response | null = null;
+      try {
+        res = await fetch('/api/daily/question', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ theme: t }),
+          cache: 'no-store',
+        });
+      } catch {
+        /* noop */
+      }
+
+      // POST が無い／405 の場合は GET を使用
+      if (!res || !res.ok) {
+        res = await fetch('/api/daily/question', { cache: 'no-store' });
+      }
+
+      const json = (await res.json()) as DailyQuestionResponse;
       if (!json.ok) throw new Error(json.error || 'failed_to_load');
+
+      // サーバが補正した theme が返ってきたらそれを採用（完全同期）
+      const fixedTheme = (json.theme || t) as Theme;
+      setTheme(fixedTheme);
+
       setSlot(json.slot);
-      setTheme(json.theme);
       setSeed(typeof json.seed === 'number' ? json.seed : null);
       setQuestion(json.question);
       setChoices(json.choices ?? []);
@@ -54,11 +96,11 @@ export default function DailyPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [fetchTheme]);
 
-  useEffect(() => { loadQuestion(); }, []);
+  useEffect(() => { loadQuestion(); }, [loadQuestion]);
 
-  // 選択→診断
+  // ---- 選択→診断（必ず theme を同梱）----
   async function onChoose(choiceId: string) {
     if (seed === null) {
       setErr('seed_not_initialized'); setPhase('error'); return;
@@ -69,7 +111,6 @@ export default function DailyPage() {
       const r = await fetch('/api/daily/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // 本番AIとして扱う（互換レイヤが吸収）
         body: JSON.stringify({ seed, choiceId, theme, env: 'prod' }),
       });
       const json = (await r.json()) as DailyAnswerResponse;
@@ -82,8 +123,6 @@ export default function DailyPage() {
       setLoading(false);
     }
   }
-
-
 
   const header = useMemo(() => {
     const s = slot==='morning'?'朝':slot==='noon'?'昼':slot==='night'?'夜':'';
@@ -153,11 +192,10 @@ export default function DailyPage() {
             </div>
           )}
 
-          {/* 保存ステータス & マイページへ */}
           <div className="text-sm opacity-70">
-           {result.save_error
-            ? <span className="text-red-400">保存に失敗しました：{result.save_error}</span>
-            : <span>自動保存しました。下のボタンからマイページへ戻れます。</span>}
+            {result.save_error
+              ? <span className="text-red-400">保存に失敗しました：{result.save_error}</span>
+              : <span>自動保存しました。下のボタンからマイページへ戻れます。</span>}
           </div>
 
           <div className="pt-2 flex gap-3">

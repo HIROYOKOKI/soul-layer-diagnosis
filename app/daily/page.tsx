@@ -1,8 +1,8 @@
 // app/daily/page.tsx
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { redirect } from "next/navigation";
+export const dynamic = "force-dynamic";
 
 type Slot  = 'morning' | 'noon' | 'night';
 type Theme = 'WORK' | 'LOVE' | 'FUTURE' | 'LIFE';
@@ -55,9 +55,9 @@ function getJstSlot(): Slot {
   return 'night';
 }
 
-export default function DailyPage() {
-  const router = useRouter();
-
+export default function Page() {
+  redirect("/daily/question");
+}
   const [phase, setPhase] = useState<Phase>('ask');
   const [loading, setLoading] = useState(false);
 

@@ -13,13 +13,16 @@ type Slot = "morning" | "noon" | "night";
 type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 
 type Body = {
-  id: string;
+  id: string;            // question_id
   slot: Slot;
   choice: EV;
-  scope?: Scope;
+  scope?: Scope;         // テーマ（優先）
   env?: "dev" | "prod";
-  theme?: "dev" | "prod";
-  ts?: string;
+  theme?: "dev" | "prod"; // ログ用タグ（互換）
+  ts?: string;           // クライアント側の生成時刻（任意）
+  // レガシー互換
+  seed?: number;
+  choiceId?: EV;
 };
 
 /* ================== ユーティリティ ================== */
@@ -51,10 +54,6 @@ const clampToRange = (text: string, _min: number, max: number) => {
   const cut = (m?.[1] || j).replace(/\s+$/, "");
   return /[。.!?！？]$/.test(cut) ? cut : cut + "。";
 };
-const inRange = (s: string, min: number, max: number) => {
-  const n = jpLen((s || "").trim());
-  return n >= min && n <= max;
-};
 
 const LEN = {
   commentMin: 100,
@@ -65,12 +64,6 @@ const LEN = {
   affirmMax: 30,
 } as const;
 
-const isAffirmation = (s: string) => {
-  const t = (s || "").trim();
-  if (!/^(私は|わたしは)/.test(t)) return false;
-  if (/[「」『』《》"“”]/.test(t)) return false;
-  return true;
-};
 const toAffirmationFallback = (code: EV): string => {
   switch (code) {
     case "E": return "私は情熱を信じ一歩踏み出す";
@@ -105,7 +98,7 @@ const FB_AFFIRM: Record<EV, string> = {
   Ǝ: `私は静けさの中で答えを見る`,
 };
 
-/* ========== OpenAI 出力 ========== */
+/* ========== OpenAI 生成 ========== */
 async function genWithAI(code: EV, slot: Slot, scope: Scope) {
   const openai = getOpenAI();
   if (!openai) throw new Error("openai_env_missing");
@@ -137,7 +130,6 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
 
   const resp = await openai.chat.completions.create({
     model: "gpt-5-mini",
- 
     messages: [
       { role: "system", content: sys },
       { role: "user", content: user },
@@ -159,81 +151,107 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
 /* ================== ハンドラ ================== */
 export async function POST(req: Request) {
   try {
-    const raw = (await req.json()) as any;
-    const isLegacy = raw && (typeof raw.seed !== "undefined" || typeof raw.choiceId !== "undefined");
+    const raw = (await req.json()) as Partial<Body>;
+    const isLegacy = typeof raw?.seed !== "undefined" || typeof raw?.choiceId !== "undefined";
 
-    let b: Body;
+    // 入力正規化
+    let id: string;
+    let slot: Slot;
+    let choice: EV;
+    let scope: Scope;
+
     if (isLegacy) {
       const c = headerCookies();
       const cookieSlot = c.get("daily_slot")?.value as Slot | undefined;
       const cookieTheme = (c.get("daily_theme")?.value as Scope | undefined) || "LIFE";
-      const slot = (cookieSlot ?? getJstSlot()) as Slot;
+      slot = (cookieSlot ?? getJstSlot()) as Slot;
       const jst = new Date(Date.now() + 9 * 3600 * 1000);
-      const id = `daily-${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, "0")}-${String(jst.getUTCDate()).padStart(2, "0")}-${slot}`;
-      const choice = String(raw.choiceId || "").toUpperCase() as EV;
-      const scope = (String(raw.theme || cookieTheme || "LIFE").toUpperCase()) as Scope;
-      b = { id, slot, choice, scope, env: "prod", theme: "prod", ts: new Date().toISOString() };
+      id = `daily-${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, "0")}-${String(jst.getUTCDate()).padStart(2, "0")}-${slot}`;
+      choice = String(raw?.choiceId ?? "").toUpperCase() as EV;
+      scope = (String((raw as any)?.theme ?? cookieTheme ?? "LIFE").toUpperCase()) as Scope;
     } else {
-      const nb = raw as Body;
-      if (!nb?.id || !nb.slot || !nb.choice)
+      if (!raw?.id || !raw?.slot || !raw?.choice) {
         return NextResponse.json({ ok: false, error: "bad_request" }, { status: 400 });
-      b = { ...nb, env: nb.env ?? "prod", theme: nb.theme ?? "prod" };
+      }
+      id = raw.id;
+      slot = raw.slot;
+      choice = raw.choice;
+      scope = (String(raw.scope ?? "LIFE").toUpperCase() as Scope);
     }
 
-    const env = b.env;
-    const theme = b.theme;
-    const code = b.choice;
-    const scope: Scope = (b.scope?.toUpperCase() as Scope) || "LIFE";
+    const env = (raw?.env ?? "prod") as "dev" | "prod";
+    const themeTag = (raw?.theme ?? "prod") as "dev" | "prod"; // ログ用途
+    const client_ts = raw?.ts ?? null;
 
     // === AI生成 ===
     let comment: string | null = null;
     let advice: string | null = null;
     let affirm: string | null = null;
     try {
-      const ai = await genWithAI(code, b.slot, scope);
+      const ai = await genWithAI(choice, slot, scope);
       comment = ai.comment;
       advice = ai.advice;
       affirm = ai.affirm;
     } catch (e: any) {
-      console.error("AI生成エラー:", e.message);
+      console.error("AI生成エラー:", e?.message ?? e);
     }
 
-    // fallback if null
-    if (!comment) comment = FB_COMMENT[code];
-    if (!advice) advice = FB_ADVICE[code];
-    if (!affirm) affirm = FB_AFFIRM[code];
+    // フォールバック
+    if (!comment) comment = FB_COMMENT[choice];
+    if (!advice) advice = FB_ADVICE[choice];
+    if (!affirm) affirm = FB_AFFIRM[choice];
 
     // === 保存 ===
     const created_at = new Date().toISOString();
     let save_error: string | null = null;
     try {
       const sb = getSupabaseAdmin();
+      if (!sb) throw new Error("supabase_env_missing");
       await sb.from("daily_results").insert({
-        id: b.id,
-        slot: b.slot,
+        id,
+        slot,
         scope,
-        code,
+        code: choice,
         comment,
         advice,
         affirm,
         score: 0.3,
         created_at,
         env,
-        theme,
-        client_ts: b.ts ?? null,
+        theme: themeTag,
+        client_ts,
       });
     } catch (e: any) {
       save_error = e?.message ?? "save_failed";
     }
 
-    return NextResponse.json({
-      ok: true,
+    // === レスポンス（常に item で返す / 互換のため直下にも同値を置く） ===
+    const item = {
+      question_id: id,
+      slot,
+      scope,
+      code: choice,
       comment,
       advice,
       affirm,
       score: 0.3,
-      save_error,
-    });
+      created_at,
+      env,
+    };
+
+    return NextResponse.json(
+      {
+        ok: true,
+        item,
+        // 互換（古いフロントが参照しても動くよう複写）
+        comment,
+        advice,
+        affirm,
+        score: 0.3,
+        save_error,
+      },
+      { status: 200 }
+    );
   } catch (e: any) {
     console.error("診断API失敗:", e);
     return NextResponse.json({ ok: false, error: e?.message ?? "internal_error" }, { status: 500 });

@@ -11,7 +11,7 @@ function toJstDateString(d: string | Date) {
   return new Date(dt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })).toDateString();
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const sb = createRouteHandlerClient({ cookies });
     const {
@@ -27,12 +27,17 @@ export async function GET() {
       );
     }
 
-    // ★ 実在するカラムだけを明示
-    const { data, error } = await sb
+    const { searchParams } = new URL(req.url);
+    const envParam = searchParams.get("env"); // dev | prod | null
+
+    // ★ 実在カラムのみ明示 + idも取得して互換吸収
+    let query = sb
       .from("daily_results")
       .select(
         [
-          "question_id",
+          "id",            // ← 追加（旧ロジック互換）
+          "question_id",   // （新ロジック）
+          "user_id",
           "slot",
           "scope",
           "theme",
@@ -51,6 +56,13 @@ export async function GET() {
       .limit(1)
       .maybeSingle();
 
+    if (envParam === "dev" || envParam === "prod") {
+      // @ts-ignore chain ok
+      query = query.eq("env", envParam);
+    }
+
+    const { data, error } = await query;
+
     if (error) {
       return NextResponse.json(
         { ok: false, error: error.message },
@@ -58,7 +70,6 @@ export async function GET() {
       );
     }
 
-    // レコードなし
     if (!data) {
       return NextResponse.json(
         { ok: true, item: null },
@@ -66,19 +77,17 @@ export async function GET() {
       );
     }
 
-    // ---- 正規化（安全に存在チェック）----
+    // ---- 正規化 ----
     const any = data as Record<string, any>;
-    // advice はそのまま（旧スキーマでも guidance/tip があっても、このselectには無い＝undefined）
     const adviceNormalized = any.advice ?? null;
-    // affirm は affirmation/quote を吸収（selectに無くても undefined → ?? で無害）
     const affirmNormalized = any.affirm ?? any.affirmation ?? any.quote ?? null;
 
     const item = {
-      question_id: any.question_id ?? null,
+      question_id: any.question_id ?? any.id ?? null, // ← ここでidをフォールバック
       slot: any.slot ?? null,
-      mode: any.slot ?? null,                 // ← UI互換
+      mode: any.slot ?? null,                         // UI互換
       scope: any.scope ?? null,
-      theme: any.theme ?? any.scope ?? null,  // ← 互換（themeが無ければscope）
+      theme: any.theme ?? any.scope ?? null,          // 互換（themeが無ければscope）
       code: any.code ?? null,
       comment: any.comment ?? null,
       advice: adviceNormalized,

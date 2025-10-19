@@ -13,19 +13,6 @@ type EV = "E" | "V" | "Λ" | "Ǝ";
 type Slot = "morning" | "noon" | "night";
 type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 
-type Body = {
-  id: string;            // question_id
-  slot: Slot;
-  choice: EV;
-  scope?: Scope;
-  env?: "dev" | "prod";
-  theme?: "dev" | "prod";
-  ts?: string;
-  // レガシー互換
-  seed?: number;
-  choiceId?: EV;
-};
-
 /* ================== ユーティリティ ================== */
 const SCOPE_HINT: Record<Scope, string> = {
   WORK: "仕事・学び・成果・チーム連携・自己効率",
@@ -65,21 +52,7 @@ const LEN = {
   affirmMax: 30,
 } as const;
 
-const toAffirmationFallback = (code: EV): string => {
-  switch (code) {
-    case "E": return "私は情熱を信じ一歩踏み出す";
-    case "V": return "私は理想を描き形にしている";
-    case "Λ": return "私は基準を定め迷いを越える";
-    case "Ǝ": return "私は静けさで本質を見つめる";
-  }
-};
-const normalizeAffirmation = (code: EV, s: string): string => {
-  let t = (s || "").trim().replace(/[「」『』《》"“”]/g, "").trim();
-  if (!/^(私は|わたしは)/.test(t)) t = toAffirmationFallback(code);
-  return clampToRange(t, LEN.affirmMin, LEN.affirmMax);
-};
-
-/* ========== フォールバック文言（★復活） ========== */
+/* ========== フォールバック文言 ========== */
 const FB_COMMENT: Record<EV, string> = {
   E: `今は内側の熱が静かに満ちる時期。小さな確定を一つ重ねれば、惰性はほどけていく。視線を近くに置き、今日できる最短の一歩を形にしよう。`,
   V: `頭の中の未来像を、現実の手触りに寄せていく段階。理想は曖昧なままで良い。輪郭を一筆だけ濃くして、届く距離に引き寄せていこう。`,
@@ -118,15 +91,6 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
     scope_hint: SCOPE_HINT[scope],
     code,
     style: "calm-positive",
-    schema: {
-      type: "object",
-      properties: {
-        comment: { type: "string" },
-        advice: { type: "string" },
-        affirm: { type: "string" },
-      },
-      required: ["comment", "advice", "affirm"],
-    },
   });
 
   const resp = await openai.chat.completions.create({
@@ -145,65 +109,48 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
   let comment = clampToRange(parsed.comment || "", LEN.commentMin, LEN.commentMax);
   let advice = clampToRange(parsed.advice || "", LEN.adviceMin, LEN.adviceMax);
   let affirm = clampToRange(parsed.affirm || "", LEN.affirmMin, LEN.affirmMax);
-  affirm = normalizeAffirmation(code, affirm);
+  if (!affirm.startsWith("私は") && !affirm.startsWith("わたしは")) {
+    affirm = FB_AFFIRM[code];
+  }
   return { comment, advice, affirm };
 }
 
 /* ================== ハンドラ ================== */
 export async function POST(req: Request) {
-  // 失敗箇所の可視化
   let stage: "parse" | "gen" | "save" | "respond" = "parse";
 
   try {
     const raw = (await req.json()) as Partial<Body>;
-    const isLegacy = typeof raw?.seed !== "undefined" || typeof raw?.choiceId !== "undefined";
-
-    // 入力正規化
-    let id: string; // question_id として使う
-    let slot: Slot;
-    let choice: EV;
-    let scope: Scope;
-
-    if (isLegacy) {
-      const c = headerCookies();
-      const cookieSlot = c.get("daily_slot")?.value as Slot | undefined;
-      const cookieTheme = (c.get("daily_theme")?.value as Scope | undefined) || "LIFE";
-      slot = (cookieSlot ?? getJstSlot()) as Slot;
-      const jst = new Date(Date.now() + 9 * 3600 * 1000);
-      id = `daily-${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, "0")}-${String(jst.getUTCDate()).padStart(2, "0")}-${slot}`;
-      choice = String(raw?.choiceId ?? "").toUpperCase() as EV;
-      scope = (String((raw as any)?.theme ?? cookieTheme ?? "LIFE").toUpperCase()) as Scope;
-    } else {
-      if (!raw?.id || !raw?.slot || !raw?.choice) {
-        return NextResponse.json({ ok: false, stage, error: "bad_request_missing_fields" }, { status: 200 });
-      }
-      id = raw.id;
-      slot = raw.slot;
-      choice = raw.choice;
-      scope = (String(raw.scope ?? "LIFE").toUpperCase() as Scope);
+    if (!raw?.id || !raw?.slot || !raw?.choice) {
+      return NextResponse.json({ ok: false, stage, error: "bad_request_missing_fields" }, { status: 200 });
     }
 
-    const env = (raw?.env ?? "prod") as "dev" | "prod";
-   const themeTag = scope.toLowerCase() as "work" | "love" | "future" | "life";
+    const id = raw.id;
+    const slot = raw.slot;
+    const choice = raw.choice;
+    const scope = (String(raw.scope ?? "LIFE").toUpperCase() as Scope);
 
+    // ✅ themeTag を scope ベースで統一
+    const themeTag = scope.toLowerCase() as "work" | "love" | "future" | "life";
+
+    const env = (raw?.env ?? "prod") as "dev" | "prod";
     const client_ts = raw?.ts ?? null;
 
-    // === 生成 ===
+    // === AI生成 ===
     stage = "gen";
     let comment: string | null = null;
     let advice: string | null = null;
     let affirm: string | null = null;
+
     try {
       const ai = await genWithAI(choice, slot, scope);
       comment = ai.comment;
       advice = ai.advice;
       affirm = ai.affirm;
     } catch (e: any) {
-      // 生成失敗でもフォールバックで継続
       console.error("AI生成エラー:", e?.message ?? e);
     }
 
-    // フォールバック（★ここでFB_*を使うので必ず定義が必要）
     if (!comment) comment = FB_COMMENT[choice];
     if (!advice) advice = FB_ADVICE[choice];
     if (!affirm) affirm = FB_AFFIRM[choice];
@@ -216,7 +163,7 @@ export async function POST(req: Request) {
       const sb = getSupabaseAdmin();
       if (!sb) throw new Error("supabase_env_missing");
 
-      // ログインユーザーID（未ログインは null）
+      // ログインユーザー
       let user_id: string | null = null;
       try {
         const auth = createRouteHandlerClient({ cookies: headerCookies });
@@ -229,6 +176,7 @@ export async function POST(req: Request) {
         user_id,
         slot,
         scope,
+        theme: themeTag, // ✅ 修正済み：4値のみ
         code: choice,
         comment,
         advice,
@@ -236,52 +184,23 @@ export async function POST(req: Request) {
         score: 0.3,
         created_at,
         env,
-        theme: themeTag,
         client_ts,
       };
 
-      // PK(id)は送らない。複合ユニーク (user_id, question_id, env) でUPSERT
-      const { error } = await sb
-        .from("daily_results")
-        .upsert(payload, { onConflict: "user_id,question_id,env" });
-
+      const { error } = await sb.from("daily_results").upsert(payload, { onConflict: "user_id,question_id,env" });
       if (error) throw error;
     } catch (e: any) {
       console.error("保存エラー:", e);
-      save_error = {
-        message: e?.message ?? "save_failed",
-        details: e?.details ?? null,
-        hint: e?.hint ?? null,
-        code: e?.code ?? null,
-      };
-      // ここでは落とさず続行（UI に理由を返す）
+      save_error = { message: e?.message ?? "save_failed" };
     }
 
     // === レスポンス ===
     stage = "respond";
-    const item = {
-      question_id: id,
-      slot,
-      scope,
-      code: choice,
-      comment,
-      advice,
-      affirm,
-      score: 0.3,
-      created_at,
-      env,
-    };
+    const item = { question_id: id, slot, scope, theme: themeTag, code: choice, comment, advice, affirm, score: 0.3, created_at, env };
 
-    return NextResponse.json(
-      { ok: true, item, comment, advice, affirm, score: 0.3, save_error },
-      { status: 200, headers: { "cache-control": "no-store" } }
-    );
+    return NextResponse.json({ ok: true, item, save_error }, { status: 200 });
   } catch (e: any) {
     console.error("診断API失敗(stage=" + stage + "):", e);
-    // ここも 200 で返す（UIで理由を表示できるように）
-    return NextResponse.json(
-      { ok: false, stage, error: e?.message ?? "internal_error" },
-      { status: 200, headers: { "cache-control": "no-store" } }
-    );
+    return NextResponse.json({ ok: false, stage, error: e?.message ?? "internal_error" }, { status: 200 });
   }
 }

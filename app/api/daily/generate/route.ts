@@ -3,8 +3,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { getOpenAI } from "@/lib/openai"; // 既存の遅延生成ラッパー
+import { getOpenAI } from "@/lib/openai";
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
 type Slot = "morning" | "noon" | "night";
@@ -34,8 +33,12 @@ function sanitizeOptions(arr: any, n: number): { key: EV; label?: string }[] {
   const ok = new Set<EV>(["E", "V", "Λ", "Ǝ"]);
   const list: { key: EV; label?: string }[] = Array.isArray(arr)
     ? arr
-        .map((o) => (typeof o?.key === "string" ? { key: o.key as EV, label: o?.label } : null))
-        .filter((o) => o && ok.has(o.key)) as any
+        .map((o) =>
+          o && typeof o.key === "string"
+            ? ({ key: o.key as EV, label: typeof o.label === "string" ? o.label : undefined } as const)
+            : null
+        )
+        .filter((o) => o && ok.has(o.key as EV)) as any
     : [];
   const seen = new Set<string>();
   const uniq = list.filter((o) => !seen.has(o.key) && seen.add(o.key));
@@ -55,10 +58,7 @@ async function resolveTheme(req: Request, bodyTheme?: string | null): Promise<Th
   if (THEMES.includes(normalized as Theme)) return normalized as Theme;
 
   try {
-    const origin =
-      process.env.NEXT_PUBLIC_SITE_URL ?? new URL(req.url).origin;
-
-    // 認証Cookieを引き継いで /api/theme を叩く（ユーザーの最新テーマ）
+    const origin = process.env.NEXT_PUBLIC_SITE_URL ?? new URL(req.url).origin;
     const r = await fetch(`${origin}/api/theme`, {
       cache: "no-store",
       headers: { cookie: (req.headers.get("cookie") ?? "") as string },
@@ -69,10 +69,68 @@ async function resolveTheme(req: Request, bodyTheme?: string | null): Promise<Th
       if (THEMES.includes(t as Theme)) return t as Theme;
     }
   } catch {
-    /* noop: フォールバックに任せる */
+    /* noop */
   }
-  // フォールバック（ズレ防止のため LOVE を既定に）
   return "LOVE";
+}
+
+/** OpenAIへ問い合わせ（JSON限定）してパース。失敗時はthrow。 */
+async function generateQuestionJSON(n: number, theme: Theme, slot: Slot) {
+  const openai = getOpenAI();
+  if (!openai) throw new Error("openai_env_missing");
+
+  const sys = [
+    "あなたのソウルレイヤーを静かに照らす案内人",
+    "出力は必ず JSON 1オブジェクトのみ。コードブロックや説明は出さない。",
+    'スキーマ: {"text": string, "options": [{"key":"E|V|Λ|Ǝ","label": string}...]}',
+  ].join("\n");
+
+  const user = [
+    `目的: EVΛƎ（E/V/Λ/Ǝ）のうち ${n} 個を選択肢として出す短い設問を作成。`,
+    `制約: 文章は80字以内。日常の言い回しで。テーマは ${theme}。`,
+    `選択肢: key は E|V|Λ|Ǝ のいずれか。label は省略せず自然文で。`,
+    `slot=${slot}`,
+    `出力: 上記スキーマの JSON オブジェクトのみ（前後の文章・マークダウン禁止）`,
+  ].join("\n");
+
+  const r = await openai.chat.completions.create({
+    model: "gpt-5-mini",
+    messages: [
+      { role: "system", content: sys },
+      { role: "user", content: user },
+    ],
+    temperature: 0.7,
+    response_format: { type: "json_object" }, // ★ JSONを強制
+  });
+
+  const content = (r?.choices?.[0]?.message?.content ?? "").trim();
+  if (!content) throw new Error("empty_openai_response");
+
+  // 一発パース → こけたら救済パース
+  let parsed: any = null;
+  try {
+    parsed = JSON.parse(content);
+  } catch (e) {
+    const jsonText =
+      content.match(/```json([\s\S]*?)```/i)?.[1]?.trim() ||
+      content.match(/```([\s\S]*?)```/i)?.[1]?.trim() ||
+      content;
+    parsed = JSON.parse(jsonText);
+  }
+
+  const textRaw =
+    typeof parsed?.text === "string"
+      ? parsed.text
+      : typeof parsed?.question === "string"
+      ? parsed.question
+      : null;
+
+  if (!textRaw) throw new Error("missing_text_in_response");
+
+  return {
+    text: textRaw as string,
+    options: sanitizeOptions(parsed?.options, n),
+  };
 }
 
 export async function POST(req: Request) {
@@ -82,50 +140,27 @@ export async function POST(req: Request) {
   const n = SLOT_COUNTS[slot] ?? 4;
   const id = todayId(slot);
 
-  // --- テーマ決定（MyPageと同期）
   const theme = await resolveTheme(req, body?.theme);
 
-  // フォールバック（AI失敗や未設定でも返す）
-  let text = "いまのあなたの意識方向はどれに近い？";
+  // デフォルト（フォールバック）
+  let text = "いまのあなたの重心はどれに近い？";
   let options = defaultOptions(n);
 
+  // 1回目試行 → 失敗時は1回だけ再試行
   try {
-    const openai = getOpenAI(); // 未設定時は内部で例外化
-
-    const sys = "あなたは日本語で短い設問を作るアシスタントです。出力は必ずJSONのみ。";
-    const user = [
-      `目的: EVΛƎ（E/V/Λ/Ǝ）のうち ${n} 個を選択肢として出す短い設問を作成。`,
-      `制約: 文章は80字以内。日常の言い回しで。テーマは ${theme}。`,
-      `選択肢: { key: "E"|"V"|"Λ"|"Ǝ", label?: string } の配列。`,
-      `slot=${slot}`,
-      `例ラベル: E=意志, V=感受, Λ=構築, Ǝ=反転（省略可）`,
-      `出力は JSON（text, options のみ）`,
-    ].join("\n");
-
-    // chat.completions（プロジェクト方針：gpt-5-mini に統一）
-    // responses API は環境により未提供のことがあるため単一路線で安定運用
-    // @ts-ignore
-    const r = await openai.chat.completions.create({
-      model: "gpt-5-mini",
-      messages: [
-        { role: "system", content: sys },
-        { role: "user", content: user },
-      ],
-      temperature: 0.7,
-    });
-    // @ts-ignore
-    const content = (r?.choices?.[0]?.message?.content ?? "").trim();
-
-    const jsonText =
-      content.match(/```json([\s\S]*?)```/i)?.[1]?.trim() ||
-      content.match(/```([\s\S]*?)```/i)?.[1]?.trim() ||
-      content;
-
-    const parsed = JSON.parse(jsonText);
-    text = typeof parsed?.text === "string" ? parsed.text : text;
-    options = sanitizeOptions(parsed?.options, n);
-  } catch {
-    // フォールバックで返す（ログはAPIゲートウェイ側に残る想定）
+    const g1 = await generateQuestionJSON(n, theme, slot);
+    text = g1.text;
+    options = g1.options;
+  } catch (e1: any) {
+    console.error("daily.generate.error#1", { err: e1?.message ?? String(e1), slot, theme, n });
+    try {
+      const g2 = await generateQuestionJSON(n, theme, slot);
+      text = g2.text;
+      options = g2.options;
+    } catch (e2: any) {
+      console.error("daily.generate.error#2", { err: e2?.message ?? String(e2), slot, theme, n });
+      // フォールバック継続（text / options は初期値のまま）
+    }
   }
 
   return NextResponse.json(
@@ -134,7 +169,7 @@ export async function POST(req: Request) {
       id,
       slot,
       env,
-      theme, // ← フロント表示用に返す（MyPageと一致）
+      theme, // MyPage表示用
       text,
       options,
       ts: new Date().toISOString(),

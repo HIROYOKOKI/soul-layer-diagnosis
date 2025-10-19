@@ -4,7 +4,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import MyPageShell from '../../components/layout/MyPageShell';
-import RadarCard from './RadarCard'; // ✅ 追加
 
 /* ===== 型 ===== */
 type QuickAny =
@@ -23,8 +22,7 @@ type DailyRaw = {
   comment?: string | null;
   advice?: string | null;
   affirm?: string | null;
-  affirmation?: string | null; // 互換キー
-  quote?: string | null;       // 念のため
+  affirmation?: string | null; // 互換プロパティ
   score?: number | null;
   created_at?: string | null;
   slot?: string | null;
@@ -35,16 +33,13 @@ type DailyRaw = {
 type Daily = {
   comment?: string | null;
   advice?: string | null;
-  affirm?: string | null;
-  affirmation?: string | null;
-  quote?: string | null;
+  affirm?: string | null;       // 本命
+  affirmation?: string | null;  // 互換
   score?: number | null;
   created_at?: string | null;
   slot?: string | null;
   theme?: string | null;
   is_today_jst?: boolean;
-  /** ★ MyPageShell がこれを優先して表示 */
-  displayText?: string | null;
 } | null;
 
 type Profile = {
@@ -58,32 +53,23 @@ type Profile = {
 const toJstDateString = (d: string | Date) =>
   new Date(new Date(d).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })).toDateString();
 
-/** Daily を統一スキーマに正規化して displayText を確定 */
 const normalizeDaily = (raw: DailyRaw): Daily => {
   if (!raw) return null;
-
   const affirm = raw.affirm ?? raw.affirmation ?? null;
-  const displayText =
-    affirm ?? raw.quote ?? raw.advice ?? raw.comment ?? null;
-
-  const isToday =
-    raw?.is_today_jst ??
-    (raw?.created_at
-      ? toJstDateString(raw.created_at) === toJstDateString(new Date())
-      : false);
-
   return {
     comment: raw.comment ?? null,
     advice: raw.advice ?? null,
-    quote: raw.quote ?? null,
     affirm,
-    affirmation: affirm, // 互換維持
+    affirmation: affirm, // 両方持たせて互換
     score: raw.score ?? null,
     created_at: raw.created_at ?? null,
     slot: raw.slot ?? null,
     theme: raw.theme ?? null,
-    is_today_jst: isToday,
-    displayText,
+    is_today_jst:
+      raw.is_today_jst ??
+      (raw.created_at
+        ? toJstDateString(raw.created_at) === toJstDateString(new Date())
+        : false),
   };
 };
 
@@ -201,12 +187,10 @@ export default function MyPageClientWrapper({
     })();
   }, []);
 
-  /* ---------- Shell + RadarChart ---------- */
+  /* ---------- Shell へ ---------- */
   return (
-    <div className="relative z-10 p-6 text-gray-100 pointer-events-auto space-y-8">
+    <div className="relative z-10 p-6 text-gray-100 pointer-events-auto">
       <h1 className="text-2xl font-semibold mb-4">My Page</h1>
-
-      {/* --- MyPageShell（既存カード） --- */}
       <MyPageShell
         data={{
           user: user
@@ -221,16 +205,12 @@ export default function MyPageClientWrapper({
             ? { model: quickModel, label: quickLabel, created_at: undefined }
             : undefined,
           theme: { name: theme, updated_at: null },
+          // ここで affirm / affirmation の両対応を維持したまま渡す
           daily: daily ?? undefined,
           profile: profile ?? undefined,
         }}
         userId={user?.id}
       />
-
-      {/* --- レーダーチャート --- */}
-      <div className="pt-4 border-t border-white/10">
-        <RadarCard />
-      </div>
     </div>
   );
 }

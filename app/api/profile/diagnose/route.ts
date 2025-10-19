@@ -33,13 +33,17 @@ type AiJson = {
 };
 
 /* ========================
-   Fallbacks
+   Fallbacks（総合運に修正済み）
 ======================== */
 const FALLBACKS: DiagnoseDetail = {
-  fortune: "今日は小さく始めるほど流れが整う日。10分だけの行動で良いので一歩進めよう。",
-  personality: "観測と直感のバランスが良い時期。小さな違和感を丁寧に拾えるタイプです。",
-  work: "短いサイクルで試作→観測→調整が◎。完璧より速度、数で当てにいこう。",
-  partner: "相手の“いまの気分”を言葉にして返すと関係が整いやすいでしょう。",
+  fortune:
+    "小さく始めた行動ほど流れが整い、習慣へと育つ傾向。10分の集中を積み重ねるほど、運の巡りが安定していきます。",
+  personality:
+    "観測と直感のバランスが良い時期。小さな違和感を丁寧に拾えるタイプです。",
+  work:
+    "短いサイクルで試作→観測→調整が◎。完璧より速度、数で当てにいこう。",
+  partner:
+    "相手の“いまの気分”を言葉にして返すと関係が整いやすいでしょう。",
 };
 
 /* ========================
@@ -82,13 +86,18 @@ function sanitizeDetail(
 
 function pickSafeLines(lines: unknown): string[] {
   const xs = Array.isArray(lines) ? (lines as unknown[]) : [];
-  return xs.map(s => (typeof s === "string" ? s.trim() : ""))
-          .filter(s => s.length > 0)
-          .slice(0, 5);
+  return xs
+    .map(s => (typeof s === "string" ? s.trim() : ""))
+    .filter(s => s.length > 0)
+    .slice(0, 5);
 }
 
 function safeJSON<T = any>(s?: string | null): T | null {
-  try { return s ? (JSON.parse(s) as T) : null; } catch { return null; }
+  try {
+    return s ? (JSON.parse(s) as T) : null;
+  } catch {
+    return null;
+  }
 }
 
 /* ========================
@@ -101,24 +110,28 @@ export async function POST(req: Request) {
     const openai = getOpenAI();
     if (!openai) throw new Error("openai_env_missing");
 
+    // 💡 モデル指定を環境変数 + fallback に変更
     const MODEL = process.env.OPENAI_PROFILE_MODEL || "gpt-4o-mini";
-
     const MAX_TOKENS = Number(process.env.OPENAI_PROFILE_MAXTOKENS || 550);
 
-    const system =
-      'あなたは「ルネア」。日本語で簡潔に、あたたかく、断定しすぎないトーンで話します。出力は必ず厳密なJSONのみ。';
+    // 💬 Luneaの人格と出力形式を明確化
+    const system = [
+      "あなたはAIアシスタント『ルネア（Lunea）』です。",
+      "入力されたプロフィールをもとに、性格傾向・運命・理想像をやさしく語ります。",
+      "出力はJSON形式で、キーは fortune, personality, partner。",
+      "語り口は親しみやすく、少し詩的に。",
+    ].join("\n");
+
     const user = buildProfilePrompt(pending);
 
-    // 一部モデルは max_tokens ではなく max_completion_tokens
-    // かつ temperature=1 固定（任意値不可）のため、温度は指定しない
     const resp = await openai.chat.completions.create({
-      model,
+      model: MODEL,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
         { role: "user", content: JSON.stringify(user) },
       ],
-      max_completion_tokens: MAX_TOKENS,
+      max_tokens: MAX_TOKENS,
     });
 
     const raw = resp.choices?.[0]?.message?.content || "{}";
@@ -135,7 +148,7 @@ export async function POST(req: Request) {
       if (detail.personality) add.push(detail.personality.slice(0, 60));
       if (add.length === 0) {
         add.push("…観測中。きみの“いま”を読み解いているよ。");
-        add.push("今日の一歩は小さくていい。熱が冷める前に、1つだけ動かそう。");
+        add.push("小さく始めた一歩が、意味の流れを整えていく。");
       }
       return pickSafeLines([...xs, ...add]);
     })();
@@ -151,9 +164,10 @@ export async function POST(req: Request) {
     };
 
     const res = NextResponse.json(resBody, {
-      headers: { "Cache-Control": "no-store, max-age=0" },
+      headers: { "cache-control": "no-store, max-age=0" },
     });
 
+    // 🔄 非同期保存（UIブロックなし）
     (async () => {
       try {
         const { getSupabaseAdmin } = await import("../../../../lib/supabase-admin");
@@ -171,11 +185,14 @@ export async function POST(req: Request) {
           work: detail.work,
           partner: detail.partner,
         });
-      } catch { console.warn("[profile/diagnose] save failed"); }
+      } catch {
+        console.warn("[profile/diagnose] save failed");
+      }
     })();
 
     return res;
   } catch (e: any) {
+    console.error("[profile/diagnose] error:", e);
     return NextResponse.json({ ok: false, error: e?.message || "failed" }, { status: 500 });
   }
 }

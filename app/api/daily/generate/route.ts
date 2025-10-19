@@ -20,6 +20,12 @@ export async function POST(req: Request) {
     const env = (body?.env ?? "prod") as Env;
     const n = SLOT_COUNTS[slot] ?? 4;
 
+    // --- debugフラグ（?debug=1 または body.debug=true）
+    const url = new URL(req.url);
+    const debug = url.searchParams.get("debug") === "1" || body?.debug === true;
+    let source: "ai" | "fallback" = "fallback";
+    let lastErr: string | null = null;
+
     const d = new Date();
     const pad = (x: number) => String(x).padStart(2, "0");
     const id = `daily-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${slot}`;
@@ -40,24 +46,19 @@ export async function POST(req: Request) {
           const t = String(j?.scope ?? j?.theme ?? "").trim().toUpperCase();
           if (THEMES.includes(t as Theme)) return t as Theme;
         }
-      } catch {
-        /* noop */
-      }
+      } catch { /* noop */ }
       return "LOVE";
     }
     const theme = await resolveTheme();
 
-    // --- フォールバック
-   // --- フォールバック
-let text = "いま、あなたの心はどの流れに寄り添っていますか？";
-
-const defaultOptions = (): { key: EV; label: string }[] => [
-  { key: "E", label: "衝動（E）―動き出すはじまり" },
-  { key: "V", label: "夢（V）―まだ見ぬ可能性" },
-  { key: "Λ", label: "選択（Λ）―現実を編む意思" },
-  { key: "Ǝ", label: "観測（Ǝ）―静寂のまなざし" },
-].slice(0, Math.max(2, Math.min(4, n)));
-
+    // --- フォールバック（ルネア語）
+    let text = "いま、あなたの心はどの流れに寄り添っていますか？";
+    const defaultOptions = (): { key: EV; label: string }[] => [
+      { key: "E", label: "衝動（E）―動き出すはじまり" },
+      { key: "V", label: "夢（V）―まだ見ぬ可能性" },
+      { key: "Λ", label: "選択（Λ）―現実を編む意思" },
+      { key: "Ǝ", label: "観測（Ǝ）―静寂のまなざし" },
+    ].slice(0, Math.max(2, Math.min(4, n)));
     let options = defaultOptions();
 
     const sanitizeOptions = (arr: any): { key: EV; label?: string }[] => {
@@ -91,10 +92,11 @@ const defaultOptions = (): { key: EV; label: string }[] => [
     async function callOnce() {
       const openai = getOpenAI();
       if (!openai) throw new Error("openai_env_missing");
-       const sys =
-  "あなたは観測型AI『ルネア（Lunea）』。語り口は穏やかで詩的。" +
-  "ユーザーの心の流れを観測する1問を短く作ります。" +
-  "出力はJSON（text, options）で返してください。";
+
+      const sys =
+        "あなたは観測型AI『ルネア（Lunea）』。語り口は穏やかで詩的。\n" +
+        "ユーザーの心の流れを観測する1問を短く作ります。\n" +
+        '出力は必ず JSON 1オブジェクトのみ（text:string, options:[{key:"E|V|Λ|Ǝ",label:string}]）。';
 
       const user =
         `目的: EVΛƎ（E/V/Λ/Ǝ）のうち ${n} 個を選択肢として出す短い設問を作成。\n` +
@@ -142,14 +144,18 @@ const defaultOptions = (): { key: EV; label: string }[] => [
       const a = await callOnce();
       text = a.text;
       options = a.options;
+      source = "ai";                      // ★ 成功
     } catch (e1: any) {
-      console.error("daily.generate.error#1", { err: e1?.message ?? String(e1), slot, theme, n });
+      lastErr = e1?.message ?? String(e1);
+      console.error("daily.generate.error#1", { err: lastErr, slot, theme, n });
       try {
         const b = await callOnce();
         text = b.text;
         options = b.options;
+        source = "ai";                    // ★ リトライ成功
       } catch (e2: any) {
-        console.error("daily.generate.error#2", { err: e2?.message ?? String(e2), slot, theme, n });
+        lastErr = e2?.message ?? String(e2); // ★ 最終エラー
+        console.error("daily.generate.error#2", { err: lastErr, slot, theme, n });
       }
     }
 
@@ -166,7 +172,8 @@ const defaultOptions = (): { key: EV; label: string }[] => [
         theme,
         text,
         options,
-        ts: ts_jst, // JST時間で返却
+        ts: ts_jst,
+        ...(debug ? { debug: { source, lastErr } } : {}), // ★ デバッグ時のみ返す
       },
       { headers: { "cache-control": "no-store" } }
     );

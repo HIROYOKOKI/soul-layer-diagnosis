@@ -21,7 +21,6 @@ export type EvlaLog = EvlaInput & {
   trace?: Record<string, unknown>;
 };
 
-// ---- テンプレ用ヒント ----
 const THEME_HINTS: Record<NonNullable<EvlaInput["theme"]>, string> = {
   work: "仕事・学び・成果・チーム連携・自己効率",
   love: "恋愛・対人関係・信頼・距離感・感情のやり取り",
@@ -29,17 +28,12 @@ const THEME_HINTS: Record<NonNullable<EvlaInput["theme"]>, string> = {
   life: "生活全般・習慣・健康・心身の整え・日々の選択",
 };
 
-// --------------------------------------------------
-// 互換: evla()
-// --------------------------------------------------
+// ---- 既存互換: evla() ----
 export function evla(): Record<string, never> {
   return {};
 }
 
-// --------------------------------------------------
-// 互換: toUiProd()
-// dev では template、本番では disabled を返す
-// --------------------------------------------------
+// ---- 既存互換: toUiProd() ----
 export async function toUiProd(
   evla: EvlaLog
 ): Promise<UiResult & { __source: "disabled" | "gpt" | "template" }> {
@@ -62,19 +56,14 @@ export async function toUiProd(
   };
 }
 
-// --------------------------------------------------
-// next* 系（呼び出し防止のダミー）
-// --------------------------------------------------
+// ---- 追加: next* 系 ----
 export function nextV(_curr?: EV): EV { return "V"; }
 export function nextE(_curr?: EV): EV { return "E"; }
 export function nextΛ(_curr?: EV): EV { return "Λ"; }
 export function nextƎ(_curr?: EV): EV { return "Ǝ"; }
 
-// --------------------------------------------------
-// 候補生成（fallback）
-// --------------------------------------------------
+// ---- generateCandidates ----
 export type Choice = { key: EV; label: string };
-
 const FALLBACK: Record<Slot, Choice[]> = {
   morning: [
     { key: "E", label: "直感で素早く動く" },
@@ -95,7 +84,6 @@ const FALLBACK: Record<Slot, Choice[]> = {
     { key: "Ǝ", label: "静かに振り返る" },
   ],
 };
-
 export function generateCandidates(
   arg?: { slot?: Slot; theme?: string } | Slot
 ): Choice[] {
@@ -104,10 +92,7 @@ export function generateCandidates(
   return FALLBACK[slot] ?? FALLBACK.morning;
 }
 
-// --------------------------------------------------
-// extract* 系（呼び出し互換のための安全スタブ）
-// 文字列や説明文から「それっぽい」EV を推定
-// --------------------------------------------------
+// ---- extract 系 ----
 export function extractE(src?: string | EV): EV { return normalizeToEV(src) ?? "E"; }
 export function extractV(src?: string | EV): EV { return normalizeToEV(src) ?? "V"; }
 export function extractΛ(src?: string | EV): EV { return normalizeToEV(src) ?? "Λ"; }
@@ -115,28 +100,16 @@ export function extractƎ(src?: string | EV): EV { return normalizeToEV(src) ?? 
 
 function normalizeToEV(src?: string | EV): EV | null {
   if (!src) return null;
-  if (src === "E" || src === "V" || src === "Λ" || src === "Ǝ") return src;
-
+  if (["E", "V", "Λ", "Ǝ"].includes(src)) return src as EV;
   const s = String(src).toUpperCase();
-
-  // 英数字・語句
   if (/\bE\b|IMPULSE|ENERGY/.test(s)) return "E";
   if (/\bV\b|POSSIBILITY|VISION/.test(s)) return "V";
   if (/Λ|LAMBDA|CHOICE|SELECT|DECIDE/.test(s)) return "Λ";
   if (/Ǝ|OBSERV|MONITOR|REFLECT/.test(s)) return "Ǝ";
-
-  // 日本語のニュアンス
-  if (/衝動|直感|勢い/.test(s)) return "E";
-  if (/可能|夢|余白|発想/.test(s)) return "V";
-  if (/選択|判断|基準|合理/.test(s)) return "Λ";
-  if (/観測|振り返り|静けさ|事実/.test(s)) return "Ǝ";
-
   return null;
 }
 
-// --------------------------------------------------
-// default export（名前空間 import 用）
-// --------------------------------------------------
+// ---- default export ----
 export default {
   evla,
   toUiProd,

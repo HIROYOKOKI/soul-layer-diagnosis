@@ -22,7 +22,8 @@ type DailyRaw = {
   comment?: string | null;
   advice?: string | null;
   affirm?: string | null;
-  affirmation?: string | null; // 互換プロパティ
+  affirmation?: string | null; // 互換キー
+  quote?: string | null;       // 念のため
   score?: number | null;
   created_at?: string | null;
   slot?: string | null;
@@ -33,13 +34,16 @@ type DailyRaw = {
 type Daily = {
   comment?: string | null;
   advice?: string | null;
-  affirm?: string | null;       // 本命
-  affirmation?: string | null;  // 互換
+  affirm?: string | null;
+  affirmation?: string | null;
+  quote?: string | null;
   score?: number | null;
   created_at?: string | null;
   slot?: string | null;
   theme?: string | null;
   is_today_jst?: boolean;
+  /** ★ MyPageShell がこれを優先して表示 */
+  displayText?: string | null;
 } | null;
 
 type Profile = {
@@ -53,23 +57,32 @@ type Profile = {
 const toJstDateString = (d: string | Date) =>
   new Date(new Date(d).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })).toDateString();
 
+/** Daily を統一スキーマに正規化して displayText を確定 */
 const normalizeDaily = (raw: DailyRaw): Daily => {
   if (!raw) return null;
+
   const affirm = raw.affirm ?? raw.affirmation ?? null;
+  const displayText =
+    affirm ?? raw.quote ?? raw.advice ?? raw.comment ?? null;
+
+  const isToday =
+    raw?.is_today_jst ??
+    (raw?.created_at
+      ? toJstDateString(raw.created_at) === toJstDateString(new Date())
+      : false);
+
   return {
     comment: raw.comment ?? null,
     advice: raw.advice ?? null,
+    quote: raw.quote ?? null,
     affirm,
-    affirmation: affirm, // 両方持たせて互換
+    affirmation: affirm, // 互換維持
     score: raw.score ?? null,
     created_at: raw.created_at ?? null,
     slot: raw.slot ?? null,
     theme: raw.theme ?? null,
-    is_today_jst:
-      raw.is_today_jst ??
-      (raw.created_at
-        ? toJstDateString(raw.created_at) === toJstDateString(new Date())
-        : false),
+    is_today_jst: isToday,
+    displayText,
   };
 };
 
@@ -205,7 +218,7 @@ export default function MyPageClientWrapper({
             ? { model: quickModel, label: quickLabel, created_at: undefined }
             : undefined,
           theme: { name: theme, updated_at: null },
-          // ここで affirm / affirmation の両対応を維持したまま渡す
+          // ★ displayText と is_today_jst を含んだ正規化済み Daily を渡す
           daily: daily ?? undefined,
           profile: profile ?? undefined,
         }}

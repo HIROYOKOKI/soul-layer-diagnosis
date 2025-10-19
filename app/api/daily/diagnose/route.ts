@@ -12,6 +12,15 @@ export const dynamic = "force-dynamic";
 type EV = "E" | "V" | "Λ" | "Ǝ";
 type Slot = "morning" | "noon" | "night";
 type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
+type Env = "dev" | "prod";
+type Body = {
+  id: string;
+  slot: Slot;
+  choice: EV;
+  scope?: Scope | string | null;
+  env?: Env | string | null;
+  ts?: string | number | null;
+};
 
 /* ================== ユーティリティ ================== */
 const SCOPE_HINT: Record<Scope, string> = {
@@ -122,18 +131,18 @@ export async function POST(req: Request) {
   try {
     const raw = (await req.json()) as Partial<Body>;
     if (!raw?.id || !raw?.slot || !raw?.choice) {
-      return NextResponse.json({ ok: false, stage, error: "bad_request_missing_fields" }, { status: 200 });
+      return NextResponse.json(
+        { ok: false, stage, error: "bad_request_missing_fields" },
+        { status: 200, headers: { "cache-control": "no-store" } },
+      );
     }
 
-    const id = raw.id;
-    const slot = raw.slot;
-    const choice = raw.choice;
+    const id = String(raw.id);
+    const slot = (["morning", "noon", "night"].includes(String(raw.slot)) ? raw.slot : getJstSlot()) as Slot;
+    const choice = String(raw.choice) as EV;
     const scope = (String(raw.scope ?? "LIFE").toUpperCase() as Scope);
-
-    // ✅ themeTag を scope ベースで統一
     const themeTag = scope.toLowerCase() as "work" | "love" | "future" | "life";
-
-    const env = (raw?.env ?? "prod") as "dev" | "prod";
+    const env = (String(raw?.env ?? "prod").toLowerCase() as Env);
     const client_ts = raw?.ts ?? null;
 
     // === AI生成 ===
@@ -141,14 +150,16 @@ export async function POST(req: Request) {
     let comment: string | null = null;
     let advice: string | null = null;
     let affirm: string | null = null;
+    let __source: "gpt" | "fallback" = "fallback";
 
     try {
       const ai = await genWithAI(choice, slot, scope);
       comment = ai.comment;
       advice = ai.advice;
       affirm = ai.affirm;
+      if (comment && advice && affirm) __source = "gpt";
     } catch (e: any) {
-      console.error("AI生成エラー:", e?.message ?? e);
+      console.error("[daily/diagnose] AI生成エラー:", e?.message ?? e);
     }
 
     if (!comment) comment = FB_COMMENT[choice];
@@ -163,7 +174,6 @@ export async function POST(req: Request) {
       const sb = getSupabaseAdmin();
       if (!sb) throw new Error("supabase_env_missing");
 
-      // ログインユーザー
       let user_id: string | null = null;
       try {
         const auth = createRouteHandlerClient({ cookies: headerCookies });
@@ -176,7 +186,7 @@ export async function POST(req: Request) {
         user_id,
         slot,
         scope,
-        theme: themeTag, // ✅ 修正済み：4値のみ
+        theme: themeTag,
         code: choice,
         comment,
         advice,
@@ -185,22 +195,45 @@ export async function POST(req: Request) {
         created_at,
         env,
         client_ts,
+        __source,
       };
 
-      const { error } = await sb.from("daily_results").upsert(payload, { onConflict: "user_id,question_id,env" });
+      const { error } = await sb
+        .from("daily_results")
+        .upsert(payload, { onConflict: "user_id,question_id,env" });
+
       if (error) throw error;
     } catch (e: any) {
-      console.error("保存エラー:", e);
+      console.error("[daily/diagnose] 保存エラー:", e);
       save_error = { message: e?.message ?? "save_failed" };
     }
 
     // === レスポンス ===
     stage = "respond";
-    const item = { question_id: id, slot, scope, theme: themeTag, code: choice, comment, advice, affirm, score: 0.3, created_at, env };
+    const item = {
+      question_id: id,
+      slot,
+      scope,
+      theme: themeTag,
+      code: choice,
+      comment,
+      advice,
+      affirm,
+      score: 0.3,
+      created_at,
+      env,
+      __source,
+    };
 
-    return NextResponse.json({ ok: true, item, save_error }, { status: 200 });
+    return NextResponse.json(
+      { ok: true, item, save_error },
+      { status: 200, headers: { "cache-control": "no-store" } },
+    );
   } catch (e: any) {
     console.error("診断API失敗(stage=" + stage + "):", e);
-    return NextResponse.json({ ok: false, stage, error: e?.message ?? "internal_error" }, { status: 200 });
+    return NextResponse.json(
+      { ok: false, stage, error: e?.message ?? "internal_error" },
+      { status: 200, headers: { "cache-control": "no-store" } },
+    );
   }
 }

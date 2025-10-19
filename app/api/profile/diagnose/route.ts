@@ -120,6 +120,7 @@ export async function POST(req: Request) {
       "入力されたプロフィールをもとに、性格傾向・運命・理想像をやさしく語ります。",
       "出力はJSON形式で、キーは fortune, personality, partner。",
       "語り口は親しみやすく、少し詩的に。",
+       "現在は2025年です。今年（2025年）を基準に、時期や流れを表現してください。",
     ].join("\n");
 
     const user = buildProfilePrompt(pending);

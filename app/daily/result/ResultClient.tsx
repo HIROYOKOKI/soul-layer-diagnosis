@@ -12,7 +12,7 @@ type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 type Env = "dev" | "prod";
 
 type Item = {
-  question_id?: string;
+  question_id?: string | null;
   mode?: Slot | null;
   scope?: Scope | null;
   code: EV;
@@ -22,6 +22,7 @@ type Item = {
   quote?: string | null;
   created_at?: string | null;
   env?: Env | null;
+  __source?: "gpt" | "fallback";
 };
 
 function getJstSlot(): Slot {
@@ -33,70 +34,115 @@ function getJstSlot(): Slot {
   return "night";
 }
 
+// サーバー/API由来のオブジェクトや sessionStorage から来た素のJSONを UI用に正規化
+function normalize(raw: any | null): Item | null {
+  if (!raw) return null;
+  const slot = (raw.mode ?? raw.slot ?? null) as Slot | null;
+  const scope = (raw.scope ?? null) as Scope | null;
+  const affirm = raw.affirm ?? raw.affirmation ?? raw.quote ?? null;
+
+  return {
+    question_id: raw.question_id ?? null,
+    mode: slot,
+    scope,
+    code: (raw.code ?? "E") as EV,
+    comment: String(raw.comment ?? ""),
+    advice: raw.advice ?? null,
+    affirm: affirm,
+    quote: raw.quote ?? null,
+    created_at: raw.created_at ?? null,
+    env: (raw.env ?? null) as Env | null,
+    __source: raw.__source ?? undefined,
+  };
+}
+
 export default function ResultClient() {
   const router = useRouter();
   const supabase = createClientComponentClient();
 
   const [currentScope, setCurrentScope] = useState<Scope | null>(null);
   const [item, setItem] = useState<Item | null>(null);
-  const [empty, setEmpty] = useState(false);        // ← 追加：空状態
-  const [unauth, setUnauth] = useState(false);      // ← 追加：未ログイン
+  const [empty, setEmpty] = useState(false);
+  const [unauth, setUnauth] = useState(false);
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  // ── 初期ロード：①直前の生成結果（sessionStorage）→ ②フォールバック最新1件 → ③テーマ取得
   useEffect(() => {
+    let mounted = true;
+
     (async () => {
       try {
         setErr(null);
 
-        // テーマ取得（MyPageと同期）
+        // ① 直前の生成結果（質問ページで保存した値）
+        let usedSession = false;
+        if (typeof window !== "undefined") {
+          const raw = sessionStorage.getItem("last_daily_result");
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              const n = normalize(parsed);
+              if (n && mounted) {
+                setItem(n);
+                setStep(1);
+                usedSession = true;
+              }
+            } catch {
+              // 壊れてたら捨てる
+            } finally {
+              // 古い表示の温床になるので一度消しておく（必要ならコメントアウト）
+              sessionStorage.removeItem("last_daily_result");
+            }
+          }
+        }
+
+        // ② セッションが無い/使えない場合は API から最新1件
+        if (!usedSession) {
+          const r = await fetch(`/api/mypage/daily-latest`, { cache: "no-store" });
+          if (!r.ok) throw new Error(`/api/mypage/daily-latest failed (${r.status})`);
+          const j = await r.json();
+
+          if (j?.unauthenticated) {
+            if (!mounted) return;
+            setUnauth(true);
+            setEmpty(true);
+            return;
+          }
+
+          if (j?.ok && j.item) {
+            const n = normalize(j.item);
+            if (mounted) {
+              setItem(n);
+              setStep(1);
+            }
+          } else {
+            if (mounted) setEmpty(true);
+          }
+        }
+
+        // ③ テーマ取得（表示用）
         try {
           const themeRes = await fetch("/api/theme", { cache: "no-store" });
           const themeJson = await themeRes.json().catch(() => null);
           const scopeVal = String(themeJson?.scope ?? themeJson?.theme ?? "").toUpperCase();
           if (["WORK", "LOVE", "FUTURE", "LIFE"].includes(scopeVal)) {
-            setCurrentScope(scopeVal as Scope);
+            if (mounted) setCurrentScope(scopeVal as Scope);
           }
-        } catch {/* noop */}
-
-        // 最新デイリー取得（envフィルタなしに変更）
-        const r = await fetch(`/api/mypage/daily-latest`, { cache: "no-store" });
-        if (!r.ok) throw new Error(`/api/mypage/daily-latest failed (${r.status})`);
-        const j = await r.json();
-
-        if (j?.unauthenticated) {
-          setUnauth(true);
-          setEmpty(true);
-          return;
-        }
-
-        if (j?.ok && j.item) {
-          const raw = j.item as any;
-          const normalized: Item = {
-            question_id: raw?.question_id ?? null,
-            mode: (raw?.mode ?? raw?.slot ?? null) as Slot | null,
-            scope: (raw?.scope ?? null) as Scope | null,
-            code: (raw?.code ?? "E") as EV,
-            comment: String(raw?.comment ?? ""),
-            advice: raw?.advice ?? null,
-            affirm: raw?.affirm ?? raw?.affirmation ?? raw?.quote ?? null,
-            quote: raw?.quote ?? null,
-            created_at: raw?.created_at ?? null,
-            env: (raw?.env ?? null) as Env | null,
-          };
-          setItem(normalized);
-          setStep(1);
-        } else {
-          // データが無い → 空状態に切り替え（Loadingは出さない）
-          setEmpty(true);
+        } catch {
+          /* noop */
         }
       } catch (e: any) {
-        setErr(e?.message || "result_fetch_failed");
+        if (mounted) setErr(e?.message || "result_fetch_failed");
       }
     })();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const hasAdvice = !!(item?.advice && item.advice.trim().length);
@@ -139,7 +185,8 @@ export default function ResultClient() {
       const env: Env = (item.env as Env) || "dev";
 
       const isoDate = new Date().toISOString().slice(0, 10);
-      const question_id = item.question_id || `daily-${isoDate}-${slot}-${scope}`;
+      const question_id =
+        item.question_id || `daily-${isoDate}-${slot}-${scope}`;
 
       const payload = {
         user_id: user.id,
@@ -189,19 +236,30 @@ export default function ResultClient() {
       <div className="min-h-[60vh] grid place-items-center bg-black text-white">
         <div className="text-center space-y-4">
           <div className="opacity-80 text-sm">
-            {unauth ? "ログイン後にデイリー診断を実行してください。" : "まだ診断がありません。/daily から診断を実行してください。"}
+            {unauth
+              ? "ログイン後にデイリー診断を実行してください。"
+              : "まだ診断がありません。/daily から診断を実行してください。"}
           </div>
           <div className="flex gap-3 justify-center">
             {unauth ? (
-              <a href="/login?next=/daily/result" className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5">
+              <a
+                href="/login?next=/daily/result"
+                className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5"
+              >
                 ログインへ
               </a>
             ) : (
-              <a href="/daily" className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5">
+              <a
+                href="/daily"
+                className="px-4 py-2 rounded-xl border border-white/20 hover:bg白/5"
+              >
                 デイリーへ
               </a>
             )}
-            <a href="/mypage" className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5">
+            <a
+              href="/mypage"
+              className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5"
+            >
               マイページへ
             </a>
           </div>
@@ -210,7 +268,6 @@ export default function ResultClient() {
     );
   }
 
-  // 通常表示
   if (!item) {
     return (
       <div className="min-h-[60vh] grid place-items-center bg-black text-white">
@@ -219,12 +276,24 @@ export default function ResultClient() {
     );
   }
 
+  // デバッグ：ソース確認（gpt/fallback）
+  if (typeof window !== "undefined") {
+    // eslint-disable-next-line no-console
+    console.log("RESULT SOURCE:", item.__source, item);
+  }
+
   return (
     <div className="min-h-[70vh] bg-black text-white px-5 sm:px-6 py-10 grid place-items-center">
       <div className="w-full max-w-2xl space-y-6">
         <div className="flex items-center justify-between text-xs opacity-70">
-          <span>{item.created_at && new Date(item.created_at).toLocaleString("ja-JP")}</span>
-          <span>テーマ: {item.scope ?? currentScope ?? "—"} / スロット: {item.mode ?? "—"}</span>
+          <span>
+            {item.created_at &&
+              new Date(item.created_at).toLocaleString("ja-JP")}
+          </span>
+          <span>
+            テーマ: {item.scope ?? currentScope ?? "—"} / スロット:{" "}
+            {item.mode ?? "—"}
+          </span>
         </div>
 
         {step >= 1 && (
@@ -236,7 +305,7 @@ export default function ResultClient() {
           />
         )}
 
-        {step >= 2 && hasAdvice && (
+        {step >= 2 && !!(item.advice && item.advice.trim()) && (
           <div className="translate-y-1 opacity-95">
             <LuneaBubble
               text={`《アドバイス》\n${item.advice}`}
@@ -246,7 +315,7 @@ export default function ResultClient() {
           </div>
         )}
 
-        {step >= 3 && hasAffirm && (
+        {step >= 3 && !!(item.affirm && item.affirm.trim()) && (
           <div className="translate-y-1 opacity-90">
             <LuneaBubble text={`《アファメーション》\n${item.affirm}`} speed={80} />
           </div>

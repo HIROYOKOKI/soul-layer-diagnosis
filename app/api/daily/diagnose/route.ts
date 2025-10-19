@@ -103,7 +103,7 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
   });
 
   const resp = await openai.chat.completions.create({
-    model: "gpt-5-mini",
+   model: "gpt-4o-mini",
     messages: [
       { role: "system", content: sys },
       { role: "user", content: user },

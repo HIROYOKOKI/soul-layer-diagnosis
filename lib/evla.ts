@@ -45,12 +45,11 @@ export async function toUiProd(
 
 // ---- JSTの現在時刻から Slot を検出 ----
 export function detectJstSlot(now: Date = new Date()): Slot {
-  // JST = UTC+9
   const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const h = jst.getUTCHours(); // JST換算後の 0..23
-  if (h >= 5 && h < 12) return "morning"; // 05:00-11:59
-  if (h >= 12 && h < 18) return "noon";   // 12:00-17:59
-  return "night";                          // 18:00-04:59
+  const h = jst.getUTCHours();
+  if (h >= 5 && h < 12) return "morning";
+  if (h >= 12 && h < 18) return "noon";
+  return "night";
 }
 
 // ---- next* ダミー ----
@@ -88,6 +87,23 @@ export function generateCandidates(
   return FALLBACK[slot] ?? FALLBACK.morning;
 }
 
+// ---- choose（候補配列から1件を安全に選ぶ）----
+export function choose(
+  candidates: Choice[] = [],
+  pick?: EV | number | string
+): Choice {
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    return { key: "E", label: "" };
+  }
+  if (typeof pick === "number" && Number.isFinite(pick)) {
+    const idx = ((pick % candidates.length) + candidates.length) % candidates.length;
+    return candidates[idx];
+  }
+  const key = (typeof pick === "string" ? pick.toUpperCase() : pick) as EV | undefined;
+  const hit = key && candidates.find(c => c.key === key);
+  return hit ?? candidates[0];
+}
+
 // ---- extract* ダミー ----
 export function extractE(src?: string | EV): EV { return normalizeToEV(src) ?? "E"; }
 export function extractV(src?: string | EV): EV { return normalizeToEV(src) ?? "V"; }
@@ -111,5 +127,6 @@ export default {
   detectJstSlot,
   nextV, nextE, nextΛ, nextƎ,
   generateCandidates,
+  choose,                  // ★ 追加
   extractE, extractV, extractΛ, extractƎ,
 };

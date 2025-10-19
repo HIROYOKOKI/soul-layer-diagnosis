@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import MyPageShell from '../../components/layout/MyPageShell';
+import RadarCard from './RadarCard'; // ✅ 追加
 
 /* ===== 型 ===== */
 type QuickAny =
@@ -200,10 +201,12 @@ export default function MyPageClientWrapper({
     })();
   }, []);
 
-  /* ---------- Shell へ ---------- */
+  /* ---------- Shell + RadarChart ---------- */
   return (
-    <div className="relative z-10 p-6 text-gray-100 pointer-events-auto">
+    <div className="relative z-10 p-6 text-gray-100 pointer-events-auto space-y-8">
       <h1 className="text-2xl font-semibold mb-4">My Page</h1>
+
+      {/* --- MyPageShell（既存カード） --- */}
       <MyPageShell
         data={{
           user: user
@@ -218,12 +221,16 @@ export default function MyPageClientWrapper({
             ? { model: quickModel, label: quickLabel, created_at: undefined }
             : undefined,
           theme: { name: theme, updated_at: null },
-          // ★ displayText と is_today_jst を含んだ正規化済み Daily を渡す
           daily: daily ?? undefined,
           profile: profile ?? undefined,
         }}
         userId={user?.id}
       />
+
+      {/* --- レーダーチャート --- */}
+      <div className="pt-4 border-t border-white/10">
+        <RadarCard />
+      </div>
     </div>
   );
 }

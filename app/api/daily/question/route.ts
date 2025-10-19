@@ -4,7 +4,6 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
 type Slot = "morning" | "noon" | "night";
 type Theme = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 type EV = "E" | "V" | "Λ" | "Ǝ";

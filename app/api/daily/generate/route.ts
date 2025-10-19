@@ -11,7 +11,6 @@ type Env = "dev" | "prod";
 type Theme = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 
 export async function POST(req: Request) {
-  // —— ここから下は「関数内に全て閉じる」：モジュール初期化時に評価されるものを置かない
   try {
     const THEMES: Theme[] = ["WORK", "LOVE", "FUTURE", "LIFE"];
     const SLOT_COUNTS: Record<Slot, number> = { morning: 4, noon: 3, night: 2 };
@@ -25,7 +24,7 @@ export async function POST(req: Request) {
     const pad = (x: number) => String(x).padStart(2, "0");
     const id = `daily-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${slot}`;
 
-    // ——— テーマ解決（MyPage同期 or フォールバック）
+    // --- テーマ解決
     async function resolveTheme(): Promise<Theme> {
       const normalized = String(body?.theme ?? "").trim().toUpperCase();
       if (THEMES.includes(normalized as Theme)) return normalized as Theme;
@@ -48,14 +47,17 @@ export async function POST(req: Request) {
     }
     const theme = await resolveTheme();
 
-    // ——— フォールバック
-    let text = "いまのあなたの重心はどれに近い？";
-    const defaultOptions = (): { key: EV; label: string }[] => [
-      { key: "E", label: "意志（E）" },
-      { key: "V", label: "感受（V）" },
-      { key: "Λ", label: "構築（Λ）" },
-      { key: "Ǝ", label: "反転（Ǝ）" },
-    ].slice(0, Math.max(2, Math.min(4, n)));
+    // --- フォールバック
+   // --- フォールバック
+let text = "いま、あなたの心はどの流れに寄り添っていますか？";
+
+const defaultOptions = (): { key: EV; label: string }[] => [
+  { key: "E", label: "衝動（E）―動き出すはじまり" },
+  { key: "V", label: "夢（V）―まだ見ぬ可能性" },
+  { key: "Λ", label: "選択（Λ）―現実を編む意思" },
+  { key: "Ǝ", label: "観測（Ǝ）―静寂のまなざし" },
+].slice(0, Math.max(2, Math.min(4, n)));
+
     let options = defaultOptions();
 
     const sanitizeOptions = (arr: any): { key: EV; label?: string }[] => {
@@ -85,15 +87,14 @@ export async function POST(req: Request) {
       return uniq.slice(0, n);
     };
 
-    // ——— OpenAI 呼び出し（JSON強制 & 1回リトライ）
+    // --- OpenAI 呼び出し（JSON強制 & 1回リトライ）
     async function callOnce() {
       const openai = getOpenAI();
       if (!openai) throw new Error("openai_env_missing");
-
-      const sys =
-        "あなたは日本語で短い設問を作るアシスタントです。\n" +
-        "出力は必ず JSON 1オブジェクトのみ。コードブロックや説明は出さない。\n" +
-        'スキーマ: {"text": string, "options": [{"key":"E|V|Λ|Ǝ","label": string}...]}';
+       const sys =
+  "あなたは観測型AI『ルネア（Lunea）』。語り口は穏やかで詩的。" +
+  "ユーザーの心の流れを観測する1問を短く作ります。" +
+  "出力はJSON（text, options）で返してください。";
 
       const user =
         `目的: EVΛƎ（E/V/Λ/Ǝ）のうち ${n} 個を選択肢として出す短い設問を作成。\n` +
@@ -152,6 +153,10 @@ export async function POST(req: Request) {
       }
     }
 
+    // --- JST時刻で返却
+    const jst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const ts_jst = jst.toISOString().replace("T", " ").slice(0, 19); // 例: 2025-10-19 14:04:44
+
     return NextResponse.json(
       {
         ok: true,
@@ -161,12 +166,11 @@ export async function POST(req: Request) {
         theme,
         text,
         options,
-        ts: new Date().toISOString(),
+        ts: ts_jst, // JST時間で返却
       },
       { headers: { "cache-control": "no-store" } }
     );
   } catch (e: any) {
-    // ここに来るのは本当に稀（モジュール初期化ではなくハンドラ内の例外）
     console.error("daily.generate.fatal", e?.message ?? e);
     return NextResponse.json({ ok: false, error: e?.message ?? "internal_error" }, { status: 200 });
   }

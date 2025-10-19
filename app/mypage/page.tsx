@@ -1,10 +1,8 @@
 // app/mypage/page.tsx
 import MyPageClientWrapper from "./MyPageClientWrapper";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 export default async function MyPagePage() {
+  // 相対 + no-store で毎回最新を取得（Cookieも同梱）
   const [tRes, qRes, dRes, pRes] = await Promise.all([
     fetch("/api/theme", { cache: "no-store" }).catch(() => null),
     fetch("/api/mypage/quick-latest", { cache: "no-store" }).catch(() => null),
@@ -23,8 +21,11 @@ export default async function MyPagePage() {
   const profile = pJson?.item ?? null;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 space-y-6">
-      <MyPageClientWrapper theme={theme} quick={quick} daily={daily} profile={profile} />
-    </div>
+    <MyPageClientWrapper
+      theme={theme}
+      quick={quick}
+      daily={daily}
+      profile={profile}
+    />
   );
 }

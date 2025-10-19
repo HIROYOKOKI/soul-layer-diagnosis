@@ -4,7 +4,6 @@ import { cookies } from "next/headers";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 // 👇 evla の関数は名前空間でまとめて import
-import * as EVLA from "@/lib/evla";
 
 import type {
   DailyAnswerRequest,

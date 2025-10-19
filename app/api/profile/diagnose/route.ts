@@ -101,7 +101,8 @@ export async function POST(req: Request) {
     const openai = getOpenAI();
     if (!openai) throw new Error("openai_env_missing");
 
-    const model = process.env.OPENAI_PROFILE_MODEL || "model: "gpt-4o-mini"
+    const MODEL = process.env.OPENAI_PROFILE_MODEL || "gpt-4o-mini";
+
     const MAX_TOKENS = Number(process.env.OPENAI_PROFILE_MAXTOKENS || 550);
 
     const system =

@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import LuneaBubble from "@/components/LuneaBubble";
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
@@ -68,6 +69,7 @@ function getJstSlot(): Slot {
 }
 
 export default function DailyQuestionPage() {
+  const router = useRouter();
   const [q, setQ] = useState<Q | null>(null);
   const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -157,7 +159,7 @@ export default function DailyQuestionPage() {
       choiceId: choice,             // 新API互換
       scope: q.scope,               // 旧フィールド名
       theme: q.scope,               // 新フィールド名（同じ値）
-      env: "prod",
+      env: "dev",   
     };
 
     try {
@@ -169,6 +171,8 @@ export default function DailyQuestionPage() {
       if (!r1.ok) throw new Error(`/api/daily/diagnose failed (${r1.status})`);
 
       const payload = await r1.json();
+     console.log("DIAGNOSE RAW >>>", payload);
+
 
       // ★ 受け取りは item / result / data / 直下 の順に拾う
       const received =
@@ -185,8 +189,12 @@ export default function DailyQuestionPage() {
         body: JSON.stringify({ ...body, result: received }),
       }).catch(() => {});
 
+    // ★ 直前の生成結果を画面に受け渡し
+     if (typeof window !== "undefined") {
+        sessionStorage.setItem("last_daily_result", JSON.stringify(received));
+      }
       // 結果ページへ
-      location.href = "/daily/result";
+      router.push("/daily/result");
     } catch (e: any) {
       setErr(e?.message || "diagnose_failed");
       setSending(false);

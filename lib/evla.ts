@@ -1,4 +1,3 @@
-cat > lib/evla.ts <<'TS'
 // lib/evla.ts — safe stub to unblock build (TypeScript)
 
 export type EV = "E" | "V" | "Λ" | "Ǝ";
@@ -30,8 +29,11 @@ export function evla(): Record<string, never> { return {}; }
 export async function toUiProd(
   evla: EvlaLog
 ): Promise<UiResult & { __source: "disabled" | "gpt" | "template" }> {
-  const base = (evla?.theme && THEME_HINTS[evla.theme]) || "生活全般・習慣・健康・心身の整え・日々の選択";
-  const DEV = (process.env.NEXT_PUBLIC_APP_MODE || process.env.NODE_ENV) !== "production";
+  const base =
+    (evla?.theme && THEME_HINTS[evla.theme]) ||
+    "生活全般・習慣・健康・心身の整え・日々の選択";
+  const DEV =
+    (process.env.NEXT_PUBLIC_APP_MODE || process.env.NODE_ENV) !== "production";
   if (!DEV) return { comment: "", advice: "", affirm: "", __source: "disabled" };
   return {
     comment: `（template）${base} の観点から、今日は「最小の一歩」を意識して進めてみましょう。完璧さより反復を優先し、小さな達成を積み重ねることで流れが生まれます。`,
@@ -39,6 +41,16 @@ export async function toUiProd(
     affirm: "（template）私は小さな完了で流れをつくる",
     __source: "template",
   };
+}
+
+// ---- JSTの現在時刻から Slot を検出 ----
+export function detectJstSlot(now: Date = new Date()): Slot {
+  // JST = UTC+9
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const h = jst.getUTCHours(); // JST換算後の 0..23
+  if (h >= 5 && h < 12) return "morning"; // 05:00-11:59
+  if (h >= 12 && h < 18) return "noon";   // 12:00-17:59
+  return "night";                          // 18:00-04:59
 }
 
 // ---- next* ダミー ----
@@ -69,7 +81,9 @@ const FALLBACK: Record<Slot, Choice[]> = {
     { key: "Ǝ", label: "静かに振り返る" },
   ],
 };
-export function generateCandidates(arg?: { slot?: Slot; theme?: string } | Slot): Choice[] {
+export function generateCandidates(
+  arg?: { slot?: Slot; theme?: string } | Slot
+): Choice[] {
   const slot: Slot = typeof arg === "string" ? arg : (arg?.slot as Slot) || "morning";
   return FALLBACK[slot] ?? FALLBACK.morning;
 }
@@ -94,8 +108,8 @@ function normalizeToEV(src?: string | EV): EV | null {
 export default {
   evla,
   toUiProd,
+  detectJstSlot,
   nextV, nextE, nextΛ, nextƎ,
   generateCandidates,
   extractE, extractV, extractΛ, extractƎ,
 };
-TS

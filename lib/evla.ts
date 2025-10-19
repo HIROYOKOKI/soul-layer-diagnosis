@@ -1,8 +1,3 @@
-# 1) 退避
-mv lib/evla.ts lib/evla.bak.ts 2>/dev/null || true
-
-# 2) 正しい内容を書き戻し（そのままコピペ）
-cat > lib/evla.ts <<'TS'
 // lib/evla.ts — safe stub to unblock build (TypeScript)
 
 export type EV = "E" | "V" | "Λ" | "Ǝ";

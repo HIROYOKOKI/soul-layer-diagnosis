@@ -184,7 +184,8 @@ export async function POST(req: Request) {
     }
 
     const env = (raw?.env ?? "prod") as "dev" | "prod";
-    const themeTag = (raw?.theme ?? "prod") as "dev" | "prod";
+   const themeTag = scope.toLowerCase() as "work" | "love" | "future" | "life";
+
     const client_ts = raw?.ts ?? null;
 
     // === 生成 ===

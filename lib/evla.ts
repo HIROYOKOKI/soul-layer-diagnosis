@@ -1,3 +1,4 @@
+cat > lib/evla.ts <<'TS'
 // lib/evla.ts — safe stub to unblock build (TypeScript)
 
 export type EV = "E" | "V" | "Λ" | "Ǝ";
@@ -98,10 +99,3 @@ export default {
   extractE, extractV, extractΛ, extractƎ,
 };
 TS
-
-
-/usr/bin/file -I lib/evla.ts
-dos2unix lib/evla.ts 2>/dev/null || true
-
-npx tsc -p tsconfig.json --noEmit
-npm run build

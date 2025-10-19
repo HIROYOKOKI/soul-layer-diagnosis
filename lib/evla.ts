@@ -99,10 +99,9 @@ export default {
 };
 TS
 
-# 3) 文字コードと改行を統一（UTF-8 / LF）
+
 /usr/bin/file -I lib/evla.ts
 dos2unix lib/evla.ts 2>/dev/null || true
 
-# 4) 静的チェック→ビルド
 npx tsc -p tsconfig.json --noEmit
 npm run build

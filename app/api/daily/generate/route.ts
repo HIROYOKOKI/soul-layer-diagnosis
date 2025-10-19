@@ -86,7 +86,7 @@ export async function POST(req: Request) {
   const theme = await resolveTheme(req, body?.theme);
 
   // フォールバック（AI失敗や未設定でも返す）
-  let text = "いまのあなたの重心はどれに近い？";
+  let text = "いまのあなたの意識方向はどれに近い？";
   let options = defaultOptions(n);
 
   try {

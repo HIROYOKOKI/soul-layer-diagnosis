@@ -128,12 +128,14 @@ async function generateQuestionJSON(n: number, theme: Theme, slot: Slot) {
   if (!textRaw) throw new Error("missing_text_in_response");
 
   return {
-    text: textRaw as string,
-    options: sanitizeOptions(parsed?.options, n),
-  };
+  text: textRaw as string,
+  options: sanitizeOptions(parsed?.options, n),
+  _raw: debug ? content : undefined,  // ★ デバッグ時のみ生レス返す
+};
 }
 
 export async function POST(req: Request) {
+  const debug = Boolean(body?.debug) || /[?&]debug=1/.test(req.url);
   const body = await req.json().catch(() => ({} as any));
   const slot = (body?.slot ?? "morning") as Slot; // morning=4, noon=3, night=2
   const env = (body?.env ?? "prod") as Env;

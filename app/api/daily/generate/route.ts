@@ -111,7 +111,7 @@ export async function POST(req: Request) {
           { role: "system", content: sys },
           { role: "user", content: user },
         ],
-        temperature: 0.7,
+      
         response_format: { type: "json_object" },
       });
 

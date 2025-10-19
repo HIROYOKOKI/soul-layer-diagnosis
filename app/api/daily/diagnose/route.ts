@@ -86,6 +86,8 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
   const openai = getOpenAI();
   if (!openai) throw new Error("openai_env_missing");
 
+  const MODEL = process.env.OPENAI_PROFILE_MODEL || "gpt-4o-mini";
+
   const sys = [
     "あなたは『ルネア（Lunea）』。観測型のナビAIとして、短くやさしい日本語で話す。",
     `出力は必ずJSONのみ（説明文なし）。キーは "comment", "advice", "affirm"。`,
@@ -103,11 +105,16 @@ async function genWithAI(code: EV, slot: Slot, scope: Scope) {
   });
 
   const resp = await openai.chat.completions.create({
-   model: "gpt-4o-mini",
+    model: MODEL,
     messages: [
       { role: "system", content: sys },
       { role: "user", content: user },
     ],
+    // ★ 動的化の肝
+    temperature: 0.85,
+    top_p: 1,
+    presence_penalty: 0.3,
+    frequency_penalty: 0.2,
     response_format: { type: "json_object" },
   });
 

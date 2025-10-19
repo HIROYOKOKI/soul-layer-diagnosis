@@ -1,15 +1,14 @@
 // app/mypage/page.tsx
 import MyPageClientWrapper from "./MyPageClientWrapper";
-import dynamic from "next/dynamic";
+import { default as nextDynamic } from "next/dynamic"; // ← 別名に変更！
 
-// レーダーチャート（クライアント専用）をSSR無効で読み込み
-const RadarCard = dynamic(() => import("./RadarCard"), { ssr: false });
+// レーダーチャートをSSR無効で読み込み
+const RadarCard = nextDynamic(() => import("./RadarCard"), { ssr: false });
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function MyPagePage() {
-  // 相対 + no-store で毎回最新を取得（Cookieも同梱）
   const [tRes, qRes, dRes, pRes] = await Promise.all([
     fetch("/api/theme", { cache: "no-store" }).catch(() => null),
     fetch("/api/mypage/quick-latest", { cache: "no-store" }).catch(() => null),
@@ -29,10 +28,7 @@ export default async function MyPagePage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 space-y-6">
-      {/* 既存のマイページ内容 */}
       <MyPageClientWrapper theme={theme} quick={quick} daily={daily} profile={profile} />
-
-      {/* レーダーチャート（最新 quick → 無ければ daily を内部で自動フェッチ/正規化） */}
       <RadarCard />
     </div>
   );

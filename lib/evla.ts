@@ -1,14 +1,15 @@
+# 1) 退避
+mv lib/evla.ts lib/evla.bak.ts 2>/dev/null || true
+
+# 2) 正しい内容を書き戻し（そのままコピペ）
+cat > lib/evla.ts <<'TS'
 // lib/evla.ts — safe stub to unblock build (TypeScript)
 
 export type EV = "E" | "V" | "Λ" | "Ǝ";
 export type Slot = "morning" | "noon" | "night";
 export type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 
-export type UiResult = {
-  comment: string;
-  advice: string;
-  affirm: string;
-};
+export type UiResult = { comment: string; advice: string; affirm: string };
 
 export type EvlaInput = {
   theme?: "work" | "love" | "future" | "life";
@@ -17,9 +18,7 @@ export type EvlaInput = {
   code?: EV;
 };
 
-export type EvlaLog = EvlaInput & {
-  trace?: Record<string, unknown>;
-};
+export type EvlaLog = EvlaInput & { trace?: Record<string, unknown> };
 
 const THEME_HINTS: Record<NonNullable<EvlaInput["theme"]>, string> = {
   work: "仕事・学び・成果・チーム連携・自己効率",
@@ -28,26 +27,16 @@ const THEME_HINTS: Record<NonNullable<EvlaInput["theme"]>, string> = {
   life: "生活全般・習慣・健康・心身の整え・日々の選択",
 };
 
-// ---- 既存互換: evla() ----
-export function evla(): Record<string, never> {
-  return {};
-}
+// ---- 互換: evla() ----
+export function evla(): Record<string, never> { return {}; }
 
-// ---- 既存互換: toUiProd() ----
+// ---- 互換: toUiProd() ----
 export async function toUiProd(
   evla: EvlaLog
 ): Promise<UiResult & { __source: "disabled" | "gpt" | "template" }> {
-  const base =
-    (evla?.theme && THEME_HINTS[evla.theme]) ||
-    "生活全般・習慣・健康・心身の整え・日々の選択";
-
-  const DEV =
-    (process.env.NEXT_PUBLIC_APP_MODE || process.env.NODE_ENV) !== "production";
-
-  if (!DEV) {
-    return { comment: "", advice: "", affirm: "", __source: "disabled" };
-  }
-
+  const base = (evla?.theme && THEME_HINTS[evla.theme]) || "生活全般・習慣・健康・心身の整え・日々の選択";
+  const DEV = (process.env.NEXT_PUBLIC_APP_MODE || process.env.NODE_ENV) !== "production";
+  if (!DEV) return { comment: "", advice: "", affirm: "", __source: "disabled" };
   return {
     comment: `（template）${base} の観点から、今日は「最小の一歩」を意識して進めてみましょう。完璧さより反復を優先し、小さな達成を積み重ねることで流れが生まれます。`,
     advice: `（template）いまから5分で終わることを1つだけ着手→完了。終えたら深呼吸し、次の一手をメモに1行で書き残すだけに留めましょう。過剰に進めないのがコツです。`,
@@ -56,13 +45,13 @@ export async function toUiProd(
   };
 }
 
-// ---- 追加: next* 系 ----
+// ---- next* ダミー ----
 export function nextV(_curr?: EV): EV { return "V"; }
 export function nextE(_curr?: EV): EV { return "E"; }
 export function nextΛ(_curr?: EV): EV { return "Λ"; }
 export function nextƎ(_curr?: EV): EV { return "Ǝ"; }
 
-// ---- generateCandidates ----
+// ---- 候補生成（fallback）----
 export type Choice = { key: EV; label: string };
 const FALLBACK: Record<Slot, Choice[]> = {
   morning: [
@@ -84,28 +73,24 @@ const FALLBACK: Record<Slot, Choice[]> = {
     { key: "Ǝ", label: "静かに振り返る" },
   ],
 };
-export function generateCandidates(
-  arg?: { slot?: Slot; theme?: string } | Slot
-): Choice[] {
-  const slot: Slot =
-    typeof arg === "string" ? arg : (arg?.slot as Slot) || "morning";
+export function generateCandidates(arg?: { slot?: Slot; theme?: string } | Slot): Choice[] {
+  const slot: Slot = typeof arg === "string" ? arg : (arg?.slot as Slot) || "morning";
   return FALLBACK[slot] ?? FALLBACK.morning;
 }
 
-// ---- extract 系 ----
+// ---- extract* ダミー ----
 export function extractE(src?: string | EV): EV { return normalizeToEV(src) ?? "E"; }
 export function extractV(src?: string | EV): EV { return normalizeToEV(src) ?? "V"; }
 export function extractΛ(src?: string | EV): EV { return normalizeToEV(src) ?? "Λ"; }
 export function extractƎ(src?: string | EV): EV { return normalizeToEV(src) ?? "Ǝ"; }
-
 function normalizeToEV(src?: string | EV): EV | null {
   if (!src) return null;
-  if (["E", "V", "Λ", "Ǝ"].includes(src)) return src as EV;
+  if (src === "E" || src === "V" || src === "Λ" || src === "Ǝ") return src;
   const s = String(src).toUpperCase();
-  if (/\bE\b|IMPULSE|ENERGY/.test(s)) return "E";
-  if (/\bV\b|POSSIBILITY|VISION/.test(s)) return "V";
-  if (/Λ|LAMBDA|CHOICE|SELECT|DECIDE/.test(s)) return "Λ";
-  if (/Ǝ|OBSERV|MONITOR|REFLECT/.test(s)) return "Ǝ";
+  if (/\bE\b|IMPULSE|ENERGY|衝動|直感|勢い/.test(s)) return "E";
+  if (/\bV\b|POSSIBILITY|VISION|可能|夢|余白|発想/.test(s)) return "V";
+  if (/Λ|LAMBDA|CHOICE|SELECT|DECIDE|選択|判断|基準|合理/.test(s)) return "Λ";
+  if (/Ǝ|OBSERV|MONITOR|REFLECT|観測|振り返り|静けさ|事実/.test(s)) return "Ǝ";
   return null;
 }
 
@@ -117,3 +102,12 @@ export default {
   generateCandidates,
   extractE, extractV, extractΛ, extractƎ,
 };
+TS
+
+# 3) 文字コードと改行を統一（UTF-8 / LF）
+/usr/bin/file -I lib/evla.ts
+dos2unix lib/evla.ts 2>/dev/null || true
+
+# 4) 静的チェック→ビルド
+npx tsc -p tsconfig.json --noEmit
+npm run build

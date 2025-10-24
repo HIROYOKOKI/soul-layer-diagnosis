@@ -203,33 +203,33 @@ export default function MyPageClientWrapper({
       {/* H1 は重複見出しになるので削除（ページ側で出す） */}
 
       {/* --- MyPageShell（モバイルはフルブリードで広げる） --- */}
-      <div
-        className="
-          w-full
-          -mx-4 sm:mx-0          /* 親の左右パディングを打ち消して全幅に */
-          [&_*]:!max-w-none      /* 子孫の max-width を強制解除 */
-        "
-      >
-        <MyPageShell
-          data={{
-            user: user
-              ? {
-                  id: user.id,
-                  name: user.name ?? undefined,
-                  displayId: user.display_id ?? undefined,
-                  avatarUrl: user.avatar_url ?? undefined,
-                }
-              : undefined,
-            quick: quickModel
-              ? { model: quickModel, label: quickLabel, created_at: undefined }
-              : undefined,
-            theme: { name: theme, updated_at: null },
-            daily: daily ?? undefined,
-            profile: profile ?? undefined,
-          }}
-          userId={user?.id}
-        />
-      </div>
+    <div
+  className="
+    w-screen                        /* ビューポート幅基準で全幅化 */
+    mx-[calc(50%-50vw)]             /* 親の max-width を突破して中央基準に再配置 */
+    [&_*]:!max-w-none               /* 子孫の max-width を完全解除 */
+  "
+>
+  <MyPageShell
+    data={{
+      user: user
+        ? {
+            id: user.id,
+            name: user.name ?? undefined,
+            displayId: user.display_id ?? undefined,
+            avatarUrl: user.avatar_url ?? undefined,
+          }
+        : undefined,
+      quick: quickModel
+        ? { model: quickModel, label: quickLabel, created_at: undefined }
+        : undefined,
+      theme: { name: theme, updated_at: null },
+      daily: daily ?? undefined,
+      profile: profile ?? undefined,
+    }}
+    userId={user?.id}
+  />
+</div>
 
       {/* --- レーダーチャート（こちらは通常幅でOK） --- */}
       <div className="pt-4 border-t border-white/10">

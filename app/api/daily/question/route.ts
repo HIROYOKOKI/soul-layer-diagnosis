@@ -29,7 +29,6 @@ const FALLBACK: Record<Slot, { key: EV; label: string }[]> = {
 };
 
 const NEED = (slot: Slot) => (slot === "morning" ? 4 : slot === "noon" ? 3 : 2);
-
 const ORIGIN = (reqUrl: string) =>
   process.env.NEXT_PUBLIC_SITE_URL ?? new URL(reqUrl).origin;
 
@@ -49,10 +48,58 @@ function toJstDateString(d: string | Date) {
   const dt = new Date(d);
   return new Date(dt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })).toDateString();
 }
-
 function seedFromUUID(uuid: string): number {
   const head = uuid.replace(/-/g, "").slice(0, 8);
   return Number.parseInt(head, 16) >>> 0;
+}
+
+/* ====== 合成ユーティリティ ====== */
+type Vec = { E: number; V: number; L: number; Ze: number }; // 0..100
+
+function clamp100(n: number) { return Math.max(0, Math.min(100, n)); }
+function nz(v?: number | null) { return typeof v === "number" && !Number.isNaN(v); }
+function normScore(x?: number | null): number | null {
+  if (!nz(x)) return null;
+  const n = x as number;
+  return n <= 1 ? clamp100(n * 100) : clamp100(n);
+}
+function fromScoreMap(m?: any): Vec | null {
+  if (!m) return null;
+  const E = normScore(m.E);
+  const V = normScore(m.V);
+  const L = normScore(m["Λ"] ?? m.L);
+  const Ze = normScore(m["Ǝ"] ?? m.Ze);
+  if ([E, V, L, Ze].every(nz)) {
+    return { E: E!, V: V!, L: L!, Ze: Ze! };
+  }
+  return null;
+}
+
+/** テーマ→バイアス（軽量・可逆） */
+function themeVector(theme: Theme): Vec {
+  // 中庸: 25ずつをベースに +/−10 の範囲で微傾斜
+  switch (theme) {
+    case "WORK":   return { E: 30, V: 20, L: 35, Ze: 15 };
+    case "LOVE":   return { E: 20, V: 40, L: 20, Ze: 20 };
+    case "FUTURE": return { E: 28, V: 38, L: 18, Ze: 16 };
+    case "LIFE":   return { E: 23, V: 27, L: 23, Ze: 27 };
+  }
+}
+
+/** ゼロベクトル */
+const ZERO: Vec = { E: 0, V: 0, L: 0, Ze: 0 };
+
+/** 加算 */
+function add(a: Vec, b: Vec): Vec {
+  return { E: a.E + b.E, V: a.V + b.V, L: a.L + b.L, Ze: a.Ze + b.Ze };
+}
+/** スカラー倍 */
+function mul(a: Vec, k: number): Vec {
+  return { E: a.E * k, V: a.V * k, L: a.L * k, Ze: a.Ze * k };
+}
+/** 正規化（0..100） */
+function normFinal(v: Vec): Vec {
+  return { E: clamp100(v.E), V: clamp100(v.V), L: clamp100(v.L), Ze: clamp100(v.Ze) };
 }
 
 export async function GET(req: Request) {
@@ -62,7 +109,7 @@ export async function GET(req: Request) {
   const jar = cookies();
   const cookieHeader = (req.headers.get("cookie") ?? "") as string;
 
-  // 1) テーマ（MyPageと同期）
+  // 1) テーマ
   let theme: Theme = "LOVE";
   try {
     const r = await fetch(`${origin}/api/theme`, {
@@ -72,15 +119,13 @@ export async function GET(req: Request) {
     const j = await r.json().catch(() => ({}));
     const t = String(j?.scope ?? j?.theme ?? "LOVE").toUpperCase();
     if (["WORK", "LOVE", "FUTURE", "LIFE"].includes(t)) theme = t as Theme;
-  } catch {
-    /* noop */
-  }
+  } catch {}
 
   // 2) JSTスロット
   const slot = getJstSlot();
   const need = NEED(slot);
 
-  // 3) /api/daily/generate に委譲（Cookie引き継ぎ）
+  // 3) /api/daily/generate へ委譲
   let text = "";
   let options: { key?: string; label?: string }[] = [];
   try {
@@ -101,11 +146,9 @@ export async function GET(req: Request) {
       if (["WORK", "LOVE", "FUTURE", "LIFE"].includes(patched))
         theme = patched as Theme;
     }
-  } catch {
-    /* noop */
-  }
+  } catch {}
 
-  // 4) 強制フォールバック：必ず 2..4 件にする
+  // 4) 選択肢フォールバック
   const keys: EV[] = ["E", "V", "Λ", "Ǝ"];
   let choices = (options || [])
     .slice(0, need)
@@ -115,8 +158,6 @@ export async function GET(req: Request) {
       return { key: k, label };
     })
     .filter((c) => c.label);
-
-  // 足りない分は FALLBACK で補完
   const have = new Set(choices.map((c) => c.key));
   for (const c of FALLBACK[slot]) {
     if (choices.length >= need) break;
@@ -125,7 +166,6 @@ export async function GET(req: Request) {
       have.add(c.key);
     }
   }
-  // それでも空なら丸ごと差し替え
   if (choices.length === 0) choices = FALLBACK[slot].slice(0, need);
   if (choices.length > need) choices = choices.slice(0, need);
 
@@ -146,7 +186,7 @@ export async function GET(req: Request) {
   jar.set("daily_slot", slot, { httpOnly: true, sameSite: "lax", path: "/" });
   jar.set("daily_theme", theme, { httpOnly: true, sameSite: "lax", path: "/" });
 
-  // 6) （★debug用）最新データの内部参照を同梱
+  // 6) debug: 最新データ & 合成スコア
   let debugPayload: any | null = null;
   if (debug) {
     try {
@@ -156,12 +196,64 @@ export async function GET(req: Request) {
         fetch(`${origin}/api/mypage/profile-latest`, { cache: "no-store", headers: { cookie: cookieHeader } }).then(r => r.json()).catch(() => null),
       ]);
 
+      const quick = q?.item ?? null;
+      const daily = d?.item ?? null;
+      const profile = p?.item ?? null;
+
+      // ---- 入力ベクトル抽出
+      const vTheme: Vec = themeVector(theme);
+      const vDaily: Vec | null = fromScoreMap(daily?.score_map);
+      // プロフィールにベクトルが無い想定のため null（将来、profile_scores 等があれば拾う）
+      const vProfile: Vec | null = fromScoreMap((profile as any)?.score_map) ?? null;
+      // クイックは型のみのため既定は使用しない（必要なら軽バイアスを与える）
+      const vQuick: Vec | null = null;
+
+      // ---- 重み（あなたの既定）
+      const weights = {
+        profile: 1.0,
+        theme:   0.5,
+        daily:   0.1,
+        weekly:  0.5,   // まだ未使用
+        monthly: 1.5,   // まだ未使用
+        quick:   0.0,   // 既定は使わない（必要あれば上げる）
+      };
+
+      // ---- 合成
+      const parts: { key: keyof typeof weights; vec: Vec | null }[] = [
+        { key: "profile", vec: vProfile },
+        { key: "theme",   vec: vTheme   },
+        { key: "daily",   vec: vDaily   },
+        { key: "quick",   vec: vQuick   },
+      ];
+
+      let acc = ZERO;
+      let wsum = 0;
+      const used: Record<string, number> = {};
+      for (const p of parts) {
+        const w = weights[p.key];
+        if (p.vec && w > 0) {
+          acc = add(acc, mul(p.vec, w));
+          wsum += w;
+          used[p.key] = w;
+        }
+      }
+      // 使用した重みの合計で割って 0..100 に丸め
+      const combined: Vec = wsum > 0 ? normFinal(mul(acc, 1 / wsum)) : normFinal(acc);
+
       debugPayload = {
         theme,
         today_jst: toJstDateString(new Date()),
-        quick_latest: q?.item ?? null,
-        daily_latest: d?.item ?? null,
-        profile_latest: p?.item ?? null,
+        quick_latest: quick,
+        daily_latest: daily,
+        profile_latest: profile,
+        vectors: {
+          theme: vTheme,
+          daily: vDaily,
+          profile: vProfile,
+          quick: vQuick,
+        },
+        weights_used: used,
+        combined, // ★ 合成スコア（0..100）
       };
     } catch {
       debugPayload = { theme, today_jst: toJstDateString(new Date()) };

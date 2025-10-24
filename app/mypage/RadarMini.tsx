@@ -90,7 +90,7 @@ export default function RadarMini({
     <svg width="100%" height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label="EVAE Radar">
       {/* グリッド（4リング） */}
       {[1,2,3,4].map(k => (
-        <polygon key={k} points={ring(k)} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="1" />
+        <polygon key={k} points={ring(k)} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="0.1" />
       ))}
 
       {/* 軸線 */}

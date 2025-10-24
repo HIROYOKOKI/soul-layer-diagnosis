@@ -6,6 +6,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { formatJP } from './date'
 import ClockJST from './ClockJST'
+import RadarMini from '@/app/mypage/RadarMini' // ★ 追加：軽量レーダー
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
@@ -33,6 +34,12 @@ export type MyPageData = {
     theme?: string | null
     nextv?: { id: string; label: string }[] | null
     nextv_selected?: string | null
+
+    /** ▼ レーダー用に将来拡張されるかもしれない形（存在すれば拾う） */
+    // 例: { E:70, V:55, L:40, Ze:65 }
+    scores?: Partial<Record<'E' | 'V' | 'L' | 'Ze', number>>
+    // 例: { E:0.7, V:0.55, Λ:0.4, Ǝ:0.65 }
+    score_map?: Partial<Record<'E' | 'V' | 'Λ' | 'Ǝ', number>>
   } | null
   profile?: {
     fortune?: string | null
@@ -68,6 +75,31 @@ function isTodayJST(daily?: MyPageData['daily'] | null): boolean {
   if (!daily.created_at) return true // created_at 無い時は寛容に表示
   return toJstDateString(daily.created_at) === toJstDateString(new Date())
 }
+
+/** ▼ レーダー用スコアの抽出（存在しない場合は見栄えの良い安全なデフォルト） */
+function pickRadarScores(d?: MyPageData | null) {
+  const daily = d?.daily
+  // 1) daily.scores: {E,V,L,Ze}
+  const s1 = daily?.scores
+  if (s1 && typeof s1.E === 'number' && typeof s1.V === 'number' && typeof s1.L === 'number' && typeof s1.Ze === 'number') {
+    return { E: clamp100(s1.E), V: clamp100(s1.V), L: clamp100(s1.L), Ze: clamp100(s1.Ze) }
+  }
+  // 2) daily.score_map: {E,V,Λ,Ǝ}（0–1 または 0–100 想定）
+  const m = daily?.score_map
+  if (m) {
+    const to100 = (v?: number) => (typeof v === 'number' ? (v <= 1 ? v * 100 : v) : undefined)
+    const E = to100(m.E)
+    const V = to100(m.V)
+    const L = to100((m as any)['Λ'])
+    const Ze = to100((m as any)['Ǝ'])
+    if ([E, V, L, Ze].every(v => typeof v === 'number')) {
+      return { E: clamp100(E as number), V: clamp100(V as number), L: clamp100(L as number), Ze: clamp100(Ze as number) }
+    }
+  }
+  // 3) 何もなければデフォルト（見栄え用）
+  return { E: 68, V: 58, L: 46, Ze: 72 }
+}
+function clamp100(n: number) { return Math.max(0, Math.min(100, n)) }
 
 /* ===== 共通カード ===== */
 export function Card({
@@ -138,9 +170,12 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
     }
   }
 
-  /* ====== 表示用決定（ここが今回の修正ポイント） ====== */
+  /* ====== 表示用決定 ====== */
   const dailyText = pickDailyText(d?.daily)
   const showDaily = Boolean(dailyText) && isTodayJST(d?.daily)
+
+  // ▼ レーダー用スコア（存在すればそれを、無ければデフォルト）
+  const radar = pickRadarScores(d)
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 md:py-10 bg-black min-h-screen font-sans">
@@ -208,9 +243,14 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
           )}
         </Card>
 
-        {/* 構造バランス（プレースホルダ） */}
+        {/* 構造バランス（★ レーダー差し替え） */}
         <Card title="構造バランス">
-          <div className="h-48 flex items-center justify-center text-neutral-500">[Radar Chart Placeholder]</div>
+          <div className="mt-1">
+            <RadarMini scores={radar} size={320} />
+            <p className="mt-2 text-xs text-white/60">
+              最新の診断から可視化（0〜100で相対表示。0〜1形式も自動変換）。
+            </p>
+          </div>
         </Card>
 
         {/* 次の一歩 */}

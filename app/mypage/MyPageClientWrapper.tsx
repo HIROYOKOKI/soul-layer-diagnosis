@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import MyPageShell from '../../components/layout/MyPageShell';
-import RadarCard from './RadarCard'; // ✅ 既存
+import RadarCard from './RadarCard';
 
 /* ===== 型 ===== */
 type QuickAny =
@@ -23,8 +23,8 @@ type DailyRaw = {
   comment?: string | null;
   advice?: string | null;
   affirm?: string | null;
-  affirmation?: string | null; // 互換キー
-  quote?: string | null;       // 念のため
+  affirmation?: string | null;
+  quote?: string | null;
   score?: number | null;
   created_at?: string | null;
   slot?: string | null;
@@ -43,7 +43,6 @@ type Daily = {
   slot?: string | null;
   theme?: string | null;
   is_today_jst?: boolean;
-  /** ★ MyPageShell がこれを優先して表示 */
   displayText?: string | null;
 } | null;
 
@@ -74,7 +73,7 @@ const normalizeDaily = (raw: DailyRaw): Daily => {
     advice: raw.advice ?? null,
     quote: raw.quote ?? null,
     affirm,
-    affirmation: affirm, // 互換維持
+    affirmation: affirm,
     score: raw.score ?? null,
     created_at: raw.created_at ?? null,
     slot: raw.slot ?? null,
@@ -199,13 +198,18 @@ export default function MyPageClientWrapper({
   }, []);
 
   /* ---------- Shell + RadarChart ---------- */
-   return (
+  return (
     <div className="relative z-10 p-6 text-gray-100 pointer-events-auto space-y-8">
-      <h1 className="text-2xl font-semibold mb-4">My Page</h1>
+      {/* H1 は重複見出しになるので削除（ページ側で出す） */}
 
-      {/* --- MyPageShell（既存カード） --- */}
-      {/* 強制ワイド化：子孫の max-width を !important で解除 */}
-      <div data-force-wide className="w-full [&_*]:!max-w-none">
+      {/* --- MyPageShell（モバイルはフルブリードで広げる） --- */}
+      <div
+        className="
+          w-full
+          -mx-4 sm:mx-0          /* 親の左右パディングを打ち消して全幅に */
+          [&_*]:!max-w-none      /* 子孫の max-width を強制解除 */
+        "
+      >
         <MyPageShell
           data={{
             user: user
@@ -227,7 +231,7 @@ export default function MyPageClientWrapper({
         />
       </div>
 
-      {/* --- レーダーチャート --- */}
+      {/* --- レーダーチャート（こちらは通常幅でOK） --- */}
       <div className="pt-4 border-t border-white/10">
         <RadarCard />
       </div>

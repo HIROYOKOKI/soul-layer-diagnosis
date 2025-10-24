@@ -90,7 +90,7 @@ export default function RadarMini({
     <svg width="100%" height={size}  viewBox={`${-50} ${-30} ${size + 100} ${size + 60}`} role="img" aria-label="EVAE Radar">
       {/* グリッド（4リング） */}
       {[1,2,3,4].map(k => (
-        <polygon key={k} points={ring(k)} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="1" />
+        <polygon key={k} points={ring(k)} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="0.8" />
       ))}
 
       {/* 軸線 */}
@@ -106,7 +106,7 @@ export default function RadarMini({
       <text x={cx - r - 10} y={cy + 4} textAnchor="end"    fontSize="12" fill={labelFill('Ze')}>Ǝ（観測）</text>
 
       {/* 面 */}
-      <polygon points={areaPts} fill={fillColor} stroke={strokeColor} strokeWidth="0.5" />
+      <polygon points={areaPts} fill={fillColor} stroke={strokeColor} strokeWidth="0.8" />
 
       {/* 頂点ドット */}
       {dot(pE,'E')}{dot(pV,'V')}{dot(pL,'L')}{dot(pZe,'Ze')}

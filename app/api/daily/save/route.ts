@@ -1,6 +1,7 @@
 // app/api/daily/save/route.ts
 import { NextResponse, type NextRequest } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { cookies } from "next/headers";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ type Env = "dev" | "prod";
 type ScoreMap = Partial<Record<EV, number>>;
 
 type Body = {
-  user_id: string;
+  user_id?: string; // ← 任意（無ければCookieから取得）
 
   // 時間帯・環境
   slot?: Slot;
@@ -47,12 +48,11 @@ type Body = {
   // 互換（既存フィールド）
   evla?: Record<string, number> | null;
 
-  // ★ ベクトル保存（0〜1 でも 0〜100 でも可）
+  // ベクトル保存（0〜1 / 0〜100 どちらでも可）
   score_map?: ScoreMap | null;
 };
 
 /* ========= Helpers ========= */
-
 function bad(msg: string, status = 400) {
   return NextResponse.json({ ok: false, error: msg }, { status });
 }
@@ -75,17 +75,17 @@ function deriveDailyScoreMapFromChoice(choice?: EV): ScoreMap {
 }
 
 /* ========= Handler ========= */
-
 export async function POST(req: NextRequest) {
   try {
-    const sb = getSupabaseAdmin();
-    if (!sb) return bad("supabase_env_missing", 500);
-
+    // Cookie セッションから uid を取得（未ログインでも body.user_id があれば許可）
+    const sb = createRouteHandlerClient({ cookies });
+    const { data: au } = await sb.auth.getUser();
     const body = (await req.json()) as Body;
 
-    /* ----- 入力バリデーション ----- */
-    if (!body?.user_id) return bad("user_id_required");
+    const uid = body.user_id ?? au?.user?.id ?? null;
+    if (!uid) return bad("not_authenticated", 401);
 
+    /* ----- 入力バリデーション ----- */
     // slot（modeエイリアス対応）
     const slotRaw = (body.slot ?? body.mode) as Slot | undefined;
     const slot = (["morning", "noon", "night"] as Slot[]).includes(slotRaw as Slot)
@@ -159,12 +159,12 @@ export async function POST(req: NextRequest) {
     /* ----- UPSERT（user_id, date_jst, slot ユニーク） ----- */
     // date_jst は DB 側 DEFAULT ((now() at time zone 'Asia/Tokyo')::date) 想定
     const row = {
-      user_id: body.user_id,
+      user_id: uid,          // ← Cookie/Body のどちらか
       slot,
       env,
       question_id,
-      scope,         // 'WORK' | ... | null
-      theme,         // 'work' | ... | null
+      scope,                 // 'WORK' | ... | null
+      theme,                 // 'work' | ... | null
       code,
       score,
       comment,
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
       affirm,
       quote: body.quote ?? null,
       evla: body.evla ?? null,
-      score_map,     // ★ ベクトル保存
+      score_map,             // ← ベクトル保存
     };
 
     const { data, error } = await sb

@@ -199,13 +199,13 @@ export default function MyPageClientWrapper({
   }, []);
 
   /* ---------- Shell + RadarChart ---------- */
-  return (
+   return (
     <div className="relative z-10 p-6 text-gray-100 pointer-events-auto space-y-8">
       <h1 className="text-2xl font-semibold mb-4">My Page</h1>
 
       {/* --- MyPageShell（既存カード） --- */}
-      {/* 変更点：ラッパを追加し、子孫の max-width を一括解除 */}
-      <div className="w-full [&_*]:max-w-none">
+      {/* 強制ワイド化：子孫の max-width を !important で解除 */}
+      <div data-force-wide className="w-full [&_*]:!max-w-none">
         <MyPageShell
           data={{
             user: user

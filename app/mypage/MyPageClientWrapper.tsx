@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import MyPageShell from '../../components/layout/MyPageShell';
-import RadarCard from './RadarCard';
+import RadarCard from './RadarCard'; // ✅ 既存
 
 /* ===== 型 ===== */
 type QuickAny =
@@ -23,8 +23,8 @@ type DailyRaw = {
   comment?: string | null;
   advice?: string | null;
   affirm?: string | null;
-  affirmation?: string | null;
-  quote?: string | null;
+  affirmation?: string | null; // 互換キー
+  quote?: string | null;       // 念のため
   score?: number | null;
   created_at?: string | null;
   slot?: string | null;
@@ -74,7 +74,7 @@ const normalizeDaily = (raw: DailyRaw): Daily => {
     advice: raw.advice ?? null,
     quote: raw.quote ?? null,
     affirm,
-    affirmation: affirm,
+    affirmation: affirm, // 互換維持
     score: raw.score ?? null,
     created_at: raw.created_at ?? null,
     slot: raw.slot ?? null,
@@ -200,14 +200,12 @@ export default function MyPageClientWrapper({
 
   /* ---------- Shell + RadarChart ---------- */
   return (
-    <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-6 text-gray-100 pointer-events-auto">
-      {/* 見出しも中央の幅に合わせる */}
-      <div className="mx-auto w-full max-w-[720px] md:max-w-[840px] lg:max-w-[960px]">
-        <h1 className="text-2xl font-semibold mb-4">My Page</h1>
-      </div>
+    <div className="relative z-10 p-6 text-gray-100 pointer-events-auto space-y-8">
+      <h1 className="text-2xl font-semibold mb-4">My Page</h1>
 
-      {/* --- MyPageShell（カード幅を拡張） --- */}
-      <div className="mx-auto w-full max-w-[720px] md:max-w-[840px] lg:max-w-[960px]">
+      {/* --- MyPageShell（既存カード） --- */}
+      {/* 変更点：ラッパを追加し、子孫の max-width を一括解除 */}
+      <div className="w-full [&_*]:max-w-none">
         <MyPageShell
           data={{
             user: user
@@ -218,7 +216,9 @@ export default function MyPageClientWrapper({
                   avatarUrl: user.avatar_url ?? undefined,
                 }
               : undefined,
-            quick: quickModel ? { model: quickModel, label: quickLabel, created_at: undefined } : undefined,
+            quick: quickModel
+              ? { model: quickModel, label: quickLabel, created_at: undefined }
+              : undefined,
             theme: { name: theme, updated_at: null },
             daily: daily ?? undefined,
             profile: profile ?? undefined,
@@ -227,8 +227,8 @@ export default function MyPageClientWrapper({
         />
       </div>
 
-      {/* --- レーダーチャート（同じ幅にそろえる） --- */}
-      <div className="mx-auto w-full max-w-[720px] md:max-w-[840px] lg:max-w-[960px] pt-6 mt-6 border-t border-white/10">
+      {/* --- レーダーチャート --- */}
+      <div className="pt-4 border-t border-white/10">
         <RadarCard />
       </div>
     </div>

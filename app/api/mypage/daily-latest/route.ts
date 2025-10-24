@@ -30,13 +30,13 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const envParam = searchParams.get("env"); // dev | prod | null
 
-    // ★ 実在カラムのみ明示 + idも取得して互換吸収
+    // ★ score_map を含めて取得
     let query = sb
       .from("daily_results")
       .select(
         [
-          "id",            // ← 追加（旧ロジック互換）
-          "question_id",   // （新ロジック）
+          "id",
+          "question_id",
           "user_id",
           "slot",
           "scope",
@@ -47,6 +47,7 @@ export async function GET(req: Request) {
           "affirm",
           "quote",
           "score",
+          "score_map",       // ← 追加
           "env",
           "created_at",
         ].join(",")
@@ -83,7 +84,7 @@ export async function GET(req: Request) {
     const affirmNormalized = any.affirm ?? any.affirmation ?? any.quote ?? null;
 
     const item = {
-      question_id: any.question_id ?? any.id ?? null, // ← ここでidをフォールバック
+      question_id: any.question_id ?? any.id ?? null, // 旧互換
       slot: any.slot ?? null,
       mode: any.slot ?? null,                         // UI互換
       scope: any.scope ?? null,
@@ -94,6 +95,7 @@ export async function GET(req: Request) {
       affirm: affirmNormalized,
       quote: any.quote ?? null,
       score: any.score ?? null,
+      score_map: any.score_map ?? null,               // ← 追加（そのまま返す）
       env: any.env ?? null,
       created_at: any.created_at ?? null,
       is_today_jst: any.created_at

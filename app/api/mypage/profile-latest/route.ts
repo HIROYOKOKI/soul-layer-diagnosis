@@ -7,7 +7,7 @@ export async function GET() {
   if (!sb) return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 });
   const { data, error } = await sb
     .from("profile_results")
-    .select("fortune, personality, partner, created_at")
+    .select("fortune, personality, partner, score_map, created_at") 
     .order("created_at", { ascending:false })
     .limit(1).maybeSingle();
   if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 });

@@ -11,7 +11,7 @@ export async function GET() {
 
   const { data, error } = await sb
     .from('quick_results')
-    .select('type_key, type_label, order_v2, created_at')
+    .select("model, type_key, label, type_label, order, score_map, created_at") 
     .order('created_at', { ascending:false })
     .limit(1)
     .maybeSingle();

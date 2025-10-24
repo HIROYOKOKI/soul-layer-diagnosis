@@ -4,7 +4,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import MyPageShell from '../../components/layout/MyPageShell';
-import RadarCard from './RadarCard';
 
 /* ===== 型 ===== */
 type QuickAny =
@@ -23,8 +22,8 @@ type DailyRaw = {
   comment?: string | null;
   advice?: string | null;
   affirm?: string | null;
-  affirmation?: string | null;
-  quote?: string | null;
+  affirmation?: string | null; // 互換キー
+  quote?: string | null;       // 念のため
   score?: number | null;
   created_at?: string | null;
   slot?: string | null;
@@ -43,6 +42,7 @@ type Daily = {
   slot?: string | null;
   theme?: string | null;
   is_today_jst?: boolean;
+  /** ★ MyPageShell がこれを優先して表示 */
   displayText?: string | null;
 } | null;
 
@@ -73,7 +73,7 @@ const normalizeDaily = (raw: DailyRaw): Daily => {
     advice: raw.advice ?? null,
     quote: raw.quote ?? null,
     affirm,
-    affirmation: affirm,
+    affirmation: affirm, // 互換維持
     score: raw.score ?? null,
     created_at: raw.created_at ?? null,
     slot: raw.slot ?? null,
@@ -197,43 +197,32 @@ export default function MyPageClientWrapper({
     })();
   }, []);
 
-  /* ---------- Shell + RadarChart ---------- */
+  /* ---------- Shell（フル幅） ---------- */
   return (
     <div className="relative z-10 p-6 text-gray-100 pointer-events-auto space-y-8">
-      {/* H1 は重複見出しになるので削除（ページ側で出す） */}
+      {/* ページ側に見出しがあるのでここでは出さない */}
 
-      {/* --- MyPageShell（モバイルはフルブリードで広げる） --- */}
-    <div
-  className="
-    w-screen                        /* ビューポート幅基準で全幅化 */
-    mx-[calc(50%-50vw)]             /* 親の max-width を突破して中央基準に再配置 */
-    [&_*]:!max-w-none               /* 子孫の max-width を完全解除 */
-  "
->
-  <MyPageShell
-    data={{
-      user: user
-        ? {
-            id: user.id,
-            name: user.name ?? undefined,
-            displayId: user.display_id ?? undefined,
-            avatarUrl: user.avatar_url ?? undefined,
-          }
-        : undefined,
-      quick: quickModel
-        ? { model: quickModel, label: quickLabel, created_at: undefined }
-        : undefined,
-      theme: { name: theme, updated_at: null },
-      daily: daily ?? undefined,
-      profile: profile ?? undefined,
-    }}
-    userId={user?.id}
-  />
-</div>
-
-      {/* --- レーダーチャート（こちらは通常幅でOK） --- */}
-      <div className="pt-4 border-t border-white/10">
-        <RadarCard />
+      {/* スマホ〜タブレット：横幅マックス。子孫の max-width も解除 */}
+      <div className="w-screen mx-[calc(50%-50vw)] [&_*]:!max-w-none">
+        <MyPageShell
+          data={{
+            user: user
+              ? {
+                  id: user.id,
+                  name: user.name ?? undefined,
+                  displayId: user.display_id ?? undefined,
+                  avatarUrl: user.avatar_url ?? undefined,
+                }
+              : undefined,
+            quick: quickModel
+              ? { model: quickModel, label: quickLabel, created_at: undefined }
+              : undefined,
+            theme: { name: theme, updated_at: null },
+            daily: daily ?? undefined,
+            profile: profile ?? undefined,
+          }}
+          userId={user?.id}
+        />
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+
 type Slot = "morning" | "noon" | "night";
 type Theme = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 type EV = "E" | "V" | "Λ" | "Ǝ";
@@ -44,6 +45,10 @@ function getJstSlot(now = new Date()): Slot {
   if (h >= 12 && h < 18) return "noon";
   return "night";
 }
+function toJstDateString(d: string | Date) {
+  const dt = new Date(d);
+  return new Date(dt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })).toDateString();
+}
 
 function seedFromUUID(uuid: string): number {
   const head = uuid.replace(/-/g, "").slice(0, 8);
@@ -52,14 +57,17 @@ function seedFromUUID(uuid: string): number {
 
 export async function GET(req: Request) {
   const origin = ORIGIN(req.url);
+  const url = new URL(req.url);
+  const debug = url.searchParams.get("debug") === "1";
   const jar = cookies();
+  const cookieHeader = (req.headers.get("cookie") ?? "") as string;
 
   // 1) テーマ（MyPageと同期）
   let theme: Theme = "LOVE";
   try {
     const r = await fetch(`${origin}/api/theme`, {
       cache: "no-store",
-      headers: { cookie: (req.headers.get("cookie") ?? "") as string },
+      headers: { cookie: cookieHeader },
     });
     const j = await r.json().catch(() => ({}));
     const t = String(j?.scope ?? j?.theme ?? "LOVE").toUpperCase();
@@ -81,7 +89,7 @@ export async function GET(req: Request) {
       cache: "no-store",
       headers: {
         "Content-Type": "application/json",
-        cookie: (req.headers.get("cookie") ?? "") as string,
+        cookie: cookieHeader,
       },
       body: JSON.stringify({ slot, theme }),
     });
@@ -121,7 +129,7 @@ export async function GET(req: Request) {
   if (choices.length === 0) choices = FALLBACK[slot].slice(0, need);
   if (choices.length > need) choices = choices.slice(0, need);
 
-  // 5) 旧レスポンス形へ
+  // 5) IDなど
   const questionId = crypto.randomUUID();
   const seed = seedFromUUID(questionId);
   const createdAt = new Date().toISOString();
@@ -138,6 +146,29 @@ export async function GET(req: Request) {
   jar.set("daily_slot", slot, { httpOnly: true, sameSite: "lax", path: "/" });
   jar.set("daily_theme", theme, { httpOnly: true, sameSite: "lax", path: "/" });
 
+  // 6) （★debug用）最新データの内部参照を同梱
+  let debugPayload: any | null = null;
+  if (debug) {
+    try {
+      const [q, d, p] = await Promise.all([
+        fetch(`${origin}/api/mypage/quick-latest`,   { cache: "no-store", headers: { cookie: cookieHeader } }).then(r => r.json()).catch(() => null),
+        fetch(`${origin}/api/mypage/daily-latest`,   { cache: "no-store", headers: { cookie: cookieHeader } }).then(r => r.json()).catch(() => null),
+        fetch(`${origin}/api/mypage/profile-latest`, { cache: "no-store", headers: { cookie: cookieHeader } }).then(r => r.json()).catch(() => null),
+      ]);
+
+      debugPayload = {
+        theme,
+        today_jst: toJstDateString(new Date()),
+        quick_latest: q?.item ?? null,
+        daily_latest: d?.item ?? null,
+        profile_latest: p?.item ?? null,
+      };
+    } catch {
+      debugPayload = { theme, today_jst: toJstDateString(new Date()) };
+    }
+  }
+
+  // 7) レスポンス
   return NextResponse.json(
     {
       ok: true,
@@ -150,6 +181,7 @@ export async function GET(req: Request) {
       created_at: createdAt,
       env: "prod",
       _proxied: true,
+      ...(debug && { debug: debugPayload }),
     },
     { headers: { "cache-control": "no-store" } }
   );

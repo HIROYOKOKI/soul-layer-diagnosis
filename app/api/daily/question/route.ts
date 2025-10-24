@@ -186,39 +186,38 @@ export async function GET(req: Request) {
   jar.set("daily_slot", slot, { httpOnly: true, sameSite: "lax", path: "/" });
   jar.set("daily_theme", theme, { httpOnly: true, sameSite: "lax", path: "/" });
 
-  // 6) debug: 最新データ & 合成スコア
+  // 6) debug: 最新データ & 合成スコア（★ここが追加/更新パート）
   let debugPayload: any | null = null;
   if (debug) {
     try {
+      // 最新レコードを /api/mypage/* から取得（Cookie付きで本人分）
       const [q, d, p] = await Promise.all([
         fetch(`${origin}/api/mypage/quick-latest`,   { cache: "no-store", headers: { cookie: cookieHeader } }).then(r => r.json()).catch(() => null),
         fetch(`${origin}/api/mypage/daily-latest`,   { cache: "no-store", headers: { cookie: cookieHeader } }).then(r => r.json()).catch(() => null),
         fetch(`${origin}/api/mypage/profile-latest`, { cache: "no-store", headers: { cookie: cookieHeader } }).then(r => r.json()).catch(() => null),
       ]);
 
-      const quick = q?.item ?? null;
-      const daily = d?.item ?? null;
-      const profile = p?.item ?? null;
+      const quick   = q?.item ?? null;      // 例: { model, label, order, score_map?, ... }
+      const daily   = d?.item ?? null;      // 例: { code, comment, score_map?, ... }
+      const profile = p?.item ?? null;      // 例: { fortune, personality, partner, score_map?, ... }
 
-      // ---- 入力ベクトル抽出
-      const vTheme: Vec = themeVector(theme);
-      const vDaily: Vec | null = fromScoreMap(daily?.score_map);
-      // プロフィールにベクトルが無い想定のため null（将来、profile_scores 等があれば拾う）
+      // 入力ベクトル抽出
+      const vTheme:   Vec       = themeVector(theme);
+      const vDaily:   Vec | null = fromScoreMap(daily?.score_map);
       const vProfile: Vec | null = fromScoreMap((profile as any)?.score_map) ?? null;
-      // クイックは型のみのため既定は使用しない（必要なら軽バイアスを与える）
-      const vQuick: Vec | null = null;
+      const vQuick:   Vec | null = fromScoreMap((quick   as any)?.score_map) ?? null; // ★ quick も score_map があれば反映
 
-      // ---- 重み（あなたの既定）
+      // 重み（既定：プロフィール=1.0 / テーマ=0.5 / デイリー=0.1 / クイック=0.5）
       const weights = {
         profile: 1.0,
         theme:   0.5,
         daily:   0.1,
-        weekly:  0.5,   // まだ未使用
-        monthly: 1.5,   // まだ未使用
-        quick:   0.0,   // 既定は使わない（必要あれば上げる）
-      };
+        quick:   0.5,
+        weekly:  0.5,  // 将来拡張用
+        monthly: 1.5,  // 将来拡張用
+      } as const;
 
-      // ---- 合成
+      // 合成（存在するベクトルのみ加重平均）
       const parts: { key: keyof typeof weights; vec: Vec | null }[] = [
         { key: "profile", vec: vProfile },
         { key: "theme",   vec: vTheme   },
@@ -232,12 +231,11 @@ export async function GET(req: Request) {
       for (const p of parts) {
         const w = weights[p.key];
         if (p.vec && w > 0) {
-          acc = add(acc, mul(p.vec, w));
+          acc  = add(acc, mul(p.vec, w));
           wsum += w;
           used[p.key] = w;
         }
       }
-      // 使用した重みの合計で割って 0..100 に丸め
       const combined: Vec = wsum > 0 ? normFinal(mul(acc, 1 / wsum)) : normFinal(acc);
 
       debugPayload = {
@@ -270,7 +268,7 @@ export async function GET(req: Request) {
       theme,
       question: question.slice(0, 100),
       choices: choices.map((c) => ({ id: c.key, label: c.label })), // 必ず 2..4 件
-      created_at: createdAt,
+      created_at: new Date().toISOString(),
       env: "prod",
       _proxied: true,
       ...(debug && { debug: debugPayload }),

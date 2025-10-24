@@ -23,8 +23,15 @@ export default async function MyPagePage() {
   const profile = pJson?.item ?? null;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 space-y-6">
-      <MyPageClientWrapper theme={theme} quick={quick} daily={daily} profile={profile} />
-    </div>
+    // 🔥 親の max-width を突破して、内側で再センタリング
+    <section className="w-screen max-w-none overflow-x-hidden">
+      <div className="mx-[calc(50%-50vw)]">
+        <div className="mx-auto w-full max-w-[1120px] px-4 sm:px-6 lg:px-8
+                        [&_*]:max-w-none">
+          {/* ↑ MyPageShell 内の max-width も子孫セレクタで無効化 */}
+          <MyPageClientWrapper theme={theme} quick={quick} daily={daily} profile={profile} />
+        </div>
+      </div>
+    </section>
   );
 }

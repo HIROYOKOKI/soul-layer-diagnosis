@@ -106,7 +106,7 @@ export default function RadarMini({
       <text x={cx - r - 10} y={cy + 4} textAnchor="end"    fontSize="12" fill={labelFill('Ze')}>Ǝ（観測）</text>
 
       {/* 面 */}
-      <polygon points={areaPts} fill={fillColor} stroke={strokeColor} strokeWidth="o.8" />
+      <polygon points={areaPts} fill={fillColor} stroke={strokeColor} strokeWidth="o.5" />
 
       {/* 頂点ドット */}
       {dot(pE,'E')}{dot(pV,'V')}{dot(pL,'L')}{dot(pZe,'Ze')}

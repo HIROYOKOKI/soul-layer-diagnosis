@@ -126,7 +126,7 @@ export default function RadarMini({
   const strokeColor = mainColor;
 
   // 端が切れないよう余白を拡張
-  const view = `${-40} ${-25} ${size + 80} ${size + 50}`;
+  const view = `${-50} ${-30} ${size + 100} ${size + 60}`;
 
   // ラベル色
   const labelFill = (k: keyof Scores) =>
@@ -142,14 +142,14 @@ export default function RadarMini({
     <svg width="100%" height={size} viewBox={view} role="img" aria-label="EVAE Radar">
       {/* グリッド（4リング） */}
       {[1,2,3,4].map(k => (
-        <polygon key={k} points={ring(k)} fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="0.3" />
+        <polygon key={k} points={ring(k)} fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="0.8" />
       ))}
 
       {/* 軸線 */}
-      <line x1={cx} y1={cy} x2={cx} y2={cy - r} stroke="rgba(255,255,255,.22)" strokeWidth="0.3" />
-      <line x1={cx} y1={cy} x2={cx + r} y2={cy}     stroke="rgba(255,255,255,.22)" strokeWidth="0.3" />
-      <line x1={cx} y1={cy} x2={cx} y2={cy + r}     stroke="rgba(255,255,255,.22)" strokeWidth="0.3" />
-      <line x1={cx} y1={cy} x2={cx - r} y2={cy}     stroke="rgba(255,255,255,.22)" strokeWidth="0.3" />
+      <line x1={cx} y1={cy} x2={cx} y2={cy - r} stroke="rgba(255,255,255,.22)" strokeWidth="0.8" />
+      <line x1={cx} y1={cy} x2={cx + r} y2={cy}     stroke="rgba(255,255,255,.22)" strokeWidth="0.8" />
+      <line x1={cx} y1={cy} x2={cx} y2={cy + r}     stroke="rgba(255,255,255,.22)" strokeWidth="0.8" />
+      <line x1={cx} y1={cy} x2={cx - r} y2={cy}     stroke="rgba(255,255,255,.22)" strokeWidth="0.8" />
 
       {/* ラベル */}
       <text x={cx} y={cy - r - 10} textAnchor="middle" fontSize="12" fill={labelFill('E')}>E（衝動）</text>

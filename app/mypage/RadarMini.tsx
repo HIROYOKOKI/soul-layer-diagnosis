@@ -87,10 +87,10 @@ export default function RadarMini({
   const pE = p(E, ang.E), pV = p(V, ang.V), pL = p(L, ang.L), pZe = p(Ze, ang.Ze);
 
   return (
-    <svg width="100%" height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label="EVAE Radar">
+    <svg width="100%" height={size}   viewBox={`${-20} ${-10} ${size + 40} ${size + 20}`}  role="img" aria-label="EVAE Radar">
       {/* グリッド（4リング） */}
       {[1,2,3,4].map(k => (
-        <polygon key={k} points={ring(k)} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="0.1" />
+        <polygon key={k} points={ring(k)} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="0.3" />
       ))}
 
       {/* 軸線 */}

@@ -1,7 +1,6 @@
 // app/api/mypage/daily-latest/route.ts
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,24 +12,19 @@ function toJstDateString(d: string | Date) {
 
 export async function GET(req: Request) {
   try {
-    const sb = createRouteHandlerClient({ cookies });
-    const {
-      data: { user },
-      error: userErr,
-    } = await sb.auth.getUser();
-
-    // 未ログイン → 空返し
-    if (userErr || !user) {
+    const sb = getSupabaseAdmin();
+    if (!sb) {
       return NextResponse.json(
-        { ok: true, item: null, unauthenticated: true },
-        { status: 200, headers: { "cache-control": "no-store" } }
+        { ok: false, error: "supabase_env_missing" },
+        { status: 500, headers: { "cache-control": "no-store" } }
       );
     }
 
     const { searchParams } = new URL(req.url);
-    const envParam = searchParams.get("env"); // dev | prod | null
+    const envParam = searchParams.get("env");     // 'dev' | 'prod' | null
+    const themeParam = searchParams.get("theme"); // 任意
 
-    // ★ score_map を含めて取得
+    // 取得カラムは互換重視で広めに
     let query = sb
       .from("daily_results")
       .select(
@@ -45,25 +39,28 @@ export async function GET(req: Request) {
           "comment",
           "advice",
           "affirm",
+          "affirmation",
           "quote",
           "score",
-          "score_map",       // ← 追加
+          "score_map",
           "env",
           "created_at",
         ].join(",")
       )
-      .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (envParam === "dev" || envParam === "prod") {
-      // @ts-ignore chain ok
+      // @ts-expect-error: chain OK
       query = query.eq("env", envParam);
+    }
+    if (themeParam) {
+      // @ts-expect-error: chain OK
+      query = query.eq("theme", themeParam);
     }
 
     const { data, error } = await query;
-
     if (error) {
       return NextResponse.json(
         { ok: false, error: error.message },
@@ -78,24 +75,24 @@ export async function GET(req: Request) {
       );
     }
 
-    // ---- 正規化 ----
+    // ---- 正規化（互換）----
     const any = data as Record<string, any>;
     const adviceNormalized = any.advice ?? null;
     const affirmNormalized = any.affirm ?? any.affirmation ?? any.quote ?? null;
 
     const item = {
-      question_id: any.question_id ?? any.id ?? null, // 旧互換
+      question_id: any.question_id ?? any.id ?? null,
       slot: any.slot ?? null,
-      mode: any.slot ?? null,                         // UI互換
+      mode: any.slot ?? null, // UI互換
       scope: any.scope ?? null,
-      theme: any.theme ?? any.scope ?? null,          // 互換（themeが無ければscope）
+      theme: any.theme ?? any.scope ?? null,
       code: any.code ?? null,
       comment: any.comment ?? null,
       advice: adviceNormalized,
       affirm: affirmNormalized,
       quote: any.quote ?? null,
       score: any.score ?? null,
-      score_map: any.score_map ?? null,               // ← 追加（そのまま返す）
+      score_map: any.score_map ?? null,
       env: any.env ?? null,
       created_at: any.created_at ?? null,
       is_today_jst: any.created_at
@@ -109,7 +106,7 @@ export async function GET(req: Request) {
     );
   } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "internal_error" },
+      { ok: false, error: String(e?.message ?? e) },
       { status: 500, headers: { "cache-control": "no-store" } }
     );
   }

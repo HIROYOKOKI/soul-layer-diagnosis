@@ -2,7 +2,6 @@ import MyPageClientWrapper from "./MyPageClientWrapper";
 import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";   // ← これだけ残す
-// export const revalidate = 0;            // ← いったん削除
 
 function makeUrl(path: string, origin: string) {
   return path.startsWith("http") ? path : `${origin}${path}`;

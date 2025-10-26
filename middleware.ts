@@ -1,11 +1,11 @@
-// middleware.ts（プロジェクトルート直下）
+// middleware.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
 
-  // ★ 環境変数を明示渡し（ここがポイント）
+  // ← ここが重要：env を明示的に渡す
   const supabase = createMiddlewareClient({
     req,
     res,
@@ -13,7 +13,6 @@ export async function middleware(req: NextRequest) {
     supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   });
 
-  // セッション更新（Cookieを最新化）
   await supabase.auth.getSession();
   return res;
 }

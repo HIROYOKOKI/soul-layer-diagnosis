@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     const envParam = searchParams.get("env");     // 'dev' | 'prod' | null
     const themeParam = searchParams.get("theme"); // 任意
 
-    // 取得カラムは互換重視で広めに
+    // ※ DBに必ず存在する列だけを選ぶ（affirmationは選ばない）
     let query = sb
       .from("daily_results")
       .select(
@@ -39,7 +39,6 @@ export async function GET(req: Request) {
           "comment",
           "advice",
           "affirm",
-          "affirmation",
           "quote",
           "score",
           "score_map",
@@ -48,19 +47,16 @@ export async function GET(req: Request) {
         ].join(",")
       )
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
     if (envParam === "dev" || envParam === "prod") {
-      // @ts-expect-error: chain OK
       query = query.eq("env", envParam);
     }
     if (themeParam) {
-      // @ts-expect-error: chain OK
       query = query.eq("theme", themeParam);
     }
 
-    const { data, error } = await query;
+    const { data, error } = await query.maybeSingle();
     if (error) {
       return NextResponse.json(
         { ok: false, error: error.message },
@@ -76,27 +72,28 @@ export async function GET(req: Request) {
     }
 
     // ---- 正規化（互換）----
-    const any = data as Record<string, any>;
-    const adviceNormalized = any.advice ?? null;
-    const affirmNormalized = any.affirm ?? any.affirmation ?? any.quote ?? null;
+    const adviceNormalized = data.advice ?? null;
+    // DBに affirmation が無い環境向け：affirmation 互換キーを生成
+    const affirmNormalized = data.affirm ?? data.quote ?? null;
 
     const item = {
-      question_id: any.question_id ?? any.id ?? null,
-      slot: any.slot ?? null,
-      mode: any.slot ?? null, // UI互換
-      scope: any.scope ?? null,
-      theme: any.theme ?? any.scope ?? null,
-      code: any.code ?? null,
-      comment: any.comment ?? null,
+      question_id: data.question_id ?? data.id ?? null,
+      slot: data.slot ?? null,
+      mode: data.slot ?? null, // UI互換
+      scope: data.scope ?? null,
+      theme: data.theme ?? data.scope ?? null,
+      code: data.code ?? null,
+      comment: data.comment ?? null,
       advice: adviceNormalized,
-      affirm: affirmNormalized,
-      quote: any.quote ?? null,
-      score: any.score ?? null,
-      score_map: any.score_map ?? null,
-      env: any.env ?? null,
-      created_at: any.created_at ?? null,
-      is_today_jst: any.created_at
-        ? toJstDateString(any.created_at) === toJstDateString(new Date())
+      affirm: affirmNormalized,           // 旧UI互換
+      affirmation: affirmNormalized,      // 新UI互換
+      quote: data.quote ?? null,
+      score: data.score ?? null,
+      score_map: data.score_map ?? null,
+      env: data.env ?? null,
+      created_at: data.created_at ?? null,
+      is_today_jst: data.created_at
+        ? toJstDateString(data.created_at) === toJstDateString(new Date())
         : false,
     };
 

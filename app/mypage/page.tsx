@@ -1,23 +1,19 @@
-// app/mypage/page.tsx
 import MyPageClientWrapper from "./MyPageClientWrapper";
 import { headers } from "next/headers";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const dynamic = "force-dynamic";   // ← これだけ残す
+// export const revalidate = 0;            // ← いったん削除
 
 function makeUrl(path: string, origin: string) {
   return path.startsWith("http") ? path : `${origin}${path}`;
 }
 
 export default async function MyPagePage() {
-  // 現在のホスト/プロトコルから origin を作る（localhost:3001 でも本番でもOK）
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const origin = `${proto}://${host}`;
-
-  // 共通オプション
-  const opt: RequestInit = { cache: "no-store", next: { revalidate: 0 } };
+  const opt: RequestInit = { cache: "no-store" };
 
   const [tRes, qRes, dRes, pRes] = await Promise.all([
     fetch(makeUrl("/api/theme", origin), opt).catch(() => null),

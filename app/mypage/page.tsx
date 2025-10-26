@@ -1,21 +1,37 @@
 // app/mypage/page.tsx
 import MyPageClientWrapper from "./MyPageClientWrapper";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+function makeUrl(path: string, origin: string) {
+  return path.startsWith("http") ? path : `${origin}${path}`;
+}
+
 export default async function MyPagePage() {
+  // 現在のホスト/プロトコルから origin を作る（localhost:3001 でも本番でもOK）
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const origin = `${proto}://${host}`;
+
+  // 共通オプション
+  const opt: RequestInit = { cache: "no-store", next: { revalidate: 0 } };
+
   const [tRes, qRes, dRes, pRes] = await Promise.all([
-    fetch("/api/theme", { cache: "no-store" }).catch(() => null),
-    fetch("/api/mypage/quick-latest", { cache: "no-store" }).catch(() => null),
-    fetch("/api/mypage/daily-latest", { cache: "no-store" }).catch(() => null),
-    fetch("/api/mypage/profile-latest", { cache: "no-store" }).catch(() => null),
+    fetch(makeUrl("/api/theme", origin), opt).catch(() => null),
+    fetch(makeUrl("/api/mypage/quick-latest", origin), opt).catch(() => null),
+    fetch(makeUrl("/api/mypage/daily-latest", origin), opt).catch(() => null),
+    fetch(makeUrl("/api/mypage/profile-latest", origin), opt).catch(() => null),
   ]);
 
-  const tJson = await tRes?.json().catch(() => null);
-  const qJson = await qRes?.json().catch(() => null);
-  const dJson = await dRes?.json().catch(() => null);
-  const pJson = await pRes?.json().catch(() => null);
+  const [tJson, qJson, dJson, pJson] = await Promise.all([
+    tRes?.ok ? tRes.json().catch(() => null) : null,
+    qRes?.ok ? qRes.json().catch(() => null) : null,
+    dRes?.ok ? dRes.json().catch(() => null) : null,
+    pRes?.ok ? pRes.json().catch(() => null) : null,
+  ]);
 
   const theme: string | null = tJson?.scope ?? null;
   const quick = qJson?.item ?? null;
@@ -23,15 +39,9 @@ export default async function MyPagePage() {
   const profile = pJson?.item ?? null;
 
   return (
-    // 祖先の max-width を突破して（フルブリード）→ 内側で再センタリング
     <section className="w-screen max-w-none overflow-x-hidden">
       <div className="mx-[calc(50%-50vw)]">
-        <div
-          className="
-            mx-auto w-full max-w-[1120px] px-4 sm:px-6 lg:px-8
-            [&_*]:!max-w-none
-          "
-        >
+        <div className="mx-auto w-full max-w-[1120px] px-4 sm:px-6 lg:px-8 [&_*]:!max-w-none">
           <MyPageClientWrapper theme={theme} quick={quick} daily={daily} profile={profile} />
         </div>
       </div>

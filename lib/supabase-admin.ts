@@ -1,22 +1,21 @@
 // lib/supabase-admin.ts
-import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-let _admin: SupabaseClient | null = null
+let _admin: SupabaseClient | null = null;
 
-export function getSupabaseAdmin(): SupabaseClient | null {
-  if (_admin) return _admin
+export function getSupabaseAdmin() {
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return null; // ← ここで null を返せばAPI側で 500 文言化できる
 
-  if (!url || !key) {
-    console.error("Supabase admin env vars are missing")
-    return null
+  if (!_admin) {
+    _admin = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { "X-Client": "soul-layer-admin" } },
+    });
   }
-
-  _admin = createClient(url, key, {
-    auth: { persistSession: false }, // サーバーはセッション保持不要
-  })
-
-  return _admin
+  return _admin;
 }

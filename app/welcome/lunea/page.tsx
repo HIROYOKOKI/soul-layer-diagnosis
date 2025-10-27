@@ -14,7 +14,7 @@ export default function LuneaOpeningPage() {
     if (!v) return;
 
     const handleEnded = () => {
-      router.replace("/profile");
+      router.replace("/theme");
     };
 
     v.addEventListener("ended", handleEnded);

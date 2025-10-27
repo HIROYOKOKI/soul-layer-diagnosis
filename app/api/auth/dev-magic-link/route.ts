@@ -1,21 +1,65 @@
+// 開発用：メール送らずに Magic Link を発行して即リダイレクト
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { headers } from "next/headers";
+import { getSupabaseAdmin } from "@/lib/supabase-admin"; // service role client
 
-export async function POST(req: Request) {
-  const { email, next = "/mypage" } = await req.json();
-  if (!email) return NextResponse.json({ ok:false, error:"email_required" }, { status:400 });
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!; // サーバー専用
-  const sb = createClient(url, key);
+function makeOrigin(h: Headers) {
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
 
-  const { data, error } = await sb.auth.admin.generateLink({
-    type: "magiclink",
-    email,
-    options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://soul-layer-diagnosis.vercel.app"}/auth/callback?next=${encodeURIComponent(next)}` }
-  });
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const email = url.searchParams.get("email") || "";
+  const next  = url.searchParams.get("next")  || "/welcome";
+  const mode  = (url.searchParams.get("mode") || "magiclink").toLowerCase(); // magiclink | signup
 
-  if (error) return NextResponse.json({ ok:false, error: error.message }, { status:400 });
-  // data.properties.action_link に有効なURLが入っています
-  return NextResponse.json({ ok:true, action_link: data.properties.action_link });
+  if (!email) {
+    return NextResponse.json({ ok:false, error:"email_required" }, { status:400 });
+  }
+
+  const admin = getSupabaseAdmin();
+  if (!admin) {
+    return NextResponse.json({ ok:false, error:"supabase_env_missing" }, { status:500 });
+  }
+
+  const origin = makeOrigin(await headers());
+  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
+
+  // まず既存ユーザー向けの magiclink を試す。無ければ signup にフォールバック。
+  let actionLink: string | null = null;
+
+  // A) 既存ユーザー向け
+  if (mode === "magiclink") {
+    const { data, error } = await (admin as any).auth.admin.generateLink({
+      type: "magiclink",
+      email,
+      options: { redirectTo },
+    });
+    if (!error && data?.properties?.action_link) {
+      actionLink = data.properties.action_link as string;
+    }
+  }
+
+  // B) 新規作成（ユーザーが未登録だった場合）
+  if (!actionLink) {
+    const { data, error } = await (admin as any).auth.admin.generateLink({
+      type: "signup",
+      email,
+      // 仮パスワード（不要だが型的に要求されることがある）
+      password: crypto.randomUUID(),
+      options: { redirectTo },
+    });
+    if (error) {
+      return NextResponse.json({ ok:false, error: error.message }, { status:500 });
+    }
+    actionLink = data?.properties?.action_link as string;
+  }
+
+  // 取得できたリンクへ 303 でリダイレクト（/auth/callback → /welcome へ）
+  return NextResponse.redirect(actionLink!, 303);
 }

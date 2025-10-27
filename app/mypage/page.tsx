@@ -1,6 +1,7 @@
 // app/mypage/page.tsx
 import MyPageClientWrapper from "./MyPageClientWrapper";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ function makeUrl(path: string, origin: string) {
 
 export default async function MyPagePage() {
   // 現在のホスト/プロトコルから origin を作成（本番/ローカル両対応）
-  const h = headers();
+  const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const origin = `${proto}://${host}`;
@@ -31,7 +32,20 @@ export default async function MyPagePage() {
     pRes?.ok ? pRes.json().catch(() => null) : null,
   ]);
 
-  const theme: string | null = tJson?.scope ?? null;
+  // ===== ガード =====
+  // 未ログインならログインへ（どれかが unauthenticated を返していたら弾く）
+  if (tJson?.unauthenticated || pJson?.unauthenticated || qJson?.unauthenticated || dJson?.unauthenticated) {
+    redirect("/login");
+  }
+
+  // /api/theme は { value } or { scope } のどちらかで返る実装があるため両対応
+  const theme: string | null = (tJson?.value ?? tJson?.scope ?? null) as string | null;
+
+  // テーマ未選択ならテーマ選択へ強制誘導（本番フロー固定）
+  if (!theme) {
+    redirect("/theme");
+  }
+
   const quick = qJson?.item ?? null;
   const daily = dJson?.item ?? null;
   const profile = pJson?.item ?? null;

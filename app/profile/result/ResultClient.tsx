@@ -138,7 +138,6 @@ export default function ProfileResultClient() {
           }).catch(() => null)
 
           if (saveRes && !saveRes.ok && saveRes.status !== 409) {
-            // ログだけ出して UI は壊さない
             const j = await saveRes.json().catch(() => ({} as any))
             console.warn("profile/save failed:", j?.error ?? saveRes.statusText)
           } else {
@@ -159,10 +158,10 @@ export default function ProfileResultClient() {
   // ルネアの吹き出し
   const bubbles = useMemo(() => {
     const arr: Array<{ label: string; text: string }> = []
-    if (detail?.fortune)     arr.push({ label: "総合運勢(ホロスコープ）",           text: detail.fortune.trim() })
-    if (detail?.personality) arr.push({ label: "性格傾向(数秘術）",           text: detail.personality.trim() })
-    if (detail?.work)        arr.push({ label: "仕事運(数秘術）",             text: detail.work.trim() })
-    if (detail?.partner)     arr.push({ label: "理想のパートナー像(ホロスコープ）", text: detail.partner.trim() })
+    if (detail?.fortune)     arr.push({ label: "総合運勢（ホロスコープ）",  text: detail.fortune.trim() })
+    if (detail?.personality) arr.push({ label: "性格傾向（数秘術）",        text: detail.personality.trim() })
+    if (detail?.work)        arr.push({ label: "仕事運（数秘術）",          text: detail.work.trim() })
+    if (detail?.partner)     arr.push({ label: "理想のパートナー像（ホロスコープ）", text: detail.partner.trim() })
     return arr
   }, [detail])
 
@@ -173,10 +172,16 @@ export default function ProfileResultClient() {
   const next = () => setStep(s => Math.min(bubbles.length, s + 1))
   const restart = () => setStep(initialStep(bubbles.length))
   const toProfile = () => router.push("/profile")
-  const toMyPage = () => router.push("/mypage")
+
+  const goQuick = () => {
+    try { sessionStorage.setItem("onboarding_step", "profile_done") } catch {}
+    router.push("/structure/quick")
+  }
 
   const topCode = quickBase?.base_order?.[0]
   const titleText = topCode ? `傾向：${topCode}（${CODE_LABELS[topCode]}）が強め` : "診断結果"
+
+  const finished = step >= bubbles.length
 
   return (
     <div className="mx-auto max-w-3xl p-6 space-y-8">
@@ -234,7 +239,7 @@ export default function ProfileResultClient() {
       {/* ボタン群：縦並び */}
       {!loading && !error && (
         <div className="space-y-3">
-          {step < bubbles.length && (
+          {!finished && (
             <button
               onClick={next}
               disabled={saving}
@@ -243,6 +248,19 @@ export default function ProfileResultClient() {
               次へ
             </button>
           )}
+
+          {finished && (
+            <GlowButton
+              variant="primary"
+              size="sm"
+              onClick={goQuick}
+              disabled={saving}
+              className="w-full h-12"
+            >
+              クイック診断へ →
+            </GlowButton>
+          )}
+
           <button
             onClick={restart}
             className="w-full px-4 py-3 rounded-xl border border-white/20 hover:bg-white/10"
@@ -250,15 +268,6 @@ export default function ProfileResultClient() {
           >
             もう一度
           </button>
-          <GlowButton
-            variant="primary"
-            size="sm"
-            onClick={toMyPage}
-            disabled={saving}
-            className="w-full h-12"
-          >
-            マイページへ
-          </GlowButton>
         </div>
       )}
     </div>

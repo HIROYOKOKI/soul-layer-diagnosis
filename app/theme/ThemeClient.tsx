@@ -43,8 +43,8 @@ const THEME_TO_SCOPE: Record<ThemeKey, Scope> = {
 export default function ThemeClient() {
   const router = useRouter();
 
-  const [current, setCurrent] = useState<ThemeKey | null>(null); // 取得済みの保存値
-  const [selected, setSelected] = useState<ThemeKey | null>(null); // 画面上の選択（未保存）
+  const [current, setCurrent] = useState<ThemeKey | null>(null); // 保存済み
+  const [selected, setSelected] = useState<ThemeKey | null>(null); // 選択中（未保存）
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
@@ -91,18 +91,16 @@ export default function ThemeClient() {
     if (typeof window !== "undefined") {
       sessionStorage.setItem("evae_theme_selected", k);
     }
-    // 触感フィードバック（対応端末のみ）
     const nav = (typeof navigator !== "undefined" ? navigator : undefined) as
       | (Navigator & { vibrate?: (p: number | number[]) => boolean })
       | undefined;
     nav?.vibrate?.(10);
   };
 
-  // 保存実行：/api/theme/set → /api/theme/reset → /mypage
-  async function doSave() {
-    if (!selected) return;
+  // テーマ保存 + ソフトリセット（必要なときだけ実行）
+  async function persistIfNeeded(): Promise<boolean> {
+    if (!dirty || !selected) return true;
     setSaving(true);
-    setConfirmOpen(false);
     try {
       // 1) テーマ保存
       const resp = await fetch("/api/theme/set", {
@@ -113,7 +111,7 @@ export default function ThemeClient() {
       const res = await resp.json();
       if (!res?.ok) throw new Error(res?.error ?? "failed_to_save");
 
-      // 2) 記録初期化（サーバでソフトリセット; 実処理はAPI側に実装）
+      // 2) テーマ記録初期化（サーバ側で実処理）
       const r2 = await fetch("/api/theme/reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -124,16 +122,30 @@ export default function ThemeClient() {
 
       setCurrent(selected);
       setToast("テーマを保存しました");
-      setTimeout(() => setToast(null), 2500);
-
-      // 3) マイページへ
-      router.push("/profile");
+      setTimeout(() => setToast(null), 2000);
+      return true;
     } catch (e: any) {
       setToast(`保存に失敗しました：${e?.message ?? "unknown"}`);
       setTimeout(() => setToast(null), 3500);
+      return false;
     } finally {
       setSaving(false);
     }
+  }
+
+  // 「次へ」：変更があれば保存してから /profile、無ければそのまま /profile
+  async function goNext() {
+    if (dirty) {
+      setConfirmOpen(true); // 変更ありの場合は警告
+      return;
+    }
+    router.push("/profile");
+  }
+
+  // モーダル内で「次へ」確定
+  async function confirmAndNext() {
+    const ok = await persistIfNeeded();
+    if (ok) router.push("/profile");
   }
 
   if (loading) {
@@ -191,30 +203,30 @@ export default function ThemeClient() {
         </section>
       </main>
 
-      {/* 下部バー：未保存時のみ「保存」を出す（即保存しない） */}
-      {dirty && (
-        <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 border-t border-white/10">
-          <div className="flex gap-3">
+      {/* 下部バー：常時「次へ」。変更があれば確認モーダルを出す */}
+      <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-3 border-t border-white/10">
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={saving}
+            className="flex-1 h-12 rounded-xl font-medium border border-emerald-400/40 bg-emerald-500/20 text-white hover:bg-emerald-500/30"
+          >
+            次へ（プロフィールへ）
+          </button>
+          {dirty && (
             <button
               type="button"
               onClick={() => setSelected(current)}
               disabled={saving}
-              className="flex-1 h-12 rounded-xl font-medium border border-white/15 bg-white/5 text-white hover:bg-white/10"
+              className="h-12 rounded-xl px-4 font-medium border border-white/15 bg-white/5 text-white hover:bg-white/10"
             >
-              キャンセル
+              変更をやめる
             </button>
-            <button
-              type="button"
-              onClick={() => setConfirmOpen(true)}
-              disabled={saving}
-              className="flex-1 h-12 rounded-xl font-medium border border-violet-400/40 bg-violet-500/20 text-white hover:bg-violet-500/30"
-            >
-              保存
-            </button>
-          </div>
-          {toast && <div className="mt-3 text-sm text-neutral-300">{toast}</div>}
+          )}
         </div>
-      )}
+        {toast && <div className="mt-3 text-sm text-neutral-300">{toast}</div>}
+      </div>
 
       {/* 確認モーダル：テーマ変更＝記録初期化の警告 */}
       {confirmOpen && (
@@ -232,15 +244,15 @@ export default function ThemeClient() {
                 onClick={() => setConfirmOpen(false)}
                 disabled={saving}
               >
-                キャンセル
+                戻る
               </button>
               <button
                 type="button"
                 className="px-3 py-2 text-sm rounded-lg border border-red-500/40 bg-red-600/20 hover:bg-red-600/30"
-                onClick={doSave}
+                onClick={confirmAndNext}
                 disabled={saving}
               >
-                変更して初期化
+                次へ（保存して進む）
               </button>
             </div>
           </div>

@@ -1,7 +1,7 @@
 // app/login/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
@@ -9,11 +9,57 @@ export default function LoginPage() {
   const sb = createClientComponentClient();
   const router = useRouter();
   const sp = useSearchParams();
-  const next = sp.get("next") || "/mypage";
+
+  // メールリンクからの遷移は /welcome を既定に
+  const next = sp.get("next") || "/welcome";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(sp.get("err"));
+
+  // ===== 追加：メールリンクで飛んできた場合に自動でセッションを確立して /welcome へ =====
+  const handledRef = useRef(false);
+  useEffect(() => {
+    if (handledRef.current) return;
+    handledRef.current = true;
+
+    (async () => {
+      try {
+        const code = sp.get("code");                       // Magic Link / PKCE
+        const type = (sp.get("type") || "").toLowerCase(); // signup, magiclink, recovery...
+        const token_hash = sp.get("token_hash");           // Confirm signup 等
+        const token = sp.get("token");                     // 稀に token で来る
+
+        if (code) {
+          const { error } = await sb.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+          router.replace(next);
+          return;
+        }
+
+        if (token_hash || token) {
+          const verifyType =
+            ["signup", "magiclink", "recovery", "invite", "email_change"].includes(type)
+              ? (type as any)
+              : ("signup" as const);
+
+          const { error } = await sb.auth.verifyOtp({
+            type: verifyType,
+            token_hash: token_hash ?? undefined,
+            token: token ?? undefined,
+          } as any);
+          if (error) throw error;
+          router.replace(next);
+          return;
+        }
+      } catch (e: any) {
+        // 失敗しても通常のログインフォームは使える
+        console.error("[login callback bridge]", e);
+        setErr(e?.message ?? "ログインリンクの処理に失敗しました。もう一度お試しください。");
+      }
+    })();
+  }, [router, sb, sp, next]);
+  // ===== ここまで追加 =====
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,6 +91,7 @@ export default function LoginPage() {
           placeholder="メールアドレス"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
         />
         <input
           className="w-full rounded border px-3 py-2"
@@ -52,6 +99,7 @@ export default function LoginPage() {
           placeholder="パスワード"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
         />
         <button className="w-full rounded bg-white/10 px-4 py-2 hover:bg-white/15">
           ログイン

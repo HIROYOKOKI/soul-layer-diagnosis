@@ -1,48 +1,66 @@
 // app/welcome/page.tsx
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 export default function WelcomePage() {
   const router = useRouter();
   const supabase = createClientComponentClient();
-  const onceRef = useRef(false);
+
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (onceRef.current) return;
-    onceRef.current = true;
+    let alive = true;
 
     (async () => {
-      // 1) セッション確認（/auth/callback 経由後の想定）
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error || !session) {
-        router.replace("/login?e=nologin");
-        return;
-      }
-
-      // 2) プロフィール自動作成（存在しなければ作成＆NO付与）
       try {
-        await fetch("/api/auth/ensure-profile", {
-          method: "POST",
-          cache: "no-store",
-        });
-      } catch {
-        // 失敗しても Theme 選択へは進める（/theme 側で再チェックする想定）
-      }
+        // /auth/callback で Cookie は確定済みの想定。
+        // ここではセッションがあるかだけを確認する。
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-      // 3) テーマ選択ページへ強制遷移（ここで保存→/profile へ）
-      router.replace("/theme");
+        if (!alive) return;
+
+        if (!session) {
+          // 未ログインなら login へ
+          router.replace("/login?e=nologin");
+        } else {
+          setLoading(false);
+        }
+      } catch {
+        if (alive) router.replace("/login?e=welcome_check_failed");
+      }
     })();
+
+    return () => {
+      alive = false;
+    };
   }, [router, supabase]);
 
-  // ローディング表示のみ（ボタンは出さない：スキップ防止）
+  if (loading) {
+    // セッション確認中のローディング表示
+    return (
+      <main className="flex items-center justify-center min-h-dvh text-white">
+        <p className="animate-pulse">確認中...</p>
+      </main>
+    );
+  }
+
   return (
-    <main className="flex min-h-dvh items-center justify-center text-white">
-      <div className="text-center">
-        <p className="text-lg font-medium">初期設定を準備中です…</p>
-        <p className="text-white/60 mt-2">数秒後にテーマ選択へ移動します</p>
+    <main className="mx-auto max-w-lg px-6 py-12 text-white">
+      <h1 className="text-2xl font-semibold mb-2">ようこそ！</h1>
+      <p className="text-white/70 mb-6">登録が完了しました。</p>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <a
+          href="/welcome/lunea"
+          className="text-center rounded-md bg-white text-black py-2 font-medium"
+        >
+          診断スタート
+        </a>
       </div>
     </main>
   );

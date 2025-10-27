@@ -27,25 +27,18 @@ export default function RegisterPage() {
   );
 
   async function ensureUserNo(userId: string) {
-    // 既に user_no が入っていれば何もしない。無ければ簡易Noを付与
     try {
       const { data: prof } = await sb
         .from("profiles")
         .select("id, user_no")
         .eq("id", userId)
         .maybeSingle();
-
       if (prof?.user_no) return;
-
       const short = userId.replace(/-/g, "").slice(0, 6).toUpperCase();
-      const userNo = `U-${short}`;
-
       await sb
         .from("profiles")
-        .upsert({ id: userId, user_no: userNo }, { onConflict: "id" });
-    } catch {
-      // 失敗してもフローは継続（後で付け直せるようにする）
-    }
+        .upsert({ id: userId, user_no: `U-${short}` }, { onConflict: "id" });
+    } catch {/* 失敗しても続行 */}
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -71,39 +64,24 @@ export default function RegisterPage() {
       });
 
       if (!signUpErr) {
-        // メール確認OFFならセッションが即時発行される
-        const {
-          data: { session },
-        } = await sb.auth.getSession();
-
+        // メール確認OFFなら即セッションあり → /welcome
+        const { data: { session } } = await sb.auth.getSession();
         if (session?.user?.id) {
           await ensureUserNo(session.user.id);
           window.location.href = "/welcome";
           return;
         }
-
-        // メール確認ONの場合は案内のみ
-        setMsg("確認メールを送信しました。メール内のリンクを開くと登録が完了します。");
+        // メール確認ON → 案内のみ（遷移しない）
+        setMsg("確認メールを送信しました。メール内リンクを開いて登録を完了してください。");
         return;
       }
 
-      // 2) 既に登録済み → パスワードで即ログインして /mypage
+      // 2) 既に登録済み（ここではログインさせず、/login を案内）
       const already =
         /already\s*registered/i.test(signUpErr.message) ||
         /既に.*登録|exist|taken/i.test(signUpErr.message);
-
       if (already) {
-        const { error: signInErr, data } = await sb.auth.signInWithPassword({
-          email,
-          password: pw,
-        });
-        if (signInErr) {
-          setErr(signInErr.message);
-          return;
-        }
-        const userId = data.user?.id;
-        if (userId) await ensureUserNo(userId);
-        window.location.href = "/mypage";
+        setErr("このメールアドレスは既に登録済みです。ログインからお入りください。");
         return;
       }
 
@@ -150,7 +128,7 @@ export default function RegisterPage() {
               type="button"
               aria-label={showPw ? "パスワードを隠す" : "パスワードを表示"}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-lg"
-              onClick={() => setShowPw((v) => !v)}
+              onClick={() => setShowPw(v => !v)}
               title={showPw ? "隠す 🙈" : "表示 👁️‍🗨️"}
             >
               {showPw ? "🙈" : "👁️‍🗨️"}
@@ -177,7 +155,7 @@ export default function RegisterPage() {
               type="button"
               aria-label={showPw2 ? "確認用パスワードを隠す" : "確認用パスワードを表示"}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-lg"
-              onClick={() => setShowPw2((v) => !v)}
+              onClick={() => setShowPw2(v => !v)}
               title={showPw2 ? "隠す 🙈" : "表示 👁️‍🗨️"}
             >
               {showPw2 ? "🙈" : "👁️‍🗨️"}
@@ -192,7 +170,7 @@ export default function RegisterPage() {
           disabled={!can}
           className="w-full rounded bg-white/10 px-4 py-2 hover:bg-white/15 disabled:opacity-40"
         >
-          登録
+          登録メールを送信
         </button>
 
         <div className="text-sm opacity-70">

@@ -127,7 +127,7 @@ export default function ThemeClient() {
       setTimeout(() => setToast(null), 2500);
 
       // 3) マイページへ
-      router.push("/mypage");
+      router.push("/profile");
     } catch (e: any) {
       setToast(`保存に失敗しました：${e?.message ?? "unknown"}`);
       setTimeout(() => setToast(null), 3500);

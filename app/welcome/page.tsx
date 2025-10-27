@@ -1,7 +1,7 @@
 // app/welcome/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
@@ -9,59 +9,51 @@ export default function WelcomePage() {
   const router = useRouter();
   const supabase = createClientComponentClient();
 
-  const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     let alive = true;
 
     (async () => {
       try {
-        // /auth/callback で Cookie は確定済みの想定。
-        // ここではセッションがあるかだけを確認する。
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
+        // 1) セッション確認（/auth/callback 経由なら確立済み）
+        const { data: { session } } = await supabase.auth.getSession();
         if (!alive) return;
 
         if (!session) {
-          // 未ログインなら login へ
           router.replace("/login?e=nologin");
-        } else {
-          setLoading(false);
+          return;
         }
+
+        // 2) プロフィールを確実に作成（NO 付与など）
+        await fetch("/api/auth/ensure-profile", {
+          method: "POST",
+          cache: "no-store",
+        }).catch(() => {});
+
+        // 3) 初回訪問フラグ（任意のAPI。存在しなくても無視）
+        await fetch("/api/profile/welcome", {
+          method: "POST",
+          cache: "no-store",
+        }).catch(() => {});
+
+        // 4) テーマ設定の有無で分岐
+        const tRes = await fetch("/api/theme", { cache: "no-store" }).catch(() => null);
+        const tJson = tRes && tRes.ok ? await tRes.json().catch(() => null) : null;
+        const theme: string | null = (tJson?.value ?? tJson?.scope ?? null) as string | null;
+
+        // 初回は /theme、設定済みなら /mypage へ
+        router.replace(theme ? "/mypage" : "/theme");
       } catch {
-        if (alive) router.replace("/login?e=welcome_check_failed");
+        if (alive) router.replace("/login?e=welcome_failed");
       }
     })();
 
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [router, supabase]);
 
-  if (loading) {
-    // セッション確認中のローディング表示
-    return (
-      <main className="flex items-center justify-center min-h-dvh text-white">
-        <p className="animate-pulse">確認中...</p>
-      </main>
-    );
-  }
-
+  // 画面は出さずに短いローディングのみ
   return (
-    <main className="mx-auto max-w-lg px-6 py-12 text-white">
-      <h1 className="text-2xl font-semibold mb-2">ようこそ！</h1>
-      <p className="text-white/70 mb-6">登録が完了しました。</p>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <a
-          href="/welcome/lunea"
-          className="text-center rounded-md bg-white text-black py-2 font-medium"
-        >
-          診断スタート
-        </a>
-      </div>
+    <main className="flex items-center justify-center min-h-dvh text-white">
+      <p className="animate-pulse">準備中...</p>
     </main>
   );
 }

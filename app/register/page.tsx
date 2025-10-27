@@ -34,17 +34,35 @@ export default function RegisterPage() {
     setErr(null);
 
     try {
-      const site = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
-      const redirectTo = `${site}/auth/callback?next=/welcome`;
+      // ---- ここを堅牢化：必ず /auth/callback に飛ばす ----
+      // 1) まず NEXT_PUBLIC_SITE_URL（本番）を優先
+      // 2) 未設定なら window.location.origin（ローカル含む）
+      const site =
+        (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL) ||
+        (typeof window !== "undefined" ? window.location.origin : "");
+
+      // フォールバック（理論上ほぼ使われないが保険）
+      const origin = site || "http://localhost:3000";
+
+      const next = encodeURIComponent("/welcome");
+      const redirectTo = `${origin.replace(/\/$/, "")}/auth/callback?next=${next}`;
 
       const { error } = await sb.auth.signUp({
         email,
         password: pw,
-        options: { emailRedirectTo: redirectTo },
+        options: {
+          // ★ 必須：メールリンクの遷移先を /auth/callback に固定
+          emailRedirectTo: redirectTo,
+        },
       });
 
-      if (error) setErr(error.message);
-      else setMsg("確認メールを送信しました。メールのリンクを開いて登録を完了してください。");
+      if (error) {
+        setErr(error.message);
+      } else {
+        setMsg("確認メールを送信しました。メールのリンクを開いて登録を完了してください。");
+      }
+    } catch (e: any) {
+      setErr(e?.message ?? "登録処理で不明なエラーが発生しました。");
     } finally {
       setSending(false);
     }

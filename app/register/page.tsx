@@ -42,11 +42,10 @@ export default function RegisterPage() {
         (typeof window !== "undefined" ? window.location.origin : "");
 
       // フォールバック（理論上ほぼ使われないが保険）
-      const origin = site || "http://localhost:3000";
-
+     const origin = (site || "http://localhost:3000").replace(/\/+$/, ""); // 末尾の / を削除
+const redirectTo = `${origin}/auth/callback?next=/welcome`;
       const next = encodeURIComponent("/welcome");
-      const redirectTo = `${origin.replace(/\/$/, "")}/auth/callback?next=${next}`;
-
+      
       const { error } = await sb.auth.signUp({
         email,
         password: pw,

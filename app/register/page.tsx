@@ -14,17 +14,39 @@ export default function RegisterPage() {
   const [showPw2, setShowPw2] = useState(false);
 
   const [sending, setSending] = useState(false);
-  const [msg,   setMsg]   = useState<string | null>(null);
-  const [err,   setErr]   = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   const emailOk = /\S+@\S+\.\S+/.test(email);
-  const lenOk   = pw.length >= 6;
+  const lenOk = pw.length >= 6;
   const matchOk = pw !== "" && pw === pw2;
 
   const can = useMemo(
     () => emailOk && lenOk && matchOk && !sending,
     [emailOk, lenOk, matchOk, sending]
   );
+
+  async function ensureUserNo(userId: string) {
+    // 既に user_no が入っていれば何もしない。無ければ簡易Noを付与
+    try {
+      const { data: prof } = await sb
+        .from("profiles")
+        .select("id, user_no")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (prof?.user_no) return;
+
+      const short = userId.replace(/-/g, "").slice(0, 6).toUpperCase();
+      const userNo = `U-${short}`;
+
+      await sb
+        .from("profiles")
+        .upsert({ id: userId, user_no: userNo }, { onConflict: "id" });
+    } catch {
+      // 失敗してもフローは継続（後で付け直せるようにする）
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,46 +57,57 @@ export default function RegisterPage() {
     setErr(null);
 
     try {
-      // 必ず /auth/callback に着地（末尾スラッシュを除去して二重//防止）
       const site =
         (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL) ||
         (typeof window !== "undefined" ? window.location.origin : "");
       const origin = (site || "http://localhost:3000").replace(/\/+$/, "");
       const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent("/welcome")}`;
 
-      // 1) signUp 試行
+      // 1) 新規登録
       const { error: signUpErr } = await sb.auth.signUp({
         email,
         password: pw,
         options: { emailRedirectTo: redirectTo },
       });
 
-      // 1-a) エラー無し → Confirm OFF ならセッションあり
       if (!signUpErr) {
-        const { data: { session } } = await sb.auth.getSession();
-        if (session) {
+        // メール確認OFFならセッションが即時発行される
+        const {
+          data: { session },
+        } = await sb.auth.getSession();
+
+        if (session?.user?.id) {
+          await ensureUserNo(session.user.id);
           window.location.href = "/welcome";
           return;
         }
-        // Confirm ON のときはメール案内
-        setMsg("確認メールを送信しました。メールのリンクを開いて登録を完了してください。");
+
+        // メール確認ONの場合は案内のみ
+        setMsg("確認メールを送信しました。メール内のリンクを開くと登録が完了します。");
         return;
       }
 
-      // 2) 既に登録済み → メール無しで即ログイン（dev-magic-link 経由）
+      // 2) 既に登録済み → パスワードで即ログインして /mypage
       const already =
         /already\s*registered/i.test(signUpErr.message) ||
-        // たまに日本語や別文面になるためフォールバック
         /既に.*登録|exist|taken/i.test(signUpErr.message);
 
       if (already) {
-        // dev-magic-link がある前提（あなたのリポに存在）
-        window.location.href =
-          `${origin}/api/auth/dev-magic-link?email=${encodeURIComponent(email)}&next=${encodeURIComponent("/welcome")}`;
+        const { error: signInErr, data } = await sb.auth.signInWithPassword({
+          email,
+          password: pw,
+        });
+        if (signInErr) {
+          setErr(signInErr.message);
+          return;
+        }
+        const userId = data.user?.id;
+        if (userId) await ensureUserNo(userId);
+        window.location.href = "/mypage";
         return;
       }
 
-      // 3) その他のエラー
+      // 3) その他エラー
       setErr(signUpErr.message);
     } catch (e: any) {
       setErr(e?.message ?? "登録処理で不明なエラーが発生しました。");
@@ -150,7 +183,7 @@ export default function RegisterPage() {
               {showPw2 ? "🙈" : "👁️‍🗨️"}
             </button>
           </div>
-          {pw2.length > 0 && !matchOk && (
+          {pw2.length > 0 && pw !== pw2 && (
             <p className="text-xs text-red-400">パスワードが一致しません。</p>
           )}
         </div>
@@ -159,7 +192,7 @@ export default function RegisterPage() {
           disabled={!can}
           className="w-full rounded bg-white/10 px-4 py-2 hover:bg-white/15 disabled:opacity-40"
         >
-          登録メールを送信
+          登録
         </button>
 
         <div className="text-sm opacity-70">

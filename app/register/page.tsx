@@ -14,11 +14,11 @@ export default function RegisterPage() {
   const [showPw2, setShowPw2] = useState(false);
 
   const [sending, setSending] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [msg,   setMsg]   = useState<string | null>(null);
+  const [err,   setErr]   = useState<string | null>(null);
 
   const emailOk = /\S+@\S+\.\S+/.test(email);
-  const lenOk = pw.length >= 6;
+  const lenOk   = pw.length >= 6;
   const matchOk = pw !== "" && pw === pw2;
 
   const can = useMemo(
@@ -29,37 +29,53 @@ export default function RegisterPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!can) return;
+
     setSending(true);
     setMsg(null);
     setErr(null);
 
     try {
-      // ---- ここを堅牢化：必ず /auth/callback に飛ばす ----
-      // 1) まず NEXT_PUBLIC_SITE_URL（本番）を優先
-      // 2) 未設定なら window.location.origin（ローカル含む）
+      // 必ず /auth/callback に着地（末尾スラッシュを除去して二重//防止）
       const site =
         (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL) ||
         (typeof window !== "undefined" ? window.location.origin : "");
+      const origin = (site || "http://localhost:3000").replace(/\/+$/, "");
+      const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent("/welcome")}`;
 
-      // フォールバック（理論上ほぼ使われないが保険）
-     const origin = (site || "http://localhost:3000").replace(/\/+$/, ""); // 末尾の / を削除
-const redirectTo = `${origin}/auth/callback?next=/welcome`;
-      const next = encodeURIComponent("/welcome");
-      
-      const { error } = await sb.auth.signUp({
+      // 1) signUp 試行
+      const { error: signUpErr } = await sb.auth.signUp({
         email,
         password: pw,
-        options: {
-          // ★ 必須：メールリンクの遷移先を /auth/callback に固定
-          emailRedirectTo: redirectTo,
-        },
+        options: { emailRedirectTo: redirectTo },
       });
 
-      if (error) {
-        setErr(error.message);
-      } else {
+      // 1-a) エラー無し → Confirm OFF ならセッションあり
+      if (!signUpErr) {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session) {
+          window.location.href = "/welcome";
+          return;
+        }
+        // Confirm ON のときはメール案内
         setMsg("確認メールを送信しました。メールのリンクを開いて登録を完了してください。");
+        return;
       }
+
+      // 2) 既に登録済み → メール無しで即ログイン（dev-magic-link 経由）
+      const already =
+        /already\s*registered/i.test(signUpErr.message) ||
+        // たまに日本語や別文面になるためフォールバック
+        /既に.*登録|exist|taken/i.test(signUpErr.message);
+
+      if (already) {
+        // dev-magic-link がある前提（あなたのリポに存在）
+        window.location.href =
+          `${origin}/api/auth/dev-magic-link?email=${encodeURIComponent(email)}&next=${encodeURIComponent("/welcome")}`;
+        return;
+      }
+
+      // 3) その他のエラー
+      setErr(signUpErr.message);
     } catch (e: any) {
       setErr(e?.message ?? "登録処理で不明なエラーが発生しました。");
     } finally {

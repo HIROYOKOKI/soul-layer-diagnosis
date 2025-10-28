@@ -13,7 +13,7 @@ type DiagnoseRes = {
   typeLabel: string;          // 例: "EVΛƎ型（未来志向型）"
   colorHex: string;           // 公式カラー（EVΛƎ=#FF4500 / EΛVƎ=#B833F5）
   order: EV[];
-  points: Record<EV, number>; // {E:3,V:2,Λ:1,Ǝ:0}
+  points?: Record<EV, number>; // {E:3,V:2,Λ:1,Ǝ:0}（任意）
   comment: string;
   advice: string;
 };
@@ -41,7 +41,7 @@ export default function ResultClient() {
     },
   };
 
-  // 1) ペンディング（並び）を復元
+  /* 1) 並びの復元 */
   useEffect(() => {
     try {
       const raw =
@@ -59,44 +59,37 @@ export default function ResultClient() {
     }
   }, [router]);
 
-  // 2) 診断API → 保存API
+  /* 2) 診断 → 保存 */
   useEffect(() => {
     (async () => {
       if (!order) return;
       setLoading(true);
       setError(null);
       try {
-        // 診断（必ず 未来志向 or 現実思考 の二択で返る）
-        const r = await fetch("/api/structure/quick/diagnose", {
+        // 診断（未来志向 or 現実思考）
+        const r: DiagnoseRes | { ok: false } = await fetch("/api/structure/quick/diagnose", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ order, theme: "dev" }),
+          cache: "no-store",
         }).then((x) => x.json());
 
-        if (!r?.ok) {
+        if (!("ok" in r) || !r.ok) {
           setError("診断に失敗しました。もう一度お試しください。");
           setLoading(false);
           return;
         }
 
-        setRes(r as DiagnoseRes);
+        setRes(r);
 
-        // 保存
+        // 自動保存（/api/structure/quick/save）
         setSaving(true);
-        await fetch("/api/structure/quick/save", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            typeKey: r.typeKey,
-            typeLabel: r.typeLabel,
-            order: r.order,
-            points: r.points,
-            comment: r.comment,
-            advice: r.advice,
-            theme: "dev",
-          }),
-        }).catch(() => {
-          // 保存失敗はUI継続（マイページ表示だけ後でリトライ）
+        await saveQuickResult({
+          type_key: r.typeKey,
+          type_label: r.typeLabel,
+          order: r.order,
+          points: r.points, // 任意。あれば 0–100 に正規化して score_map に変換
+          env: "dev",
         });
       } catch (e) {
         setError("通信が不安定です。時間をおいて再度お試しください。");
@@ -170,4 +163,52 @@ export default function ResultClient() {
       </div>
     </div>
   );
+}
+
+/* ===== ここから追記：保存関数 ===== */
+
+type SavePayload = {
+  type_key: QuickTypeKey | null;
+  type_label: string | null;
+  order: EV[] | null;
+  points?: Record<EV, number> | undefined;
+  env?: "dev" | "prod";
+};
+
+/** points(0..3) → score_map(0..100) に正規化 */
+function pointsToScoreMap(points?: Record<EV, number> | null) {
+  if (!points) return null;
+  const max = 3; // 0..3 スケール想定
+  const toPct = (v: number | undefined) =>
+    typeof v === "number" ? Math.max(0, Math.min(100, (v / max) * 100)) : null;
+  return {
+    E: toPct(points.E),
+    V: toPct(points.V),
+    Λ: toPct(points["Λ"]),
+    Ǝ: toPct(points["Ǝ"]),
+  };
+}
+
+async function saveQuickResult(payload: SavePayload) {
+  const score_map = pointsToScoreMap(payload.points) ?? null;
+
+  const body = {
+    type_key: payload.type_key,
+    type_label: payload.type_label,
+    order: payload.order,
+    // points が無ければ score_map は null のままでOK（サーバーが order→重み付けに変換）
+    score_map,
+    env: payload.env ?? "dev",
+  };
+
+  try {
+    await fetch("/api/structure/quick/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+  } catch {
+    // 保存失敗しても UI は継続（MyPage 反映は次回に回す）
+  }
 }

@@ -5,42 +5,55 @@ import { useEffect, useMemo, useState } from 'react';
 import MyPageShell from '../../components/layout/MyPageShell';
 
 /* ===== 型 ===== */
-type QuickItem = {
-  type_key?: 'EVΛƎ' | 'EΛVƎ' | null;
-  type_label?: string | null;
-  created_at?: string | null;
-  scores?: Partial<Record<'E' | 'V' | 'Λ' | 'Ǝ', number | null>>;
-} | null;
+type EV = 'E' | 'V' | 'Λ' | 'Ǝ';
 
-type UserMeta = {
-  id?: string;
-  name?: string | null;
-  user_no?: string | null;
-  display_id?: string | null;
-  avatar_url?: string | null;
-} | null;
+type QuickAPI =
+  | {
+      type_key?: 'EVΛƎ' | 'EΛVƎ' | null;
+      type_label?: string | null;
+      created_at?: string | null;
+      scores?: Partial<Record<EV, number | null>>;
+      // 旧スキーマ互換
+      model?: 'EVΛƎ' | 'EΛVƎ' | null;
+      label?: string | null;
+    }
+  | null;
 
-type DailyRaw = {
-  comment?: string | null;
-  advice?: string | null;
-  affirm?: string | null;
-  affirmation?: string | null; // 互換キー
-  quote?: string | null;
-  score?: number | null;
-  created_at?: string | null;
-  slot?: string | null;
-  theme?: string | null;
-  is_today_jst?: boolean;
-} | null;
+type UserMeta =
+  | {
+      id?: string;
+      name?: string | null;
+      user_no?: string | null;      // API から来る (snake_case)
+      display_id?: string | null;
+      avatar_url?: string | null;
+    }
+  | null;
 
-type Daily = DailyRaw & { displayText?: string | null } | null;
+type DailyRaw =
+  | {
+      comment?: string | null;
+      advice?: string | null;
+      affirm?: string | null;
+      affirmation?: string | null; // 互換キー
+      quote?: string | null;
+      score?: number | null;
+      created_at?: string | null;
+      slot?: string | null;
+      theme?: string | null;
+      is_today_jst?: boolean;
+    }
+  | null;
 
-type Profile = {
-  fortune?: string | null;
-  personality?: string | null;
-  partner?: string | null;
-  created_at?: string | null;
-} | null;
+type Daily = (DailyRaw & { displayText?: string | null }) | null;
+
+type Profile =
+  | {
+      fortune?: string | null;
+      personality?: string | null;
+      partner?: string | null;
+      created_at?: string | null;
+    }
+  | null;
 
 /* ===== Utils ===== */
 const toJstDateString = (d: string | Date) =>
@@ -57,9 +70,15 @@ const normalizeDaily = (raw: DailyRaw): Daily => {
   return { ...raw, affirm, affirmation: affirm, is_today_jst: isToday, displayText };
 };
 
-/** Quick（API正規化版 or 旧版）→ 統一 */
-const normalizeQuick = (q: any | null | undefined) => {
-  if (!q) return { model: null as 'EVΛƎ' | 'EΛVƎ' | null, label: undefined as string | undefined, created_at: undefined as string | undefined };
+/** Quick（新API or 旧スキーマ）→ 統一 */
+const normalizeQuick = (q: QuickAPI | undefined) => {
+  if (!q) {
+    return {
+      model: null as 'EVΛƎ' | 'EΛVƎ' | null,
+      label: undefined as string | undefined,
+      created_at: undefined as string | undefined,
+    };
+  }
   const model = (q.type_key ?? q.model ?? null) as 'EVΛƎ' | 'EΛVƎ' | null;
   const labelRaw = q.type_label ?? q.label ?? undefined;
   const label =
@@ -75,44 +94,52 @@ export default function MyPageClientWrapper({
   profile: ssrProfile,
 }: {
   theme?: string | null;
-  quick?: any;       // 互換のため any
+  quick?: QuickAPI;  // 互換のため any→型を整理
   daily?: DailyRaw;
   profile?: Profile;
 }) {
+  /* ---------- ローカル状態 ---------- */
   const [user, setUser] = useState<UserMeta>(null);
-  const [quickModel, setQuickModel] = useState<'EVΛƎ' | 'EΛVƎ' | null>(normalizeQuick(ssrQuick).model);
-  const [quickLabel, setQuickLabel] = useState<string | undefined>(normalizeQuick(ssrQuick).label);
-  const [quickAt, setQuickAt] = useState<string | undefined>(normalizeQuick(ssrQuick).created_at);
+
+  const nQuick = normalizeQuick(ssrQuick);
+  const [quickModel, setQuickModel] = useState<'EVΛƎ' | 'EΛVƎ' | null>(nQuick.model);
+  const [quickLabel, setQuickLabel] = useState<string | undefined>(nQuick.label);
+  const [quickAt, setQuickAt] = useState<string | undefined>(nQuick.created_at);
 
   const [theme, setTheme] = useState<string>((ssrTheme ?? 'LIFE').toUpperCase());
   const [daily, setDaily] = useState<Daily>(normalizeDaily(ssrDaily ?? null));
   const [profile, setProfile] = useState<Profile>(ssrProfile ?? null);
 
+  // すべての fetch を no-store に統一
   const opt: RequestInit = useMemo(() => ({ cache: 'no-store' }), []);
 
-  /* ---------- ユーザー情報（名前／ID） ---------- */
+  /* ---------- ユーザー情報（/api/mypage/user-meta） ---------- */
   useEffect(() => {
     (async () => {
       try {
         const r = await fetch('/api/mypage/user-meta', opt);
         const j = await r.json().catch(() => ({}));
         if (j?.ok) setUser(j.item ?? null);
-      } catch { /* noop */ }
+      } catch {
+        // noop：UIは user: undefined でフォールバック
+      }
     })();
   }, [opt]);
 
-  /* ---------- テーマ ---------- */
+  /* ---------- テーマ（/api/theme） ---------- */
   useEffect(() => {
     (async () => {
       try {
         const r = await fetch('/api/theme', opt);
         const j = await r.json().catch(() => ({}));
         if (j?.scope) setTheme(String(j.scope).toUpperCase());
-      } catch { /* noop */ }
+      } catch {
+        // noop
+      }
     })();
   }, [opt]);
 
-  /* ---------- クイック診断（正規化API） ---------- */
+  /* ---------- クイック最新（/api/mypage/quick-latest） ---------- */
   useEffect(() => {
     (async () => {
       try {
@@ -124,33 +151,39 @@ export default function MyPageClientWrapper({
           setQuickLabel(n.label);
           setQuickAt(n.created_at);
         }
-      } catch { /* noop */ }
+      } catch {
+        // noop
+      }
     })();
   }, [opt]);
 
-  /* ---------- デイリー ---------- */
+  /* ---------- デイリー最新（/api/mypage/daily-latest） ---------- */
   useEffect(() => {
     (async () => {
       try {
         const r = await fetch('/api/mypage/daily-latest', opt);
         const j = await r.json().catch(() => ({}));
         if (j?.ok) setDaily(normalizeDaily(j.item ?? null));
-      } catch { /* noop */ }
+      } catch {
+        // noop
+      }
     })();
   }, [opt]);
 
-  /* ---------- プロフィール ---------- */
+  /* ---------- プロフィール最新（/api/mypage/profile-latest） ---------- */
   useEffect(() => {
     (async () => {
       try {
         const r = await fetch('/api/mypage/profile-latest', opt);
         const j = await r.json().catch(() => ({}));
         if (j?.ok) setProfile(j.item ?? null);
-      } catch { /* noop */ }
+      } catch {
+        // noop
+      }
     })();
   }, [opt]);
 
-  /* ---------- Shell（フル幅） ---------- */
+  /* ---------- Shell（フル幅ラッパ） ---------- */
   return (
     <div className="relative z-10 p-6 text-gray-100 pointer-events-auto space-y-8">
       <div className="w-screen mx-[calc(50%-50vw)] [&_*]:!max-w-none">
@@ -162,17 +195,19 @@ export default function MyPageClientWrapper({
                   name: user.name ?? undefined,
                   displayId: user.display_id ?? undefined,
                   avatarUrl: user.avatar_url ?? undefined,
-                  // ★ 表示に使う ID 番号
+                  /** ← 表示用。snake_case を camelCase に変換して渡す */
                   userNo: user.user_no ?? undefined,
                 }
               : undefined,
-            quick: quickModel
-              ? { model: quickModel, label: quickLabel, created_at: quickAt }
-              : undefined,
+            quick:
+              quickModel !== null
+                ? { model: quickModel, label: quickLabel, created_at: quickAt }
+                : undefined,
             theme: { name: theme, updated_at: null },
             daily: daily ?? undefined,
             profile: profile ?? undefined,
           }}
+          /** 既存の MyPageShell が userId を読む場合に備えて渡す */
           userId={user?.id}
         />
       </div>

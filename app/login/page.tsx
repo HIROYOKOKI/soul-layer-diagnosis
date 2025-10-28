@@ -1,23 +1,38 @@
 // app/login/page.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+
+/** 開発者メモ：
+ * - URLに next クエリがあれば、ログイン成功後にそこへ遷移（/ で始まるパスのみ許可）
+ * - Magic Link / Confirm Signup / Recovery のコールバックもこのページで受けて next へ
+ * - フォールバック遷移先は /mypage
+ */
 
 export default function LoginPage() {
   const sb = createClientComponentClient();
   const router = useRouter();
   const sp = useSearchParams();
 
-  // メールリンクからの遷移は /welcome を既定に
-  const next = sp.get("next") || "/welcome";
+  /* ===== next の安全化（外部URLは拒否） ===== */
+  const safeNext = useMemo(() => {
+    const raw = sp.get("next") || "/mypage";
+    try {
+      // 先頭が "/" のパスだけ許可（"//evil.com" なども弾く）
+      return raw.startsWith("/") && !raw.startsWith("//") ? raw : "/mypage";
+    } catch {
+      return "/mypage";
+    }
+  }, [sp]);
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(sp.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(sp.get("err"));
+  const [sending, setSending] = useState(false);
 
-  // ===== 追加：メールリンクで飛んできた場合に自動でセッションを確立して /welcome へ =====
+  /* ====== MagicLink / OTP（/login 自身で受けるブリッジ） ====== */
   const handledRef = useRef(false);
   useEffect(() => {
     if (handledRef.current) return;
@@ -25,18 +40,20 @@ export default function LoginPage() {
 
     (async () => {
       try {
-        const code = sp.get("code");                       // Magic Link / PKCE
-        const type = (sp.get("type") || "").toLowerCase(); // signup, magiclink, recovery...
-        const token_hash = sp.get("token_hash");           // Confirm signup 等
-        const token = sp.get("token");                     // 稀に token で来る
+        const code = sp.get("code");                 // PKCE / OAuth Code
+        const type = (sp.get("type") || "").toLowerCase(); // signup, magiclink, recovery, ...
+        const token_hash = sp.get("token_hash");     // confirm などで来る
+        const token = sp.get("token");               // 稀に token で来る
 
+        // 1) PKCE / OAuth code
         if (code) {
           const { error } = await sb.auth.exchangeCodeForSession(code);
           if (error) throw error;
-          router.replace(next);
+          router.replace(safeNext);
           return;
         }
 
+        // 2) Email OTP（Magic Link / Confirm Signup / Recovery など）
         if (token_hash || token) {
           const verifyType =
             ["signup", "magiclink", "recovery", "invite", "email_change"].includes(type)
@@ -49,35 +66,57 @@ export default function LoginPage() {
             token: token ?? undefined,
           } as any);
           if (error) throw error;
-          router.replace(next);
+          router.replace(safeNext);
           return;
         }
       } catch (e: any) {
-        // 失敗しても通常のログインフォームは使える
-        console.error("[login callback bridge]", e);
+        // 失敗しても通常ログインにフォールバック
+        console.error("[login callback]", e);
         setErr(e?.message ?? "ログインリンクの処理に失敗しました。もう一度お試しください。");
       }
     })();
-  }, [router, sb, sp, next]);
-  // ===== ここまで追加 =====
+  }, [router, sb, sp, safeNext]);
 
+  /* ====== パスワードログイン ====== */
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (sending) return;
+    setSending(true);
     setErr(null);
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) return setErr(error.message);
-    router.replace(next);
+
+    try {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        setErr(error.message);
+        return;
+      }
+      router.replace(safeNext);
+    } catch (e: any) {
+      setErr(e?.message ?? "ログインに失敗しました。時間をおいて再試行してください。");
+    } finally {
+      setSending(false);
+    }
   }
 
+  /* ====== パスワードリセット ====== */
   async function onForgot() {
+    setErr(null);
     if (!/\S+@\S+\.\S+/.test(email)) {
       setErr("メールアドレスを入力してください");
       return;
     }
-    const site = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
-    const redirectTo = `${site}/auth/callback?next=/login?reset=1`;
-    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
-    setErr(error ? error.message : "パスワード再設定メールを送信しました。");
+    try {
+      const site =
+        (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL) ||
+        (typeof window !== "undefined" ? window.location.origin : "");
+      const origin = (site || "http://localhost:3000").replace(/\/+$/, "");
+      // リセット完了後は /login?reset=1 に戻す
+      const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent("/login?reset=1")}`;
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+      setErr(error ? error.message : "パスワード再設定メールを送信しました。");
+    } catch (e: any) {
+      setErr(e?.message ?? "メール送信に失敗しました。時間をおいて再試行してください。");
+    }
   }
 
   return (
@@ -86,23 +125,28 @@ export default function LoginPage() {
 
       <form onSubmit={onSubmit} className="space-y-3">
         <input
-          className="w-full rounded border px-3 py-2"
+          className="w-full rounded border px-3 py-2 bg-black/20"
           type="email"
           placeholder="メールアドレス"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
+          required
         />
         <input
-          className="w-full rounded border px-3 py-2"
+          className="w-full rounded border px-3 py-2 bg-black/20"
           type="password"
           placeholder="パスワード"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password"
+          required
         />
-        <button className="w-full rounded bg-white/10 px-4 py-2 hover:bg-white/15">
-          ログイン
+        <button
+          className="w-full rounded bg-white/10 px-4 py-2 hover:bg-white/15 disabled:opacity-50"
+          disabled={sending}
+        >
+          {sending ? "ログイン中…" : "ログイン"}
         </button>
       </form>
 

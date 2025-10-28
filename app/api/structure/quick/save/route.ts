@@ -1,4 +1,3 @@
-// app/api/structure/quick/save/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
@@ -14,9 +13,9 @@ type Body = {
   type_key?: "EVΛƎ" | "EΛVƎ" | null; // 新
   type_label?: string | null;         // 新
   model?: "EVΛƎ" | "EΛVƎ" | null;     // 旧互換
-  label?: string | null;              // 旧互換
-  order?: EV[] | string | null;       // ["E","V","Λ","Ǝ"] or "E,V,Λ,Ǝ" or JSON文字列
-  score_map?: ScoreMap | null;        // {E,V,Λ,Ǝ} 0..1 or 0..100
+  label?: string | null;               // 旧互換
+  order?: EV[] | string | null;        // ["E","V","Λ","Ǝ"] | "E,V,Λ,Ǝ" | JSON文字列
+  score_map?: ScoreMap | null;         // {E,V,Λ,Ǝ}: 0..1 or 0..100
   env?: "dev" | "prod" | null;
 };
 
@@ -25,8 +24,8 @@ const toEV = (x: unknown): EV | null => {
   const s = String(x ?? "").trim();
   if (s === "E") return "E";
   if (s === "V") return "V";
-  if (s === "Λ" || s.toUpperCase() === "L") return "Λ";
-  if (s === "Ǝ" || s.toUpperCase() === "EEXISTS") return "Ǝ";
+  if (s === "Λ" || s.toUpperCase() === "L" || s === "∧") return "Λ";
+  if (s === "Ǝ") return "Ǝ"; // ここは正確一致に寄せる
   return null;
 };
 
@@ -60,7 +59,7 @@ const to100 = (n: unknown): number | null => {
 };
 
 /** undefined を null に寄せる（JSONB安全） */
-const nn = <T>(v: T | undefined): T | null => (v === undefined ? null : (v as any));
+const nn = <T,>(v: T | undefined): T | null => (v === undefined ? null : (v as any));
 
 /** スコアマップ正規化（0..100 / null） */
 const normalizeScores = (m?: ScoreMap | null) => {

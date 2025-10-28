@@ -23,7 +23,7 @@ type UserMeta =
   | {
       id?: string;
       name?: string | null;
-      user_no?: string | null;      // API から来る (snake_case)
+      user_no?: string | null;      // API: snake_case
       display_id?: string | null;
       avatar_url?: string | null;
     }
@@ -94,17 +94,18 @@ export default function MyPageClientWrapper({
   profile: ssrProfile,
 }: {
   theme?: string | null;
-  quick?: QuickAPI;  // 互換のため any→型を整理
+  quick?: QuickAPI;
   daily?: DailyRaw;
   profile?: Profile;
 }) {
   /* ---------- ローカル状態 ---------- */
   const [user, setUser] = useState<UserMeta>(null);
 
-  const nQuick = normalizeQuick(ssrQuick);
-  const [quickModel, setQuickModel] = useState<'EVΛƎ' | 'EΛVƎ' | null>(nQuick.model);
-  const [quickLabel, setQuickLabel] = useState<string | undefined>(nQuick.label);
-  const [quickAt, setQuickAt] = useState<string | undefined>(nQuick.created_at);
+  // SSR quick を一度だけ正規化
+  const ssrNQuick = useMemo(() => normalizeQuick(ssrQuick), [ssrQuick]);
+  const [quickModel, setQuickModel] = useState<'EVΛƎ' | 'EΛVƎ' | null>(ssrNQuick.model);
+  const [quickLabel, setQuickLabel] = useState<string | undefined>(ssrNQuick.label);
+  const [quickAt, setQuickAt] = useState<string | undefined>(ssrNQuick.created_at);
 
   const [theme, setTheme] = useState<string>((ssrTheme ?? 'LIFE').toUpperCase());
   const [daily, setDaily] = useState<Daily>(normalizeDaily(ssrDaily ?? null));
@@ -120,9 +121,7 @@ export default function MyPageClientWrapper({
         const r = await fetch('/api/mypage/user-meta', opt);
         const j = await r.json().catch(() => ({}));
         if (j?.ok) setUser(j.item ?? null);
-      } catch {
-        // noop：UIは user: undefined でフォールバック
-      }
+      } catch {/* noop */}
     })();
   }, [opt]);
 
@@ -133,9 +132,7 @@ export default function MyPageClientWrapper({
         const r = await fetch('/api/theme', opt);
         const j = await r.json().catch(() => ({}));
         if (j?.scope) setTheme(String(j.scope).toUpperCase());
-      } catch {
-        // noop
-      }
+      } catch {/* noop */}
     })();
   }, [opt]);
 
@@ -151,9 +148,7 @@ export default function MyPageClientWrapper({
           setQuickLabel(n.label);
           setQuickAt(n.created_at);
         }
-      } catch {
-        // noop
-      }
+      } catch {/* noop */}
     })();
   }, [opt]);
 
@@ -164,9 +159,7 @@ export default function MyPageClientWrapper({
         const r = await fetch('/api/mypage/daily-latest', opt);
         const j = await r.json().catch(() => ({}));
         if (j?.ok) setDaily(normalizeDaily(j.item ?? null));
-      } catch {
-        // noop
-      }
+      } catch {/* noop */}
     })();
   }, [opt]);
 
@@ -177,17 +170,28 @@ export default function MyPageClientWrapper({
         const r = await fetch('/api/mypage/profile-latest', opt);
         const j = await r.json().catch(() => ({}));
         if (j?.ok) setProfile(j.item ?? null);
-      } catch {
-        // noop
-      }
+      } catch {/* noop */}
     })();
   }, [opt]);
 
   /* ---------- Shell（フル幅ラッパ） ---------- */
+  // 取得後に確実に再描画させるためのキー
+  const shellKey = useMemo(
+    () =>
+      [
+        user?.id ?? 'anon',
+        user?.user_no ?? 'no-user-no',
+        quickModel ?? 'no-quick',
+        theme ?? 'no-theme',
+      ].join(':'),
+    [user?.id, user?.user_no, quickModel, theme]
+  );
+
   return (
     <div className="relative z-10 p-6 text-gray-100 pointer-events-auto space-y-8">
       <div className="w-screen mx-[calc(50%-50vw)] [&_*]:!max-w-none">
         <MyPageShell
+          key={shellKey}
           data={{
             user: user
               ? {
@@ -195,7 +199,7 @@ export default function MyPageClientWrapper({
                   name: user.name ?? undefined,
                   displayId: user.display_id ?? undefined,
                   avatarUrl: user.avatar_url ?? undefined,
-                  /** ← 表示用。snake_case を camelCase に変換して渡す */
+                  // 表示用：snake_case → camelCase
                   userNo: user.user_no ?? undefined,
                 }
               : undefined,
@@ -207,7 +211,6 @@ export default function MyPageClientWrapper({
             daily: daily ?? undefined,
             profile: profile ?? undefined,
           }}
-          /** 既存の MyPageShell が userId を読む場合に備えて渡す */
           userId={user?.id}
         />
       </div>

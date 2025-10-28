@@ -1,4 +1,3 @@
-// app/api/mypage/user-meta/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
@@ -17,7 +16,6 @@ export async function GET(_req: NextRequest) {
     const { data: auth } = await sb.auth.getUser();
     const user = auth?.user ?? null;
 
-    // 未ログイン → 空返し（200）
     if (!user) {
       return NextResponse.json(
         { ok: true, item: null, unauthenticated: true },
@@ -25,56 +23,42 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    // ===== ベース（最小メタ） =====
     const emailLocal = (user.email ?? "").split("@")[0] || null;
-    let item: {
-      id: string;
-      name: string | null;
-      display_id: string | null;
-      avatar_url: string | null;
-      user_no: string | null;
-    } = {
-      id: user.id,
-      name: null,
-      display_id: null,
-      avatar_url: null,
-      user_no: null,
-    };
 
-    // ===== profiles から読めれば反映（RLS/行無しでも例外にしない） =====
+    // 1) profiles から読む（失敗無視）
+    let prof: any = null;
     try {
       const { data: row } = await sb
         .from("profiles")
         .select("id, name, display_id, avatar_url, user_no")
         .eq("id", user.id)
         .maybeSingle();
+      prof = row ?? null;
+    } catch { /* noop */ }
 
-      if (row) {
-        item = {
-          id: row.id ?? item.id,
-          name: row.name ?? item.name,
-          display_id: row.display_id ?? item.display_id,
-          avatar_url: row.avatar_url ?? item.avatar_url,
-          user_no: row.user_no ?? item.user_no,
-        };
-      }
-    } catch {
-      /* noop */
-    }
+    // 2) 最新の profile_results から name を拾う（失敗無視）
+    let latestProfileName: string | null = null;
+    try {
+      const { data: pr } = await sb
+        .from("profile_results")
+        .select("name, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      latestProfileName = pr?.name ?? null;
+    } catch { /* noop */ }
 
-    // ===== フィールド補完（name / user_no） =====
-    // name: profiles → auth.user_metadata.name → email ローカル部
-    if (!item.name) {
-      const metaName = (user.user_metadata as any)?.name ?? null;
-      item.name = metaName ?? emailLocal;
-    }
+    // 3) マージとフォールバック
+    const item = {
+      id: prof?.id ?? user.id,
+      name: prof?.name ?? latestProfileName ?? (user.user_metadata as any)?.name ?? emailLocal,
+      display_id: prof?.display_id ?? null,
+      avatar_url: prof?.avatar_url ?? null,
+      user_no: prof?.user_no ?? genUserNo(user.id),
+    };
 
-    // user_no が無ければ計算
-    if (!item.user_no) {
-      item.user_no = genUserNo(user.id);
-    }
-
-    // ===== 可能なら保存（upsert / RLS で失敗しても無視） =====
+    // 4) 可能なら profiles を upsert（RLSで失敗しても無視）
     try {
       await sb.from("profiles").upsert(
         {
@@ -86,9 +70,7 @@ export async function GET(_req: NextRequest) {
         },
         { onConflict: "id" }
       );
-    } catch {
-      /* noop */
-    }
+    } catch { /* noop */ }
 
     return NextResponse.json(
       { ok: true, item },

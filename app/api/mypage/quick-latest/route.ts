@@ -6,14 +6,15 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** 返却フォーマット
+/**
+ * 返却フォーマット（正規化）
  * {
  *   ok: true,
  *   item: {
- *     type_key: 'EVΛƎ' | 'EΛVƎ' | null,
- *     type_label: string | null,
+ *     model: 'EVΛƎ' | 'EΛVƎ' | null,   // ★ フロントは基本これだけ見ればOK
+ *     label: string | null,             //   "未来志向型" / "現実思考型"
  *     order: ('E'|'V'|'Λ'|'Ǝ')[] | null,
- *     scores: { E:number|null, V:number|null, Λ:number|null, Ǝ:number|null },
+ *     scores: { E:number|null, V:number|null, Λ:number|null, Ǝ:number|null } | null,
  *     created_at: string | null
  *   } | null,
  *   unauthenticated?: true
@@ -33,7 +34,7 @@ export async function GET() {
   }
 
   try {
-    // カラム揺れによる 500 を避けるため、まずは * で取得
+    // カラム揺れを避けるために "*" で取得
     const { data } = await sb
       .from("quick_results")
       .select("*")
@@ -49,13 +50,13 @@ export async function GET() {
       );
     }
 
-    // ===== 正規化ユーティリティ =====
+    /* ========= 正規化ユーティリティ ========= */
     const toEV = (x: unknown) => {
       const s = String(x ?? "").trim();
       if (s === "E") return "E";
       if (s === "V") return "V";
-      if (s === "Λ" || s.toUpperCase() === "L") return "Λ";
-      if (s === "Ǝ" || s.toUpperCase() === "EEXISTS") return "Ǝ";
+      if (s === "Λ" || s.toUpperCase() === "L" || s === "∧") return "Λ";
+      if (s === "Ǝ") return "Ǝ";
       return null;
     };
 
@@ -85,42 +86,37 @@ export async function GET() {
     };
 
     const normalizeScores = (row: any) => {
-      // 新：score_map 優先
+      // 新：score_map 優先、旧：scores 互換
       const m = row?.score_map ?? row?.scores ?? null;
       if (m && typeof m === "object") {
         return {
           E: toNum(m.E),
           V: toNum(m.V),
           Λ: toNum(m["Λ"] ?? m.L),
-          Ǝ: toNum(m["Ǝ"] ?? m.Eexists ?? m.EEXISTS),
+          Ǝ: toNum(m["Ǝ"]),
         };
       }
-      // 旧：バラカラム（推定名を広く吸収）
-      return {
-        E: toNum(row?.score_e ?? row?.scoreE ?? row?.e),
-        V: toNum(row?.score_v ?? row?.scoreV ?? row?.v),
-        Λ: toNum(row?.score_l ?? row?.score_lambda ?? row?.lambda ?? row?.l),
-        Ǝ: toNum(row?.score_eexists ?? row?.score_e_exists ?? row?.scoreEcho ?? row?.echo ?? row?.ee),
-      };
+      // 旧：バラカラム（想定される別名を吸収）
+      const E = toNum(row?.score_e ?? row?.scoreE ?? row?.e);
+      const V = toNum(row?.score_v ?? row?.scoreV ?? row?.v);
+      const L = toNum(row?.score_l ?? row?.score_lambda ?? row?.lambda ?? row?.l);
+      const EE = toNum(row?.score_echo ?? row?.echo ?? row?.ee);
+      if (E == null && V == null && L == null && EE == null) return null;
+      return { E, V, Λ: L, Ǝ: EE };
     };
 
-    // ===== 正規化本体 =====
-    const type_key = (data.type_key ?? data.model ?? null) as "EVΛƎ" | "EΛVƎ" | null;
-    const type_label =
+    /* ========= 正規化本体 ========= */
+    const model = (data.type_key ?? data.model ?? null) as "EVΛƎ" | "EΛVƎ" | null;
+    const label =
       data.type_label ??
       data.label ??
-      (type_key === "EVΛƎ" ? "未来志向型" : type_key === "EΛVƎ" ? "現実思考型" : null);
+      (model === "EVΛƎ" ? "未来志向型" : model === "EΛVƎ" ? "現実思考型" : null);
 
     const order = normalizeOrder(data.order_v2 ?? data.order ?? data.rank ?? null);
     const scores = normalizeScores(data);
+    const created_at = data.created_at ?? null;
 
-    const item = {
-      type_key,
-      type_label,
-      order,
-      scores,
-      created_at: data.created_at ?? null,
-    };
+    const item = { model, label, order, scores, created_at };
 
     return NextResponse.json(
       { ok: true, item },

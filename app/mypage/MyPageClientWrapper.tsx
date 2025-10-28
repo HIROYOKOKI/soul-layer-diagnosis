@@ -9,13 +9,14 @@ type EV = 'E' | 'V' | 'Λ' | 'Ǝ';
 
 type QuickAPI =
   | {
-      type_key?: 'EVΛƎ' | 'EΛVƎ' | null;
-      type_label?: string | null;
-      created_at?: string | null;
-      scores?: Partial<Record<EV, number | null>>;
-      // 旧スキーマ互換
+      // 新API（推奨）
       model?: 'EVΛƎ' | 'EΛVƎ' | null;
       label?: string | null;
+      created_at?: string | null;
+      scores?: Partial<Record<EV, number | null>> | null;
+      // 旧スキーマ互換
+      type_key?: 'EVΛƎ' | 'EΛVƎ' | null;
+      type_label?: string | null;
     }
   | null;
 
@@ -79,11 +80,11 @@ const normalizeQuick = (q: QuickAPI | undefined) => {
       created_at: undefined as string | undefined,
     };
   }
-  const model = (q.type_key ?? q.model ?? null) as 'EVΛƎ' | 'EΛVƎ' | null;
-  const labelRaw = q.type_label ?? q.label ?? undefined;
+  const model = (q.model ?? q.type_key ?? null) as 'EVΛƎ' | 'EΛVƎ' | null;
+  const labelRaw = q.label ?? q.type_label ?? undefined;
   const label =
     labelRaw ?? (model === 'EVΛƎ' ? '未来志向型' : model === 'EΛVƎ' ? '現実思考型' : undefined);
-  return { model, label, created_at: q.created_at as string | undefined };
+  return { model, label, created_at: q.created_at ?? undefined };
 };
 
 /* ===== コンポーネント ===== */
@@ -121,7 +122,9 @@ export default function MyPageClientWrapper({
         const r = await fetch('/api/mypage/user-meta', opt);
         const j = await r.json().catch(() => ({}));
         if (j?.ok) setUser(j.item ?? null);
-      } catch {/* noop */}
+      } catch {
+        /* noop */
+      }
     })();
   }, [opt]);
 
@@ -132,7 +135,9 @@ export default function MyPageClientWrapper({
         const r = await fetch('/api/theme', opt);
         const j = await r.json().catch(() => ({}));
         if (j?.scope) setTheme(String(j.scope).toUpperCase());
-      } catch {/* noop */}
+      } catch {
+        /* noop */
+      }
     })();
   }, [opt]);
 
@@ -148,7 +153,9 @@ export default function MyPageClientWrapper({
           setQuickLabel(n.label);
           setQuickAt(n.created_at);
         }
-      } catch {/* noop */}
+      } catch {
+        /* noop */
+      }
     })();
   }, [opt]);
 
@@ -159,7 +166,9 @@ export default function MyPageClientWrapper({
         const r = await fetch('/api/mypage/daily-latest', opt);
         const j = await r.json().catch(() => ({}));
         if (j?.ok) setDaily(normalizeDaily(j.item ?? null));
-      } catch {/* noop */}
+      } catch {
+        /* noop */
+      }
     })();
   }, [opt]);
 
@@ -170,12 +179,14 @@ export default function MyPageClientWrapper({
         const r = await fetch('/api/mypage/profile-latest', opt);
         const j = await r.json().catch(() => ({}));
         if (j?.ok) setProfile(j.item ?? null);
-      } catch {/* noop */}
+      } catch {
+        /* noop */
+      }
     })();
   }, [opt]);
 
   /* ---------- Shell（フル幅ラッパ） ---------- */
-  // 取得後に確実に再描画させるためのキー
+  // 取得後に確実に再描画させるためのキー（quickModel を含める）
   const shellKey = useMemo(
     () =>
       [

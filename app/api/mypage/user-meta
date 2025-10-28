@@ -1,0 +1,22 @@
+// app/api/mypage/user-meta/route.ts
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const sb = createRouteHandlerClient({ cookies });
+  const { data: { user }, error: uerr } = await sb.auth.getUser();
+  if (uerr || !user) return NextResponse.json({ ok:true, item:null, unauthenticated:true }, { status:200 });
+
+  const { data, error } = await sb
+    .from("profiles")
+    .select("id,name,user_no,display_id,avatar_url")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 });
+  return NextResponse.json({ ok:true, item:data ?? null }, { headers: { "cache-control":"no-store" }});
+}

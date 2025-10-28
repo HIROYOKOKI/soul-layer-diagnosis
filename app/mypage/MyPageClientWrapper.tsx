@@ -2,18 +2,20 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import MyPageShell from '../../components/layout/MyPageShell';
 
 /* ===== 型 ===== */
-type QuickAny =
-  | { model?: 'EVΛƎ' | 'EΛVƎ' | null; label?: string | null; created_at?: string | null }
-  | { type_key?: 'EVΛƎ' | 'EΛVƎ' | null; type_label?: string | null; created_at?: string | null }
-  | null;
+type QuickItem = {
+  type_key?: 'EVΛƎ' | 'EΛVƎ' | null;
+  type_label?: string | null;
+  created_at?: string | null;
+  scores?: Partial<Record<'E' | 'V' | 'Λ' | 'Ǝ', number | null>>;
+} | null;
 
 type UserMeta = {
-  id: string;
+  id?: string;
   name?: string | null;
+  user_no?: string | null;
   display_id?: string | null;
   avatar_url?: string | null;
 } | null;
@@ -23,7 +25,7 @@ type DailyRaw = {
   advice?: string | null;
   affirm?: string | null;
   affirmation?: string | null; // 互換キー
-  quote?: string | null;       // 念のため
+  quote?: string | null;
   score?: number | null;
   created_at?: string | null;
   slot?: string | null;
@@ -31,20 +33,7 @@ type DailyRaw = {
   is_today_jst?: boolean;
 } | null;
 
-type Daily = {
-  comment?: string | null;
-  advice?: string | null;
-  affirm?: string | null;
-  affirmation?: string | null;
-  quote?: string | null;
-  score?: number | null;
-  created_at?: string | null;
-  slot?: string | null;
-  theme?: string | null;
-  is_today_jst?: boolean;
-  /** ★ MyPageShell がこれを優先して表示 */
-  displayText?: string | null;
-} | null;
+type Daily = DailyRaw & { displayText?: string | null } | null;
 
 type Profile = {
   fortune?: string | null;
@@ -60,27 +49,22 @@ const toJstDateString = (d: string | Date) =>
 /** Daily を統一スキーマに正規化して displayText を確定 */
 const normalizeDaily = (raw: DailyRaw): Daily => {
   if (!raw) return null;
-
   const affirm = raw.affirm ?? raw.affirmation ?? null;
   const displayText = affirm ?? raw.quote ?? raw.advice ?? raw.comment ?? null;
-
   const isToday =
     raw?.is_today_jst ??
     (raw?.created_at ? toJstDateString(raw.created_at) === toJstDateString(new Date()) : false);
+  return { ...raw, affirm, affirmation: affirm, is_today_jst: isToday, displayText };
+};
 
-  return {
-    comment: raw.comment ?? null,
-    advice: raw.advice ?? null,
-    quote: raw.quote ?? null,
-    affirm,
-    affirmation: affirm, // 互換維持
-    score: raw.score ?? null,
-    created_at: raw.created_at ?? null,
-    slot: raw.slot ?? null,
-    theme: raw.theme ?? null,
-    is_today_jst: isToday,
-    displayText,
-  };
+/** Quick（API正規化版 or 旧版）→ 統一 */
+const normalizeQuick = (q: any | null | undefined) => {
+  if (!q) return { model: null as 'EVΛƎ' | 'EΛVƎ' | null, label: undefined as string | undefined, created_at: undefined as string | undefined };
+  const model = (q.type_key ?? q.model ?? null) as 'EVΛƎ' | 'EΛVƎ' | null;
+  const labelRaw = q.type_label ?? q.label ?? undefined;
+  const label =
+    labelRaw ?? (model === 'EVΛƎ' ? '未来志向型' : model === 'EΛVƎ' ? '現実思考型' : undefined);
+  return { model, label, created_at: q.created_at as string | undefined };
 };
 
 /* ===== コンポーネント ===== */
@@ -91,118 +75,84 @@ export default function MyPageClientWrapper({
   profile: ssrProfile,
 }: {
   theme?: string | null;
-  quick?: QuickAny;
+  quick?: any;       // 互換のため any
   daily?: DailyRaw;
   profile?: Profile;
 }) {
-  const supabase = useMemo(() => createClientComponentClient(), []);
-
-  /* ---------- ユーザー情報 ---------- */
   const [user, setUser] = useState<UserMeta>(null);
+  const [quickModel, setQuickModel] = useState<'EVΛƎ' | 'EΛVƎ' | null>(normalizeQuick(ssrQuick).model);
+  const [quickLabel, setQuickLabel] = useState<string | undefined>(normalizeQuick(ssrQuick).label);
+  const [quickAt, setQuickAt] = useState<string | undefined>(normalizeQuick(ssrQuick).created_at);
+
+  const [theme, setTheme] = useState<string>((ssrTheme ?? 'LIFE').toUpperCase());
+  const [daily, setDaily] = useState<Daily>(normalizeDaily(ssrDaily ?? null));
+  const [profile, setProfile] = useState<Profile>(ssrProfile ?? null);
+
+  const opt: RequestInit = useMemo(() => ({ cache: 'no-store' }), []);
+
+  /* ---------- ユーザー情報（名前／ID） ---------- */
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await supabase.auth.getUser();
-        const uid = data?.user?.id;
-        if (!uid) return;
-
-        const { data: prof, error } = await supabase
-          .from('profiles')
-          .select('name, display_id, avatar_url')
-          .eq('id', uid)
-          .maybeSingle();
-
-        if (!error && prof) {
-          setUser({
-            id: uid,
-            name: prof.name ?? null,
-            display_id: prof.display_id ?? null,
-            avatar_url: prof.avatar_url ?? null,
-          });
-        }
-      } catch (e) {
-        console.error('user fetch failed', e);
-      }
+        const r = await fetch('/api/mypage/user-meta', opt);
+        const j = await r.json().catch(() => ({}));
+        if (j?.ok) setUser(j.item ?? null);
+      } catch { /* noop */ }
     })();
-  }, [supabase]);
+  }, [opt]);
 
   /* ---------- テーマ ---------- */
-  const [theme, setTheme] = useState<string>((ssrTheme ?? 'LIFE').toUpperCase());
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/theme', { cache: 'no-store' });
-        const j = await r.json();
+        const r = await fetch('/api/theme', opt);
+        const j = await r.json().catch(() => ({}));
         if (j?.scope) setTheme(String(j.scope).toUpperCase());
-      } catch {
-        /* noop */
-      }
+      } catch { /* noop */ }
     })();
-  }, []);
+  }, [opt]);
 
-  /* ---------- Quick ---------- */
-  const normalizeQuick = (q: QuickAny | undefined | null) => {
-    const model = (q as any)?.model ?? (q as any)?.type_key ?? null;
-    const labelRaw = (q as any)?.label ?? (q as any)?.type_label ?? undefined;
-    const label =
-      labelRaw ?? (model === 'EVΛƎ' ? '未来志向型' : model === 'EΛVƎ' ? '現実思考型' : undefined);
-    return { model, label };
-  };
-
-  const initQuick = normalizeQuick(ssrQuick);
-  const [quickModel, setQuickModel] = useState<'EVΛƎ' | 'EΛVƎ' | null>(initQuick.model ?? null);
-  const [quickLabel, setQuickLabel] = useState<string | undefined>(initQuick.label);
-
+  /* ---------- クイック診断（正規化API） ---------- */
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/mypage/quick-latest', { cache: 'no-store' });
-        const j = await r.json();
+        const r = await fetch('/api/mypage/quick-latest', opt);
+        const j = await r.json().catch(() => ({}));
         if (j?.ok) {
           const n = normalizeQuick(j.item);
-          setQuickModel((n.model ?? null) as 'EVΛƎ' | 'EΛVƎ' | null);
+          setQuickModel(n.model);
           setQuickLabel(n.label);
+          setQuickAt(n.created_at);
         }
-      } catch {
-        /* noop */
-      }
+      } catch { /* noop */ }
     })();
-  }, []);
+  }, [opt]);
 
-  /* ---------- Daily ---------- */
-  const [daily, setDaily] = useState<Daily>(normalizeDaily(ssrDaily ?? null));
+  /* ---------- デイリー ---------- */
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/mypage/daily-latest', { cache: 'no-store' });
-        const j = await r.json();
+        const r = await fetch('/api/mypage/daily-latest', opt);
+        const j = await r.json().catch(() => ({}));
         if (j?.ok) setDaily(normalizeDaily(j.item ?? null));
-      } catch {
-        /* noop */
-      }
+      } catch { /* noop */ }
     })();
-  }, []);
+  }, [opt]);
 
-  /* ---------- Profile ---------- */
-  const [profile, setProfile] = useState<Profile>(ssrProfile ?? null);
+  /* ---------- プロフィール ---------- */
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/mypage/profile-latest', { cache: 'no-store' });
-        const j = await r.json();
-        if (j?.ok) setProfile(j.item);
-      } catch {
-        /* noop */
-      }
+        const r = await fetch('/api/mypage/profile-latest', opt);
+        const j = await r.json().catch(() => ({}));
+        if (j?.ok) setProfile(j.item ?? null);
+      } catch { /* noop */ }
     })();
-  }, []);
+  }, [opt]);
 
   /* ---------- Shell（フル幅） ---------- */
   return (
     <div className="relative z-10 p-6 text-gray-100 pointer-events-auto space-y-8">
-      {/* ページ側に見出しがあるのでここでは出さない */}
-
-      {/* スマホ〜タブレット：横幅マックス。子孫の max-width も解除 */}
       <div className="w-screen mx-[calc(50%-50vw)] [&_*]:!max-w-none">
         <MyPageShell
           data={{
@@ -212,10 +162,12 @@ export default function MyPageClientWrapper({
                   name: user.name ?? undefined,
                   displayId: user.display_id ?? undefined,
                   avatarUrl: user.avatar_url ?? undefined,
+                  // ★ 表示に使う ID 番号
+                  userNo: user.user_no ?? undefined,
                 }
               : undefined,
             quick: quickModel
-              ? { model: quickModel, label: quickLabel, created_at: undefined }
+              ? { model: quickModel, label: quickLabel, created_at: quickAt }
               : undefined,
             theme: { name: theme, updated_at: null },
             daily: daily ?? undefined,

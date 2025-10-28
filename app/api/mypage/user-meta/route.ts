@@ -5,69 +5,75 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// U-XXXXXX を生成（安定：ユーザーID由来）
 function genUserNo(userId: string) {
   const base = userId.replace(/-/g, "").slice(0, 6).toUpperCase();
   return `U-${base}`;
 }
 
-export async function GET(req: NextRequest) {
-  const sb = createRouteHandlerClient({ cookies });
+export async function GET(_req: NextRequest) {
+  try {
+    const sb = createRouteHandlerClient({ cookies });
+    const { data: auth } = await sb.auth.getUser();
+    const user = auth?.user ?? null;
 
-  // 認証確認
-  const { data: auth, error: userErr } = await sb.auth.getUser();
-  const user = auth?.user ?? null;
+    // 未ログイン → 空返し（200）
+    if (!user) {
+      return NextResponse.json(
+        { ok: true, item: null, unauthenticated: true },
+        { status: 200, headers: { "cache-control": "no-store" } }
+      );
+    }
 
-  if (userErr || !user) {
+    // profiles 行の有無に依らず“必ず”最小メタを返す
+    let baseItem = {
+      id: user.id,
+      name: (user.user_metadata as any)?.name ?? null,
+      display_id: (user.user_metadata as any)?.display_id ?? null,
+      avatar_url: (user.user_metadata as any)?.avatar_url ?? null,
+      user_no: null as string | null,
+    };
+
+    // RLS/行無しでも例外にしない安全読み
+    try {
+      const { data: row } = await sb
+        .from("profiles")
+        .select("id, name, display_id, avatar_url, user_no")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (row) {
+        baseItem = {
+          id: row.id ?? baseItem.id,
+          name: row.name ?? baseItem.name,
+          display_id: row.display_id ?? baseItem.display_id,
+          avatar_url: row.avatar_url ?? baseItem.avatar_url,
+          user_no: row.user_no ?? baseItem.user_no,
+        };
+      }
+    } catch {
+      // 権限NGでも握りつぶす
+    }
+
+    // user_no が無ければ計算して“返す”（保存はベストエフォート）
+    if (!baseItem.user_no) {
+      const computed = genUserNo(user.id);
+      baseItem.user_no = computed;
+      // 保存は試すだけ（失敗してもOK）
+      try {
+        await sb.from("profiles").update({ user_no: computed }).eq("id", user.id);
+      } catch {/* noop */}
+    }
+
     return NextResponse.json(
-      { ok: true, item: null, unauthenticated: true },
+      { ok: true, item: baseItem },
       { status: 200, headers: { "cache-control": "no-store" } }
     );
-  }
-
-  // profiles から基本メタ取得
-  const { data: row, error } = await sb
-    .from("profiles")
-    .select("id, name, display_id, avatar_url, user_no")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (error) {
+  } catch (e: any) {
+    // ここまで来ることは稀。絶対500を返さない方針でもよいが、
+    // デバッグのためメッセージは返す。
     return NextResponse.json(
-      { ok: false, error: error.message },
+      { ok: false, error: e?.message ?? "unexpected_error" },
       { status: 500, headers: { "cache-control": "no-store" } }
     );
   }
-
-  // 行が無い場合は最小オブジェクトで返す（RLSでinsert不可の環境でも落ちないように）
-  let item =
-    row ??
-    ({
-      id: user.id,
-      name: null,
-      display_id: null,
-      avatar_url: null,
-      user_no: null,
-    } as const);
-
-  // user_no が未設定なら生成して保存を試みる（失敗してもレスポンスは返す）
-  if (!item.user_no) {
-    const newNo = genUserNo(user.id);
-    try {
-      const { error: upErr } = await sb
-        .from("profiles")
-        .update({ user_no: newNo })
-        .eq("id", user.id);
-      if (!upErr) {
-        item = { ...item, user_no: newNo };
-      }
-    } catch {
-      // RLS などで失敗しても無視（フロントは user_no=null でも動く）
-    }
-  }
-
-  return NextResponse.json(
-    { ok: true, item },
-    { status: 200, headers: { "cache-control": "no-store" } }
-  );
 }

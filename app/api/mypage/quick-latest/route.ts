@@ -21,111 +21,116 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   const sb = createRouteHandlerClient({ cookies });
-  const {
-    data: { user },
-    error: uerr,
-  } = await sb.auth.getUser();
+  const { data: auth } = await sb.auth.getUser();
+  const user = auth?.user ?? null;
 
-  // 未ログイン → 空返し
-  if (uerr || !user) {
+  // 未ログイン → 空返し（200）
+  if (!user) {
     return NextResponse.json(
       { ok: true, item: null, unauthenticated: true },
       { status: 200, headers: { "cache-control": "no-store" } }
     );
   }
 
-  // あり得る全カラムを拾う（旧/新の互換）
-  const { data, error } = await sb
-    .from("quick_results")
-    .select(
-      [
-        "user_id",
-        "model",        // 旧
-        "label",        // 旧
-        "type_key",     // 新
-        "type_label",   // 新
-        "order",        // 旧（配列 or 文字列）
-        "order_v2",     // 新（配列）
-        "score_map",    // 新（{E,V,Λ,Ǝ}）
-        "score_e",      // 旧ばらし
-        "score_v",
-        "score_l",
-        "score_eexists",
-        "created_at",
-      ].join(",")
-    )
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  try {
+    // カラム揺れによる 500 を避けるため、まずは * で取得
+    const { data } = await sb
+      .from("quick_results")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (error) {
+    if (!data) {
+      return NextResponse.json(
+        { ok: true, item: null },
+        { status: 200, headers: { "cache-control": "no-store" } }
+      );
+    }
+
+    // ===== 正規化ユーティリティ =====
+    const toEV = (x: unknown) => {
+      const s = String(x ?? "").trim();
+      if (s === "E") return "E";
+      if (s === "V") return "V";
+      if (s === "Λ" || s.toUpperCase() === "L") return "Λ";
+      if (s === "Ǝ" || s.toUpperCase() === "EEXISTS") return "Ǝ";
+      return null;
+    };
+
+    const normalizeOrder = (o: unknown): ("E" | "V" | "Λ" | "Ǝ")[] | null => {
+      if (!o) return null;
+      let arr: unknown[] = [];
+      if (Array.isArray(o)) {
+        arr = o;
+      } else if (typeof o === "string") {
+        try {
+          const parsed = JSON.parse(o);
+          if (Array.isArray(parsed)) arr = parsed;
+          else arr = String(o).split(",").map((s) => s.trim());
+        } catch {
+          arr = String(o).split(",").map((s) => s.trim());
+        }
+      }
+      const evs = (arr.map(toEV).filter(Boolean) as ("E" | "V" | "Λ" | "Ǝ")[]) ?? [];
+      const uniq = Array.from(new Set(evs));
+      return uniq.length ? uniq : null;
+    };
+
+    const toNum = (v: any): number | null => {
+      if (typeof v === "number" && isFinite(v)) return v;
+      const n = Number(v);
+      return isFinite(n) ? n : null;
+    };
+
+    const normalizeScores = (row: any) => {
+      // 新：score_map 優先
+      const m = row?.score_map ?? row?.scores ?? null;
+      if (m && typeof m === "object") {
+        return {
+          E: toNum(m.E),
+          V: toNum(m.V),
+          Λ: toNum(m["Λ"] ?? m.L),
+          Ǝ: toNum(m["Ǝ"] ?? m.Eexists ?? m.EEXISTS),
+        };
+      }
+      // 旧：バラカラム（推定名を広く吸収）
+      return {
+        E: toNum(row?.score_e ?? row?.scoreE ?? row?.e),
+        V: toNum(row?.score_v ?? row?.scoreV ?? row?.v),
+        Λ: toNum(row?.score_l ?? row?.score_lambda ?? row?.lambda ?? row?.l),
+        Ǝ: toNum(row?.score_eexists ?? row?.score_e_exists ?? row?.scoreEcho ?? row?.echo ?? row?.ee),
+      };
+    };
+
+    // ===== 正規化本体 =====
+    const type_key = (data.type_key ?? data.model ?? null) as "EVΛƎ" | "EΛVƎ" | null;
+    const type_label =
+      data.type_label ??
+      data.label ??
+      (type_key === "EVΛƎ" ? "未来志向型" : type_key === "EΛVƎ" ? "現実思考型" : null);
+
+    const order = normalizeOrder(data.order_v2 ?? data.order ?? data.rank ?? null);
+    const scores = normalizeScores(data);
+
+    const item = {
+      type_key,
+      type_label,
+      order,
+      scores,
+      created_at: data.created_at ?? null,
+    };
+
     return NextResponse.json(
-      { ok: false, error: error.message },
-      { status: 500 }
+      { ok: true, item },
+      { status: 200, headers: { "cache-control": "no-store" } }
+    );
+  } catch {
+    // どんな例外でも “成功(null)” で返して UI を止めない
+    return NextResponse.json(
+      { ok: true, item: null, note: "softened_error" },
+      { status: 200, headers: { "cache-control": "no-store" } }
     );
   }
-
-  // 正規化ユーティリティ
-  const toEV = (x: unknown) => {
-    const s = String(x ?? "").trim();
-    if (s === "E") return "E";
-    if (s === "V") return "V";
-    if (s === "Λ" || s.toUpperCase() === "L") return "Λ";
-    if (s === "Ǝ" || s.toUpperCase() === "EEXISTS") return "Ǝ";
-    return null;
-  };
-
-  const normalizeOrder = (o: unknown): ("E" | "V" | "Λ" | "Ǝ")[] | null => {
-    if (!o) return null;
-    let arr: unknown[] = [];
-    if (Array.isArray(o)) arr = o;
-    else if (typeof o === "string") {
-      try {
-        const parsed = JSON.parse(o);
-        if (Array.isArray(parsed)) arr = parsed;
-      } catch {
-        // カンマ区切りの文字列などに対応
-        arr = o.split(",").map((s: string) => s.trim());
-      }
-    }
-    const evs = (arr.map(toEV).filter(Boolean) as ("E" | "V" | "Λ" | "Ǝ")[]) ?? [];
-    // ユニーク化
-    const uniq = Array.from(new Set(evs));
-    return uniq.length ? uniq : null;
-  };
-
-  const normalizeScores = (row: any) => {
-    // score_map優先、無ければ旧カラム
-    if (row?.score_map && typeof row.score_map === "object") {
-      const m = row.score_map;
-      return {
-        E: typeof m.E === "number" ? m.E : null,
-        V: typeof m.V === "number" ? m.V : null,
-        Λ: typeof m["Λ"] === "number" ? m["Λ"] : (typeof m.L === "number" ? m.L : null),
-        Ǝ: typeof m["Ǝ"] === "number" ? m["Ǝ"] : (typeof m.Eexists === "number" ? m.Eexists : null),
-      };
-    }
-    return {
-      E: row?.score_e ?? null,
-      V: row?.score_v ?? null,
-      Λ: row?.score_l ?? null,
-      Ǝ: row?.score_eexists ?? null,
-    };
-  };
-
-  const item = data
-    ? {
-      type_key: data.type_key ?? data.model ?? null,
-      type_label: data.type_label ?? data.label ?? null,
-      order: normalizeOrder(data.order_v2 ?? data.order),
-      scores: normalizeScores(data),
-      created_at: data.created_at ?? null,
-    }
-    : null;
-
-  return NextResponse.json(
-    { ok: true, item },
-    { headers: { "cache-control": "no-store" } }
-  );
 }

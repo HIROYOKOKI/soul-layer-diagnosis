@@ -6,13 +6,20 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { formatJP } from './date'
 import ClockJST from './ClockJST'
-import RadarMini from '@/app/mypage/RadarMini' // ★ 追加：軽量レーダー
+import RadarMini from '@/app/mypage/RadarMini' // ★ 軽量レーダー
 
 type EV = 'E' | 'V' | 'Λ' | 'Ǝ'
 
 /* ====== 型 ====== */
 export type MyPageData = {
-  user?: { name?: string | null; displayId?: string | null; avatarUrl?: string | null; id?: string | null } | null
+  user?: {
+    id?: string | null
+    name?: string | null
+    displayId?: string | null
+    avatarUrl?: string | null
+    /** ★ 追加：API から camelCase で渡すユーザー番号 */
+    userNo?: string | null
+  } | null
   quick?: { model?: 'EVΛƎ' | 'EΛVƎ' | null; label?: string | null; created_at?: string | null } | null
   theme?: { name?: string | null; updated_at?: string | null } | null
   daily?: {
@@ -21,13 +28,9 @@ export type MyPageData = {
     comment?: string | null
     advice?: string | null
     affirm?: string | null
-    /** 互換用：APIが affirmation で返す場合も拾う */
     affirmation?: string | null
-    /** 互換用：名言等をアファメーション代替にしている場合 */
     quote?: string | null
-    /** JST当日判定が API 側で渡ってくる場合 */
     is_today_jst?: boolean | null
-    /** 補足 */
     score?: number | null
     created_at?: string | null
     slot?: string | null
@@ -35,10 +38,8 @@ export type MyPageData = {
     nextv?: { id: string; label: string }[] | null
     nextv_selected?: string | null
 
-    /** ▼ レーダー用に将来拡張されるかもしれない形（存在すれば拾う） */
-    // 例: { E:70, V:55, L:40, Ze:65 }
+    // ▼ レーダー用スキーマ（存在すれば拾う）
     scores?: Partial<Record<'E' | 'V' | 'L' | 'Ze', number>>
-    // 例: { E:0.7, V:0.55, Λ:0.4, Ǝ:0.65 }
     score_map?: Partial<Record<'E' | 'V' | 'Λ' | 'Ǝ', number>>
   } | null
   profile?: {
@@ -127,7 +128,15 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
   const d = (data ?? EMPTY_DATA) as MyPageData
 
   const avatar = d?.user?.avatarUrl ?? ''
-  const idText = d?.user?.displayId ?? '0001'
+  const userNoRaw = d?.user?.userNo ?? null
+  const displayIdRaw = d?.user?.displayId ?? null
+
+  /** ★ 表示IDの優先順位：userNo（#U-XXXXXX 表記） > displayId（ID: xxxx） > 既定 */
+  const idText =
+    userNoRaw ? `#${userNoRaw}` :
+    displayIdRaw ? `ID: ${displayIdRaw}` :
+    'ID: 0001'
+
   const nameText = d?.user?.name ?? 'Hiro'
   const uid = userId ?? d?.user?.id ?? null
 
@@ -202,7 +211,8 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-xs text-neutral-400">ID: {idText}</div>
+            {/* ★ ここが #U-XXXXXX / ID: xxxx を表示 */}
+            <div className="text-xs text-neutral-400">{idText}</div>
             <div className="text-lg md:text-xl font-semibold text-white truncate">{nameText}</div>
           </div>
         </div>
@@ -256,7 +266,6 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
         {/* 次の一歩 */}
         <Card title="次の一歩を選んでください">
           <div className="flex gap-4">
-            {/* 確実に遷移するよう Link */}
             <Link
               href="/daily"
               className="flex-1 rounded-xl border border-neutral-600 bg-neutral-800 px-4 py-3
@@ -319,7 +328,6 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
               </button>
             </div>
 
-            {/* 詳細は元レコードをそのまま見せる */}
             {d.daily.comment && (
               <p className="text-sm text-white/90 mb-3">
                 <span className="text-white/60">コメント：</span>{d.daily.comment}
@@ -336,11 +344,11 @@ export default function MyPageShell({ data, children, userId }: MyPageShellProps
               </p>
             )}
 
-            {nextVList && nextVList.length > 0 && (
+            {d.daily.nextv && d.daily.nextv.length > 0 && (
               <div className="mt-4">
                 <p className="text-white/70 mb-2">次の一手を選ぶ</p>
                 <ul className="space-y-2">
-                  {nextVList.map((n) => (
+                  {d.daily.nextv.map((n) => (
                     <li key={n.id}>
                       <button
                         onClick={() => { if (!selectedNextV) saveNextV(n.id, n.label) }}

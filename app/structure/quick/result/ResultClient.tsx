@@ -10,8 +10,8 @@ type QuickTypeKey = "EVΛƎ" | "EΛVƎ";
 type DiagnoseRes = {
   ok: true;
   typeKey: QuickTypeKey;
-  typeLabel: string;          // 例: "EVΛƎ型（未来志向型）"
-  colorHex: string;           // 公式カラー（EVΛƎ=#FF4500 / EΛVƎ=#B833F5）
+  typeLabel: string;           // 例: "EVΛƎ型（未来志向型）"
+  colorHex: string;            // 公式カラー（EVΛƎ=#FF4500 / EΛVƎ=#B833F5）
   order: EV[];
   points?: Record<EV, number>; // {E:3,V:2,Λ:1,Ǝ:0}（任意）
   comment: string;
@@ -59,7 +59,7 @@ export default function ResultClient() {
     }
   }, [router]);
 
-  /* 2) 診断 → 保存 */
+  /* 2) 診断 → 保存 → 直後に quick-latest をプローブ */
   useEffect(() => {
     (async () => {
       if (!order) return;
@@ -82,15 +82,30 @@ export default function ResultClient() {
 
         setRes(r);
 
-        // 自動保存（/api/structure/quick/save）
+        // ====== 自動保存（/api/structure/quick/save）======
         setSaving(true);
-        await saveQuickResult({
+        const saveRes = await saveQuickResult({
           type_key: r.typeKey,
           type_label: r.typeLabel,
           order: r.order,
           points: r.points, // 任意。あれば 0–100 に正規化して score_map に変換
           env: "dev",
         });
+
+        if (!saveRes.ok) {
+          console.error("❌ QUICK SAVE FAILED:", saveRes.status, saveRes.json);
+        } else {
+          console.log("✅ QUICK SAVED:", saveRes.json);
+          // 直後に最新1件を確認（ここで item が null ならDB未保存）
+          try {
+            const probe = await fetch("/api/mypage/quick-latest", { cache: "no-store" });
+            const pj = await probe.json();
+            console.log("🔎 quick-latest:", pj);
+          } catch (e) {
+            console.warn("probe quick-latest failed:", e);
+          }
+        }
+        // ====== /自動保存 ======
       } catch (e) {
         setError("通信が不安定です。時間をおいて再度お試しください。");
       } finally {
@@ -189,7 +204,11 @@ function pointsToScoreMap(points?: Record<EV, number> | null) {
   };
 }
 
-async function saveQuickResult(payload: SavePayload) {
+async function saveQuickResult(payload: SavePayload): Promise<{
+  ok: boolean;
+  status: number;
+  json: any;
+}> {
   const score_map = pointsToScoreMap(payload.points) ?? null;
 
   const body = {
@@ -202,13 +221,15 @@ async function saveQuickResult(payload: SavePayload) {
   };
 
   try {
-    await fetch("/api/structure/quick/save", {
+    const res = await fetch("/api/structure/quick/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       cache: "no-store",
     });
-  } catch {
-    // 保存失敗しても UI は継続（MyPage 反映は次回に回す）
+    const json = await res.json().catch(() => ({}));
+    return { ok: res.ok && json?.ok !== false, status: res.status, json };
+  } catch (e) {
+    return { ok: false, status: 0, json: { error: String(e) } };
   }
 }

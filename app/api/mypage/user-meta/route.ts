@@ -1,3 +1,4 @@
+// app/api/mypage/user-meta/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
@@ -24,16 +25,23 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    // profiles 行の有無に依らず“必ず”最小メタを返す
-    let baseItem = {
+    // ===== ベース（最小メタ） =====
+    const emailLocal = (user.email ?? "").split("@")[0] || null;
+    let item: {
+      id: string;
+      name: string | null;
+      display_id: string | null;
+      avatar_url: string | null;
+      user_no: string | null;
+    } = {
       id: user.id,
-      name: (user.user_metadata as any)?.name ?? null,
-      display_id: (user.user_metadata as any)?.display_id ?? null,
-      avatar_url: (user.user_metadata as any)?.avatar_url ?? null,
-      user_no: null as string | null,
+      name: null,
+      display_id: null,
+      avatar_url: null,
+      user_no: null,
     };
 
-    // RLS/行無しでも例外にしない安全読み
+    // ===== profiles から読めれば反映（RLS/行無しでも例外にしない） =====
     try {
       const { data: row } = await sb
         .from("profiles")
@@ -42,35 +50,51 @@ export async function GET(_req: NextRequest) {
         .maybeSingle();
 
       if (row) {
-        baseItem = {
-          id: row.id ?? baseItem.id,
-          name: row.name ?? baseItem.name,
-          display_id: row.display_id ?? baseItem.display_id,
-          avatar_url: row.avatar_url ?? baseItem.avatar_url,
-          user_no: row.user_no ?? baseItem.user_no,
+        item = {
+          id: row.id ?? item.id,
+          name: row.name ?? item.name,
+          display_id: row.display_id ?? item.display_id,
+          avatar_url: row.avatar_url ?? item.avatar_url,
+          user_no: row.user_no ?? item.user_no,
         };
       }
     } catch {
-      // 権限NGでも握りつぶす
+      /* noop */
     }
 
-    // user_no が無ければ計算して“返す”（保存はベストエフォート）
-    if (!baseItem.user_no) {
-      const computed = genUserNo(user.id);
-      baseItem.user_no = computed;
-      // 保存は試すだけ（失敗してもOK）
-      try {
-        await sb.from("profiles").update({ user_no: computed }).eq("id", user.id);
-      } catch {/* noop */}
+    // ===== フィールド補完（name / user_no） =====
+    // name: profiles → auth.user_metadata.name → email ローカル部
+    if (!item.name) {
+      const metaName = (user.user_metadata as any)?.name ?? null;
+      item.name = metaName ?? emailLocal;
+    }
+
+    // user_no が無ければ計算
+    if (!item.user_no) {
+      item.user_no = genUserNo(user.id);
+    }
+
+    // ===== 可能なら保存（upsert / RLS で失敗しても無視） =====
+    try {
+      await sb.from("profiles").upsert(
+        {
+          id: user.id,
+          name: item.name,
+          display_id: item.display_id,
+          avatar_url: item.avatar_url,
+          user_no: item.user_no,
+        },
+        { onConflict: "id" }
+      );
+    } catch {
+      /* noop */
     }
 
     return NextResponse.json(
-      { ok: true, item: baseItem },
+      { ok: true, item },
       { status: 200, headers: { "cache-control": "no-store" } }
     );
   } catch (e: any) {
-    // ここまで来ることは稀。絶対500を返さない方針でもよいが、
-    // デバッグのためメッセージは返す。
     return NextResponse.json(
       { ok: false, error: e?.message ?? "unexpected_error" },
       { status: 500, headers: { "cache-control": "no-store" } }

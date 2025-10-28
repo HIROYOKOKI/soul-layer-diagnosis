@@ -64,50 +64,72 @@ export default function ProfileResultClient() {
   const [step, setStep] = useState(0)
   const [quickBase, setQuickBaseState] = useState<ReturnType<typeof getQuickBase> | null>(null)
 
-  /* ==== load from sessionStorage ==== */
-  useEffect(() => {
+  /** 保存処理だけ関数化（存在しないAPIでもUIは継続） */
+  const saveProfileSafely = useCallback(async (d?: DiagnoseDetail | null) => {
     try {
-      const raw = typeof window !== "undefined" ? sessionStorage.getItem("profile_diagnose_pending") : null
-      if (!raw) {
-        setError("結果データが見つかりません（もう一度診断してください）")
-        setLoading(false)
-        return
+      setSaving(true)
+      const res = await fetch("/api/profile/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: null,
+          fortune: d?.fortune ?? null,
+          personality: d?.personality ?? null,
+          work: d?.work ?? null,
+          partner: d?.partner ?? null,
+          ...(getQuickBase() ?? {}),
+        }),
+      }).catch(() => null)
+
+      if (res && !res.ok && res.status !== 409) {
+        const j = await res.json().catch(() => ({} as any))
+        console.warn("profile/save failed:", j?.error ?? res.statusText)
+      } else {
+        try { sessionStorage.removeItem("structure_quick_pending") } catch {}
       }
-      const result = JSON.parse(raw) as DiagnoseResult
-      setDetail(result?.detail ?? null)
-      setQuickBaseState(getQuickBase())
-
-      // 保存API（あれば）※失敗してもUI継続
-      ;(async () => {
-        try {
-          setSaving(true)
-          const d = result?.detail ?? {}
-          const res = await fetch("/api/profile/save", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              user_id: null,
-              fortune: d.fortune ?? null,
-              personality: d.personality ?? null,
-              partner: d.partner ?? null,
-              ...(getQuickBase() ?? {}),
-            }),
-          }).catch(() => null)
-
-          if (res && !res.ok && res.status !== 409) {
-            const j = await res.json().catch(() => ({} as any))
-            console.warn("profile/save failed:", j?.error ?? res.statusText)
-          } else {
-            try { sessionStorage.removeItem("structure_quick_pending") } catch {}
-          }
-        } finally { setSaving(false) }
-      })()
-    } catch {
-      setError("結果データの読み込みに失敗しました")
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }, [])
+
+  /* ==== load from sessionStorage + フォールバック ==== */
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = typeof window !== "undefined" ? sessionStorage.getItem("profile_diagnose_pending") : null
+
+        if (raw) {
+          const result = JSON.parse(raw) as DiagnoseResult
+          const d = result?.detail ?? null
+          setDetail(d)
+          setQuickBaseState(getQuickBase())
+          await saveProfileSafely(d)
+          return
+        }
+
+        // ★ フォールバック：最新1件をAPIから
+        const r = await fetch("/api/mypage/profile-latest", { cache: "no-store" }).catch(() => null)
+        const j = await r?.json().catch(() => null)
+        const d = j?.item ?? null // { fortune, personality, work?, partner, created_at }
+        if (d) {
+          setDetail({
+            fortune: d.fortune ?? null,
+            personality: d.personality ?? null,
+            work: d.work ?? null,
+            partner: d.partner ?? null,
+          })
+          setQuickBaseState(getQuickBase())
+          return
+        }
+
+        setError("結果データが見つかりません（もう一度診断してください）")
+      } catch {
+        setError("結果データの読み込みに失敗しました")
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [saveProfileSafely])
 
   /* ==== bubbles ==== */
   const bubbles = useMemo(() => {
@@ -200,7 +222,7 @@ export default function ProfileResultClient() {
               >
                 再試行
               </button>
-              <button className="px-3 py-2 rounded border border-white/20 hover:bg-white/10" onClick={toProfile}>
+              <button className="px-3 py-2 rounded border border-white/20 hover:bg白/10" onClick={toProfile}>
                 入力へ戻る
               </button>
             </div>

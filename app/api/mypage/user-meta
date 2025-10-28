@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const sb = createRouteHandlerClient({ cookies });
   const { data: { user }, error: uerr } = await sb.auth.getUser();
-  if (uerr || !user) return NextResponse.json({ ok:true, item:null, unauthenticated:true }, { status:200 });
+  if (uerr || !user) return NextResponse.json({ ok:true, item:null, unauthenticated:true });
 
   const { data, error } = await sb
     .from("profiles")
@@ -18,5 +18,8 @@ export async function GET() {
     .maybeSingle();
 
   if (error) return NextResponse.json({ ok:false, error:error.message }, { status:500 });
-  return NextResponse.json({ ok:true, item:data ?? null }, { headers: { "cache-control":"no-store" }});
+
+  return NextResponse.json({ ok:true, item: data ?? { id: user.id, name: null, user_no: null } }, {
+    headers: { "cache-control":"no-store" }
+  });
 }

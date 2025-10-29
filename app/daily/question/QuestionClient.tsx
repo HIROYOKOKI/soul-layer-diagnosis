@@ -40,6 +40,16 @@ function getJstSlotClient(date = new Date()): Slot {
   return "night";
 }
 
+/* ===== 名前プレフィックス保証（重複防止） ===== */
+function ensureNamePrefix(text: string | undefined, name?: string | null): string {
+  const t = (text ?? "").trim();
+  if (!t) return "";
+  const n = (name ?? "").trim();
+  if (!n) return t;
+  const prefix = `${n}さん、`;
+  return t.startsWith(prefix) ? t : `${prefix}${t}`;
+}
+
 export default function QuestionClient({ initialTheme }: { initialTheme: Theme }) {
   const [phase, setPhase] = useState<Phase>("ask");
   const [loading, setLoading] = useState(false);
@@ -56,7 +66,36 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
   const [result, setResult] = useState<DailyAnswerResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  // /api/me からのユーザー名（表示用の最終保険）
+  const [meName, setMeName] = useState<string | null>(null);
+
+  // ユーザー名取得（最初に一度だけ）
   useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch("/api/me", { cache: "no-store" });
+        const j = await r.json().catch(() => null);
+        if (!alive) return;
+        // /api/me の返却仕様に合わせて素直に拾う（item.name or name）
+        const name =
+          j?.item?.name ??
+          j?.name ??
+          j?.item?.display_id ??
+          j?.item?.user_no ??
+          null;
+        setMeName(typeof name === "string" ? name : null);
+      } catch {
+        if (!alive) return;
+        setMeName(null);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // 質問の取得
+  useEffect(() => {
+    let alive = true;
     (async () => {
       setLoading(true);
       try {
@@ -67,17 +106,20 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
 
         // スロットはクライアントで再計算したものを使う
         const s = getJstSlotClient();
+        if (!alive) return;
         setSlot(s);
 
         setSeed(jq.seed || 0);
-        setQuestion(
+
+        // 問いのテキスト（API出力 or ローカル既定）→ 表示直前に ensureNamePrefix する
+        const baseQ =
           jq.question ||
-            (s === "morning"
-              ? "今のあなたに必要な最初の一歩はどれ？"
-              : s === "noon"
-              ? "このあと数時間で進めたい進路は？"
-              : "今日はどんな締めくくりが心地いい？")
-        );
+          (s === "morning"
+            ? "今のあなたに必要な最初の一歩はどれ？"
+            : s === "noon"
+            ? "このあと数時間で進めたい進路は？"
+            : "今日はどんな締めくくりが心地いい？");
+        setQuestion(baseQ);
 
         // 強制フォールバック：必ず 2〜4 件にする
         const need = needCount(s);
@@ -98,12 +140,15 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
 
         setPhase("ask");
       } catch (e: any) {
+        if (!alive) return;
         setErr(e?.message ?? "failed_to_load");
         setPhase("error");
       } finally {
+        if (!alive) return;
         setLoading(false);
       }
     })();
+    return () => { alive = false; };
   }, [initialTheme]);
 
   async function onChoose(choiceId: string) {
@@ -135,6 +180,17 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
     return `デイリー診断（${slotJp} × ${themeJp}）`;
   }, [slot, theme]);
 
+  // 表示時に「◯◯さん、」を保証（APIが既に名前入りでも重複しない）
+  const displayQuestion = useMemo(
+    () => ensureNamePrefix(question, meName),
+    [question, meName]
+  );
+
+  const displayComment = useMemo(() => {
+    const c = (result as any)?.comment as string | undefined;
+    return ensureNamePrefix(c, meName);
+  }, [result, meName]);
+
   return (
     <>
       <h2 className="text-base font-semibold mb-4 text-white">{header}</h2>
@@ -144,7 +200,7 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
 
       {phase === "ask" && !loading && (
         <div className="space-y-4">
-          <p className="opacity-90">{question}</p>
+          <p className="opacity-90">{displayQuestion}</p>
 
           {choices.length > 0 ? (
             <div className="grid gap-3 mt-4">
@@ -169,7 +225,7 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
         <div className="mt-6 space-y-4">
           <div className="rounded-2xl p-4 border border-white/10 bg-white/5">
             <div className="text-sm uppercase tracking-wider opacity-60 mb-2">コメント</div>
-            <p>{(result as any).comment}</p>
+            <p>{displayComment}</p>
           </div>
           <div className="rounded-2xl p-4 border border-white/10 bg-white/5">
             <div className="text-sm uppercase tracking-wider opacity-60 mb-2">アドバイス</div>

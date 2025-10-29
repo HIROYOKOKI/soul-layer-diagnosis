@@ -1,17 +1,17 @@
-"use client";
-
-import { usePathname } from "next/navigation";
-
+// AppFooter.tsx（要点だけ）
 export default function AppFooter() {
-  const pathname = usePathname() || "/";
-  const hide = pathname === "/" || pathname.startsWith("/intro");
-  if (hide) return null; // ← ホームと/introでは出さない
-
   return (
-    <footer className="border-t border-white/10 bg-black/50">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        {/* 既存のフッター内容 */}
-      </div>
+    <footer
+      style={{
+        position: 'static',     // ← sticky をやめる
+        background: 'rgba(6,7,10,.85)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        borderTop: '1px solid rgba(255,255,255,.08)',
+        zIndex: 50,             // 念のため前面へ
+      }}
+    >
+      {/* ... */}
     </footer>
   );
 }

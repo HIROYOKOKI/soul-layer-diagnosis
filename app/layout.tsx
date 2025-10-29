@@ -1,9 +1,10 @@
-import './globals.css';
-import AuthSync from '@/components/AuthSync';
-import AppHeader from './components/AppHeader';
-import LayoutClient from './LayoutClient'; // ← 追加
+// app/layout.tsx
+import "./globals.css";
+import AuthSync from "@/components/AuthSync";
+import AppHeader from "./components/AppHeader";
+import LayoutClient from "./LayoutClient";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

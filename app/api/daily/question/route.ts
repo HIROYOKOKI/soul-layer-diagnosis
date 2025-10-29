@@ -1,15 +1,41 @@
-// app/api/daily/question/route.ts
+// =============================================================
+// app/api/daily/question/route.ts（改訂版）
+// 変更点：ユーザー名を取得して LUNEA_SYSTEM_PROMPT_FOR(name) を使用
+// =============================================================
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import OpenAI from "openai";
+import { LUNEA_SYSTEM_PROMPT_FOR } from "@/app/_data/characters/lunea";
 
+/* ===== 型定義 ===== */
 type Slot = "morning" | "noon" | "night";
 type Theme = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 type EV = "E" | "V" | "Λ" | "Ǝ";
 
-/* ===== フォールバック ===== */
+/* ===== ユーザー名取得 ===== */
+async function getUserName() {
+  const sb = createRouteHandlerClient({ cookies });
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return null;
+
+  const { data: prof } = await sb
+    .from("profiles")
+    .select("name, display_id, user_no")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const byProfile = prof?.name || prof?.display_id || prof?.user_no;
+  const byMeta = (user.user_metadata as any)?.name as string | undefined;
+  const byEmail = user.email?.split("@")[0];
+
+  return (byProfile || byMeta || byEmail || null) as string | null;
+}
+
+/* ===== フォールバック選択肢 ===== */
 const FALLBACK: Record<Slot, { key: EV; label: string }[]> = {
   morning: [
     { key: "E", label: "直感で素早く動く" },
@@ -32,14 +58,14 @@ const NEED = (slot: Slot) => (slot === "morning" ? 4 : slot === "noon" ? 3 : 2);
 const ORIGIN = (reqUrl: string) =>
   process.env.NEXT_PUBLIC_SITE_URL ?? new URL(reqUrl).origin;
 
-/* ===== JSTスロット（Asia/Tokyoを厳密指定） ===== */
+/* ===== JSTスロット ===== */
 function getJstSlot(now = new Date()): Slot {
   const hourFmt = new Intl.DateTimeFormat("ja-JP", {
     timeZone: "Asia/Tokyo",
     hour: "numeric",
     hour12: false,
   });
-  const h = Number(hourFmt.format(now)); // 0..23（JST）
+  const h = Number(hourFmt.format(now));
   if (h >= 5 && h < 12) return "morning";
   if (h >= 12 && h < 18) return "noon";
   return "night";
@@ -53,9 +79,8 @@ function seedFromUUID(uuid: string): number {
   return Number.parseInt(head, 16) >>> 0;
 }
 
-/* ====== 合成ユーティリティ ====== */
-type Vec = { E: number; V: number; L: number; Ze: number }; // 0..100
-
+/* ===== ベクトル演算ユーティリティ ===== */
+type Vec = { E: number; V: number; L: number; Ze: number };
 function clamp100(n: number) { return Math.max(0, Math.min(100, n)); }
 function nz(v?: number | null) { return typeof v === "number" && !Number.isNaN(v); }
 function normScore(x?: number | null): number | null {
@@ -74,10 +99,7 @@ function fromScoreMap(m?: any): Vec | null {
   }
   return null;
 }
-
-/** テーマ→バイアス（軽量・可逆） */
 function themeVector(theme: Theme): Vec {
-  // 中庸: 25ずつをベースに +/−10 の範囲で微傾斜
   switch (theme) {
     case "WORK":   return { E: 30, V: 20, L: 35, Ze: 15 };
     case "LOVE":   return { E: 20, V: 40, L: 20, Ze: 20 };
@@ -85,23 +107,14 @@ function themeVector(theme: Theme): Vec {
     case "LIFE":   return { E: 23, V: 27, L: 23, Ze: 27 };
   }
 }
-
-/** ゼロベクトル */
 const ZERO: Vec = { E: 0, V: 0, L: 0, Ze: 0 };
+function add(a: Vec, b: Vec): Vec { return { E: a.E + b.E, V: a.V + b.V, L: a.L + b.L, Ze: a.Ze + b.Ze }; }
+function mul(a: Vec, k: number): Vec { return { E: a.E * k, V: a.V * k, L: a.L * k, Ze: a.Ze * k }; }
+function normFinal(v: Vec): Vec { return { E: clamp100(v.E), V: clamp100(v.V), L: clamp100(v.L), Ze: clamp100(v.Ze) }; }
 
-/** 加算 */
-function add(a: Vec, b: Vec): Vec {
-  return { E: a.E + b.E, V: a.V + b.V, L: a.L + b.L, Ze: a.Ze + b.Ze };
-}
-/** スカラー倍 */
-function mul(a: Vec, k: number): Vec {
-  return { E: a.E * k, V: a.V * k, L: a.L * k, Ze: a.Ze * k };
-}
-/** 正規化（0..100） */
-function normFinal(v: Vec): Vec {
-  return { E: clamp100(v.E), V: clamp100(v.V), L: clamp100(v.L), Ze: clamp100(v.Ze) };
-}
-
+/* =============================================================
+   GET: 質問生成（LUNEA_SYSTEM_PROMPT_FOR(name)を使用）
+   ============================================================= */
 export async function GET(req: Request) {
   const origin = ORIGIN(req.url);
   const url = new URL(req.url);
@@ -109,7 +122,10 @@ export async function GET(req: Request) {
   const jar = cookies();
   const cookieHeader = (req.headers.get("cookie") ?? "") as string;
 
-  // 1) テーマ
+  // 1) ユーザー名取得
+  const userName = await getUserName();
+
+  // 2) テーマ取得
   let theme: Theme = "LOVE";
   try {
     const r = await fetch(`${origin}/api/theme`, {
@@ -121,34 +137,61 @@ export async function GET(req: Request) {
     if (["WORK", "LOVE", "FUTURE", "LIFE"].includes(t)) theme = t as Theme;
   } catch {}
 
-  // 2) JSTスロット
+  // 3) JSTスロット
   const slot = getJstSlot();
   const need = NEED(slot);
 
-  // 3) /api/daily/generate へ委譲
+  // 4) /api/daily/generate 呼び出し（LUNEA_SYSTEM_PROMPT_FOR(name)を注入）
   let text = "";
   let options: { key?: string; label?: string }[] = [];
-  try {
-    const r = await fetch(`${origin}/api/daily/generate`, {
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        "Content-Type": "application/json",
-        cookie: cookieHeader,
-      },
-      body: JSON.stringify({ slot, theme }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (r.ok && j?.ok) {
-      text = String(j.text ?? "");
-      options = Array.isArray(j.options) ? j.options : [];
-      const patched = String(j.theme ?? "").toUpperCase();
-      if (["WORK", "LOVE", "FUTURE", "LIFE"].includes(patched))
-        theme = patched as Theme;
-    }
-  } catch {}
 
-  // 4) 選択肢フォールバック
+  try {
+    const client = new OpenAI();
+    const messages = [
+      { role: "system", content: LUNEA_SYSTEM_PROMPT_FOR(userName ?? undefined) },
+      {
+        role: "user",
+        content: JSON.stringify({
+          slot,
+          theme,
+          instruction:
+            "ルネアとして1問4択の質問を生成してください。質問は50〜100文字以内、選択肢は20〜50文字以内で、すべて日本語で自然に。",
+        }),
+      },
+    ];
+
+    const res = await client.chat.completions.create({
+      model: "gpt-5-mini",
+      messages,
+      temperature: 0.7,
+      response_format: { type: "json_object" },
+    });
+
+    const raw = res.choices[0]?.message?.content ?? "{}";
+    const json = JSON.parse(raw);
+    text = json.question ?? "";
+    options = Array.isArray(json.options) ? json.options : [];
+  } catch {
+    // fallback: /api/daily/generate に委譲
+    try {
+      const r = await fetch(`${origin}/api/daily/generate`, {
+        method: "POST",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          cookie: cookieHeader,
+        },
+        body: JSON.stringify({ slot, theme }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j?.ok) {
+        text = String(j.text ?? "");
+        options = Array.isArray(j.options) ? j.options : [];
+      }
+    } catch {}
+  }
+
+  // 5) 選択肢フォールバック
   const keys: EV[] = ["E", "V", "Λ", "Ǝ"];
   let choices = (options || [])
     .slice(0, need)
@@ -169,7 +212,7 @@ export async function GET(req: Request) {
   if (choices.length === 0) choices = FALLBACK[slot].slice(0, need);
   if (choices.length > need) choices = choices.slice(0, need);
 
-  // 5) IDなど
+  // 6) メタ情報
   const questionId = crypto.randomUUID();
   const seed = seedFromUUID(questionId);
   const createdAt = new Date().toISOString();
@@ -181,82 +224,10 @@ export async function GET(req: Request) {
       ? "このあと数時間で進めたい進路は？"
       : "今日はどんな締めくくりが心地いい？");
 
-  // Cookie（互換）
+  // Cookie保存
   jar.set("daily_question_id", questionId, { httpOnly: true, sameSite: "lax", path: "/" });
   jar.set("daily_slot", slot, { httpOnly: true, sameSite: "lax", path: "/" });
   jar.set("daily_theme", theme, { httpOnly: true, sameSite: "lax", path: "/" });
-
-  // 6) debug: 最新データ & 合成スコア（★ここが追加/更新パート）
-  let debugPayload: any | null = null;
-  if (debug) {
-    try {
-      // 最新レコードを /api/mypage/* から取得（Cookie付きで本人分）
-      const [q, d, p] = await Promise.all([
-        fetch(`${origin}/api/mypage/quick-latest`,   { cache: "no-store", headers: { cookie: cookieHeader } }).then(r => r.json()).catch(() => null),
-        fetch(`${origin}/api/mypage/daily-latest`,   { cache: "no-store", headers: { cookie: cookieHeader } }).then(r => r.json()).catch(() => null),
-        fetch(`${origin}/api/mypage/profile-latest`, { cache: "no-store", headers: { cookie: cookieHeader } }).then(r => r.json()).catch(() => null),
-      ]);
-
-      const quick   = q?.item ?? null;      // 例: { model, label, order, score_map?, ... }
-      const daily   = d?.item ?? null;      // 例: { code, comment, score_map?, ... }
-      const profile = p?.item ?? null;      // 例: { fortune, personality, partner, score_map?, ... }
-
-      // 入力ベクトル抽出
-      const vTheme:   Vec       = themeVector(theme);
-      const vDaily:   Vec | null = fromScoreMap(daily?.score_map);
-      const vProfile: Vec | null = fromScoreMap((profile as any)?.score_map) ?? null;
-      const vQuick:   Vec | null = fromScoreMap((quick   as any)?.score_map) ?? null; // ★ quick も score_map があれば反映
-
-      // 重み（既定：プロフィール=1.0 / テーマ=0.5 / デイリー=0.1 / クイック=0.5）
-      const weights = {
-        profile: 1.0,
-        theme:   0.5,
-        daily:   0.1,
-        quick:   0.5,
-        weekly:  0.5,  // 将来拡張用
-        monthly: 1.5,  // 将来拡張用
-      } as const;
-
-      // 合成（存在するベクトルのみ加重平均）
-      const parts: { key: keyof typeof weights; vec: Vec | null }[] = [
-        { key: "profile", vec: vProfile },
-        { key: "theme",   vec: vTheme   },
-        { key: "daily",   vec: vDaily   },
-        { key: "quick",   vec: vQuick   },
-      ];
-
-      let acc = ZERO;
-      let wsum = 0;
-      const used: Record<string, number> = {};
-      for (const p of parts) {
-        const w = weights[p.key];
-        if (p.vec && w > 0) {
-          acc  = add(acc, mul(p.vec, w));
-          wsum += w;
-          used[p.key] = w;
-        }
-      }
-      const combined: Vec = wsum > 0 ? normFinal(mul(acc, 1 / wsum)) : normFinal(acc);
-
-      debugPayload = {
-        theme,
-        today_jst: toJstDateString(new Date()),
-        quick_latest: quick,
-        daily_latest: daily,
-        profile_latest: profile,
-        vectors: {
-          theme: vTheme,
-          daily: vDaily,
-          profile: vProfile,
-          quick: vQuick,
-        },
-        weights_used: used,
-        combined, // ★ 合成スコア（0..100）
-      };
-    } catch {
-      debugPayload = { theme, today_jst: toJstDateString(new Date()) };
-    }
-  }
 
   // 7) レスポンス
   return NextResponse.json(
@@ -267,16 +238,18 @@ export async function GET(req: Request) {
       slot,
       theme,
       question: question.slice(0, 100),
-      choices: choices.map((c) => ({ id: c.key, label: c.label })), // 必ず 2..4 件
-      created_at: new Date().toISOString(),
+      choices: choices.map((c) => ({ id: c.key, label: c.label })),
+      created_at: createdAt,
       env: "prod",
       _proxied: true,
-      ...(debug && { debug: debugPayload }),
     },
     { headers: { "cache-control": "no-store" } }
   );
 }
 
+/* =============================================================
+   POST: 既存フォールバック（変更なし）
+   ============================================================= */
 export async function POST(req: Request) {
   const origin = ORIGIN(req.url);
   const bodyText = await req.text();

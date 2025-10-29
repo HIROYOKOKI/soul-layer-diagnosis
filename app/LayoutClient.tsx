@@ -1,11 +1,11 @@
+// app/LayoutClient.tsx
 "use client";
 
 import { usePathname } from "next/navigation";
-import AppHeader from "@/components/AppHeader";  // ← パスを修正
-import AppFooter from "@/components/AppFooter";  // ← パスを修正
+import AppHeader from "./components/AppHeader";   // ← 相対に修正
+import AppFooter from "./components/AppFooter";   // ← 相対に修正
 
-// 隠す対象: /intro 以下すべて（/intro, /intro/...）
-const shouldHide = (pathname: string) => pathname === "/intro" || pathname.startsWith("/intro/");
+const shouldHide = (p: string) => p === "/intro" || p.startsWith("/intro/");
 
 export default function LayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";

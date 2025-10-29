@@ -14,13 +14,14 @@ type Env = "dev" | "prod";
 type ScoreMap = Partial<Record<EV, number>>;
 
 type Body = {
-  user_id?: string; // 任意（無ければCookieから取得）
+  user_id?: string;          // 任意（無ければCookieから取得）
   slot?: Slot;
-  mode?: Slot; // alias of slot
-  env?: Env;   // 'dev' (default) | 'prod'
+  mode?: Slot;               // alias of slot
+  force_slot?: boolean;      // ← 追加：true の時だけ slot を尊重
+  env?: Env;                 // 'dev' (default) | 'prod'
   question_id?: string | null;
-  scope?: string | null; // 'WORK' | 'LOVE' | 'FUTURE' | 'LIFE'
-  theme?: string | null; // 'work' | 'love' | 'future' | 'life'
+  scope?: string | null;     // 'WORK' | 'LOVE' | 'FUTURE' | 'LIFE'
+  theme?: string | null;     // 'work' | 'love' | 'future' | 'life'
   code: EV;
   score?: number | null;
   comment?: string | null;
@@ -75,10 +76,13 @@ export async function POST(req: NextRequest) {
     if (!uid) return bad("not_authenticated", 401);
 
     /* ----- 入力バリデーション ----- */
-    // slot（mode エイリアス対応）: 未指定や不正なら JST で自動判定
+    const isValidSlot = (s?: string): s is Slot =>
+      !!s && ["morning", "noon", "night"].includes(s);
+
+    // 既定は JST 自動判定。force_slot=true のときだけクライアント指定を尊重。
     const slotIn = (body.slot ?? body.mode) as Slot | undefined;
     const slot: Slot =
-      slotIn && (["morning", "noon", "night"] as Slot[]).includes(slotIn) ? slotIn : detectJstSlot();
+      body.force_slot === true && isValidSlot(slotIn) ? slotIn! : detectJstSlot();
 
     const code = body.code;
     if (!["E", "V", "Λ", "Ǝ"].includes(code)) return bad("invalid_code");
@@ -130,7 +134,7 @@ export async function POST(req: NextRequest) {
     // date_jst は DB 側 DEFAULT ((now() at time zone 'Asia/Tokyo')::date) 想定
     const row = {
       user_id: uid,
-      slot,               // ← JST自動判定 or 明示指定
+      slot,               // ← JST自動判定 or 明示指定（force_slot=true）
       env,
       question_id,
       scope,              // 'WORK' | ... | null
@@ -155,7 +159,10 @@ export async function POST(req: NextRequest) {
 
     if (error) return bad(error.message, 500);
 
-    return NextResponse.json({ ok: true, item: data }, { headers: { "cache-control": "no-store" } });
+    return NextResponse.json(
+      { ok: true, item: data },
+      { headers: { "cache-control": "no-store" } }
+    );
   } catch (e: any) {
     return bad(e?.message ?? "unknown_error", 500);
   }

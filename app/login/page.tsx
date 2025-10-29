@@ -49,7 +49,7 @@ function PasswordField({
         id={`${id}-toggle`}
         className="absolute right-3 top-1/2 -translate-y-1/2 text-base opacity-80 hover:opacity-100 focus:outline-none"
       >
-        {show ? "👁️‍🗨️" : "👁️"}
+        {show ? "‍🙈" : "👁️‍🗨️"}
       </button>
       <span id={`${id}-toggle-help`} className="sr-only">
         目のボタンでパスワードの表示・非表示を切り替えられます
@@ -181,7 +181,7 @@ export default function LoginPage() {
           required
         />
 
-        {/* 👁️ 目アイコンで表示/非表示を切り替えるパスワード欄 */}
+        {/* 👁️‍🗨️ 目アイコンで表示/非表示を切り替えるパスワード欄 */}
         <PasswordField
           id="password"
           value={password}

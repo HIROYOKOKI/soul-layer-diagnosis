@@ -70,6 +70,48 @@ export default function ResultClient() {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  // ▼ 追加：名前を一度だけ取得
+  const [meName, setMeName] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const r = await fetch("/api/me", { cache: "no-store" });
+        const j = await r.json().catch(() => null);
+        const name =
+          j?.item?.name ||
+          j?.item?.display_id ||
+          j?.item?.user_no ||
+          (j?.item?.email ? String(j.item.email).split("@")[0] : null) ||
+          null;
+        if (active) setMeName(name);
+      } catch {
+        if (active) setMeName(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // ▼ 追加：先頭に「◯◯さん、」を保証する（表示用だけに適用）
+  const ensurePrefix = useCallback(
+    (text?: string | null) => {
+      if (!text || !text.trim()) return "";
+      const name = meName?.trim();
+      if (!name) return text; // 名前が無ければ何もしない
+      const prefix = `${name}さん、`;
+      // すでに付いている/改行で始まる等を吸収
+      const t = String(text);
+      if (t.startsWith(prefix)) return t;
+      // 先頭の全角/半角スペースなど除去後の判定
+      const trimmedHead = t.replace(/^[\s\u3000]+/, "");
+      if (trimmedHead.startsWith(prefix)) return t;
+      return `${prefix}${t}`;
+    },
+    [meName]
+  );
+
   // ── 初期ロード：①直前の生成結果（sessionStorage）→ ②フォールバック最新1件 → ③テーマ取得
   useEffect(() => {
     let mounted = true;
@@ -94,7 +136,6 @@ export default function ResultClient() {
             } catch {
               // 壊れてたら捨てる
             } finally {
-              // 古い表示の温床になるので一度消しておく（必要ならコメントアウト）
               sessionStorage.removeItem("last_daily_result");
             }
           }
@@ -197,7 +238,7 @@ export default function ResultClient() {
         theme,
         code: item.code,
         score: null as number | null,
-        comment: item.comment,
+        comment: item.comment,      // ← 保存は元の文そのまま
         advice: item.advice ?? null,
         affirm: item.affirm ?? null,
         quote: item.quote ?? null,
@@ -276,11 +317,15 @@ export default function ResultClient() {
     );
   }
 
-  // デバッグ：ソース確認（gpt/fallback）
   if (typeof window !== "undefined") {
     // eslint-disable-next-line no-console
     console.log("RESULT SOURCE:", item.__source, item);
   }
+
+  // ▼ 表示時だけ prefix を当てたテキストを作る
+  const shownComment = ensurePrefix(item.comment);
+  const shownAdvice = item.advice ? ensurePrefix(item.advice) : "";
+  const shownAffirm = item.affirm ? ensurePrefix(item.affirm) : "";
 
   return (
     <div className="min-h-[70vh] bg-black text-white px-5 sm:px-6 py-10 grid place-items-center">
@@ -298,7 +343,7 @@ export default function ResultClient() {
 
         {step >= 1 && (
           <LuneaBubble
-            text={`《コメント》\n${item.comment}`}
+            text={`《コメント》\n${shownComment}`}
             tone="accent"
             onDone={handleCommentDone}
             speed={110}
@@ -308,7 +353,7 @@ export default function ResultClient() {
         {step >= 2 && !!(item.advice && item.advice.trim()) && (
           <div className="translate-y-1 opacity-95">
             <LuneaBubble
-              text={`《アドバイス》\n${item.advice}`}
+              text={`《アドバイス》\n${shownAdvice}`}
               onDone={handleAdviceDone}
               speed={110}
             />
@@ -317,7 +362,7 @@ export default function ResultClient() {
 
         {step >= 3 && !!(item.affirm && item.affirm.trim()) && (
           <div className="translate-y-1 opacity-90">
-            <LuneaBubble text={`《アファメーション》\n${item.affirm}`} speed={80} />
+            <LuneaBubble text={`《アファメーション》\n${shownAffirm}`} speed={80} />
           </div>
         )}
 

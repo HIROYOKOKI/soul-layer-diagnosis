@@ -2,12 +2,12 @@
 // LUNEA Character Spec — ルネア人物設定ファイル（完全版 修正版 最終）
 // Project: ソウルレイヤー診断 / EVΛƎ
 // Placement: app/_data/characters/lunea.ts
+// Policy: モード選択は廃止（常に friend）。名前必須・やさしい口調ルールを強制。
 // =============================================================
 
 export type StructureCode = 'E' | 'V' | 'Λ' | 'Ǝ'
-export type LuneaMode = 'friend' | 'lover' | 'boss' | 'self'
+export type LuneaMode = 'friend'   // 互換のため型は残すが friend 固定
 export const DEFAULT_LUNEA_MODE: LuneaMode = 'friend'
-
 
 export type Character = {
   id: 'lunea'
@@ -63,13 +63,6 @@ export const LUNEA: Character = {
       'Λ': '立ち止まる勇気は前進だよ。選ばないことも、選び方の練習。',
       'Ǝ': '静けさは力になる。3呼吸だけ、観測する側に戻ろう。',
     },
-    quoteByCode: {
-      E: '「やりたいことをやれ。」— 岡本太郎',
-      V: '「想像力は知識よりも重要だ。」— アインシュタイン',
-      'Λ': '「道は自分で選ぶ。」— 老子（意訳）',
-      'Ǝ': '「どこから来て、どこへ行くのか。」— カール・セーガン（意訳）',
-    },
-  },
   runtime: {
     storageKey: 'daily_character',
     modeKey: 'daily_character_mode',
@@ -78,92 +71,87 @@ export const LUNEA: Character = {
 }
 
 // =============================================================
-// UI接続ヘルパ
+// モードまわり（後方互換用のダミー化）
 // =============================================================
 
-/** キャラ選択保存 */
+/** キャラ選択保存（互換・実質 no-op） */
 export function selectLuneaIntoSession(): void {
   if (typeof window === 'undefined') return
   sessionStorage.setItem(LUNEA.runtime.storageKey, LUNEA.id)
 }
 
-/** モード保存 */
-export function setLuneaMode(mode: LuneaMode): void {
+/** モード保存（廃止：常に friend。引数は無視） */
+export function setLuneaMode(_mode: LuneaMode): void {
   if (typeof window === 'undefined') return
-  sessionStorage.setItem(LUNEA.runtime.modeKey, mode)
+  sessionStorage.setItem(LUNEA.runtime.modeKey, 'friend')
 }
 
-/** モード取得 */
+/** モード取得（常に friend 固定） */
 export function getLuneaMode(): LuneaMode {
-  if (typeof window === 'undefined') return 'friend'
-  return (sessionStorage.getItem(LUNEA.runtime.modeKey) as LuneaMode) || 'friend'
+  return 'friend'
 }
 
-// 口調変換ロジック
-function applyMode(text: string, mode: LuneaMode): string {
-  switch (mode) {
-    case 'friend':
-      return text
-        .replace(/です。/g, 'だよ。')
-        .replace(/してみてください/g, 'やってみよう！')
-        .replace(/してください/g, 'してみよう！')
-    case 'lover':
-      return text
-        .replace(/です。/g, 'だよ。')
-        .replace(/してください/g, 'してみてね')
-        .replace(/してみてください/g, 'してみてね')
-        .concat(' 一緒に考えたいな。')
-    case 'boss':
-      return text
-        .replace(/してください/g, 'しなさい')
-        .replace(/してみてください/g, '観測しなさい')
-    case 'self':
-      return '（あなた自身の心の声）' + text
-        .replace(/です。/g, 'な気がする。')
-        .replace(/してください/g, 'してみよう。')
-        .replace(/してみてください/g, 'してみよう。')
-    default:
-      return text
-  }
+// =============================================================
+// 口調変換ロジック（friend固定・やさしく寄り添う）
+// =============================================================
+
+/** やさしい口調へ変換（簡易） */
+function applyFriendTone(text: string): string {
+  return text
+    .replace(/です。/g, 'だよ。')
+    .replace(/してください/g, 'してみよう！')
+    .replace(/してみてください/g, 'やってみよう！')
+}
+
+/** 互換API：mode を受けても friend トーンのみ */
+function applyMode(text: string, _mode: LuneaMode): string {
+  return applyFriendTone(text)
+}
+
+/** 「◯◯さん、」を必ず先頭に付与（重複付与は防止） */
+function ensureNamePrefix(text: string, name?: string | null): string {
+  const n = (name ?? '').trim()
+  if (!n) return text
+  const prefix = `${n}さん、`
+  return text.startsWith(prefix) ? text : `${prefix}${text}`
 }
 
 export type LuneaSpeechKind = 'start' | 'beforeQuestion' | 'afterResult' | 'closing'
 
-/** 各画面ごとのセリフ取得 */
-export function luneaSpeech(kind: LuneaSpeechKind, code?: StructureCode): string {
-  const mode = getLuneaMode()
+/** 各画面ごとのセリフ取得（名前必須運用・先頭に付与） */
+export function luneaSpeech(kind: LuneaSpeechKind, code?: StructureCode, userName?: string | null): string {
+  const mode: LuneaMode = 'friend'
   switch (kind) {
     case 'start':
-      return applyMode(LUNEA.speechPatterns.start, mode)
+      return ensureNamePrefix(applyMode(LUNEA.speechPatterns.start, mode), userName)
     case 'beforeQuestion':
-      return applyMode(LUNEA.speechPatterns.beforeQuestion, mode)
+      return ensureNamePrefix(applyMode(LUNEA.speechPatterns.beforeQuestion, mode), userName)
     case 'afterResult': {
       const base = LUNEA.speechPatterns.afterResult
-      if (!code) return applyMode(base, mode)
-      const tip = LUNEA.messages.encouragementByCode[code]
-      const quote = LUNEA.messages.quoteByCode[code]
-      return applyMode(`${base}\n${tip}\n${quote}`, mode)
+      const tip = code ? LUNEA.messages.encouragementByCode[code] : ''
+      const quote = code ? LUNEA.messages.quoteByCode[code] : ''
+      const text = [base, tip, quote].filter(Boolean).join('\n')
+      return ensureNamePrefix(applyMode(text, mode), userName)
     }
     case 'closing':
-      return applyMode(LUNEA.speechPatterns.closing, mode)
+      return ensureNamePrefix(applyMode(LUNEA.speechPatterns.closing, mode), userName)
     default:
       return ''
   }
 }
 
-/** MYPAGE 締めコメント（直近コード反映） */
-export function luneaMypageClosing(latestCode?: StructureCode): string {
-  const mode = getLuneaMode()
+/** MYPAGE 締めコメント（直近コード反映・名前必須先頭付与） */
+export function luneaMypageClosing(latestCode?: StructureCode, userName?: string | null): string {
+  const mode: LuneaMode = 'friend'
   const base = LUNEA.speechPatterns.closing
-  if (!latestCode) return applyMode(base, mode)
-  const tip = LUNEA.messages.encouragementByCode[latestCode]
-  return applyMode(`${base}\n${tip}`, mode)
+  const tip = latestCode ? LUNEA.messages.encouragementByCode[latestCode] : ''
+  const text = [base, tip].filter(Boolean).join('\n')
+  return ensureNamePrefix(applyMode(text, mode), userName)
 }
 
-/** ナビゲータID取得 */
+/** ナビゲータID取得（互換） */
 export function getNavigatorIdFromSession(): 'lunea' {
-  if (typeof window === 'undefined') return 'lunea'
-  return (sessionStorage.getItem(LUNEA.runtime.storageKey) as 'lunea') || 'lunea'
+  return 'lunea'
 }
 
 // =============================================================
@@ -177,12 +165,28 @@ __assert(LUNEA.persona.idCode === 'AI-002', 'IDコードが不正')
   __assert(!!LUNEA.messages.encouragementByCode[k], `encouragement ${k} 未定義`)
   __assert(!!LUNEA.messages.quoteByCode[k], `quote ${k} 未定義`)
 })
-/** ルネアの system プロンプト（API用） */
+
+// =============================================================
+// API用 System プロンプト
+// =============================================================
+
+/** 既存互換：固定の System Prompt（名前必須ルールを明記） */
 export const LUNEA_SYSTEM_PROMPT =
   `あなたは「${LUNEA.persona.displayName}」。日本語で簡潔に、あたたかく、断定しすぎないトーンで話します。
+最初の一文で必ず利用者の名前を呼びかけてから話し始めます（例：「◯◯さん、」）。
+専門用語は避け、提案・伴走の言い回しを用い、絵文字は多用しません（使っても1つまで）。
 出力は必ず厳密な JSON のみ。本文中にラベルや箇条書きや装飾を入れず、改行や引用符は JSON として正しい形式で。` as const
 
-/** サーバー側でも使える口調変換（mode を明示受け取り） */
-export function applyLuneaTone(text: string, mode: LuneaMode = DEFAULT_LUNEA_MODE): string {
-  return applyMode(text, mode) // 既存の applyMode をそのまま利用
+/** 名前を直接埋め込む可変版（推奨） */
+export function LUNEA_SYSTEM_PROMPT_FOR(name?: string) {
+  const n = (name ?? 'あなた').trim()
+  return `あなたは「${LUNEA.persona.displayName}」。日本語で簡潔に、あたたかく、断定しすぎないトーンで話します。
+最初の一文で必ず「${n}さん、」と名前を呼びかけてから話し始めます。
+専門用語は避け、提案・伴走の言い回しを用い、絵文字は多用しません（使っても1つまで）。
+出力は必ず厳密な JSON のみ。本文中にラベルや箇条書きや装飾を入れず、改行や引用符は JSON として正しい形式で。`
+}
+
+/** サーバー側でも使える口調変換（friend 固定） */
+export function applyLuneaTone(text: string, _mode: LuneaMode = DEFAULT_LUNEA_MODE): string {
+  return applyFriendTone(text)
 }

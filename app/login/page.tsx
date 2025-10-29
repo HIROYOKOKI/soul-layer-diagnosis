@@ -11,6 +11,53 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
  * - フォールバック遷移先は /mypage
  */
 
+/* ===== 目アイコントグル付きパスワード入力（このファイル内のみで完結） ===== */
+function PasswordField({
+  id = "password",
+  value,
+  onChange,
+  placeholder = "パスワード",
+  autoComplete = "current-password",
+  className = "",
+}: {
+  id?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  autoComplete?: string;
+  className?: string;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className={`relative ${className}`}>
+      <input
+        id={id}
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        required
+        className="w-full rounded border px-3 py-2 bg-black/20 pr-12"
+        aria-describedby={`${id}-toggle-help`}
+      />
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        aria-pressed={show}
+        aria-label={show ? "パスワードを隠す" : "パスワードを表示"}
+        id={`${id}-toggle`}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-base opacity-80 hover:opacity-100 focus:outline-none"
+      >
+        {show ? "👁️‍🗨️" : "👁️"}
+      </button>
+      <span id={`${id}-toggle-help`} className="sr-only">
+        目のボタンでパスワードの表示・非表示を切り替えられます
+      </span>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const sb = createClientComponentClient();
   const router = useRouter();
@@ -133,15 +180,16 @@ export default function LoginPage() {
           autoComplete="email"
           required
         />
-        <input
-          className="w-full rounded border px-3 py-2 bg-black/20"
-          type="password"
-          placeholder="パスワード"
+
+        {/* 👁️ 目アイコンで表示/非表示を切り替えるパスワード欄 */}
+        <PasswordField
+          id="password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={setPassword}
+          placeholder="パスワード"
           autoComplete="current-password"
-          required
         />
+
         <button
           className="w-full rounded bg-white/10 px-4 py-2 hover:bg-white/15 disabled:opacity-50"
           disabled={sending}
@@ -166,3 +214,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

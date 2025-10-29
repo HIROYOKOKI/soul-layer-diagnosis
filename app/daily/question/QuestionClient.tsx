@@ -1,4 +1,5 @@
-'use client';
+// app/daily/question/QuestionClient.tsx
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { Slot, Theme, DailyQuestionResponse, DailyAnswerResponse } from "@/lib/types";
@@ -47,7 +48,24 @@ function ensureNamePrefix(text: string | undefined, name?: string | null): strin
   const n = (name ?? "").trim();
   if (!n) return t;
   const prefix = `${n}さん、`;
-  return t.startsWith(prefix) ? t : `${prefix}${t}`;
+  // 先頭の空白（半角/全角）を無視して判定
+  const headTrimmed = t.replace(/^[\s\u3000]+/, "");
+  return headTrimmed.startsWith(prefix) ? t : `${prefix}${t}`;
+}
+
+/* ===== choices の形を {id,label} に正規化（堅牢化） ===== */
+function normalizeChoices(input: any): { id: string; label: string }[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((c) => {
+      if (!c) return null;
+      // よくあるバリエーション: {id,label} / {key,text} / {value,label}
+      const id = String(c.id ?? c.key ?? c.value ?? "").trim();
+      const label = String(c.label ?? c.text ?? "").trim();
+      if (!id || !label) return null;
+      return { id, label };
+    })
+    .filter(Boolean) as { id: string; label: string }[];
 }
 
 export default function QuestionClient({ initialTheme }: { initialTheme: Theme }) {
@@ -77,12 +95,12 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
         const r = await fetch("/api/me", { cache: "no-store" });
         const j = await r.json().catch(() => null);
         if (!alive) return;
-        // /api/me の返却仕様に合わせて素直に拾う（item.name or name）
         const name =
           j?.item?.name ??
           j?.name ??
           j?.item?.display_id ??
           j?.item?.user_no ??
+          (j?.item?.email ? String(j.item.email).split("@")[0] : null) ??
           null;
         setMeName(typeof name === "string" ? name : null);
       } catch {
@@ -90,7 +108,9 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
         setMeName(null);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // 質問の取得
@@ -109,25 +129,23 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
         if (!alive) return;
         setSlot(s);
 
-        setSeed(jq.seed || 0);
+        setSeed((jq as any).seed || 0);
 
         // 問いのテキスト（API出力 or ローカル既定）→ 表示直前に ensureNamePrefix する
         const baseQ =
-          jq.question ||
+          (jq as any).question ||
           (s === "morning"
             ? "今のあなたに必要な最初の一歩はどれ？"
             : s === "noon"
             ? "このあと数時間で進めたい進路は？"
             : "今日はどんな締めくくりが心地いい？");
-        setQuestion(baseQ);
+        setQuestion(String(baseQ ?? ""));
 
-        // 強制フォールバック：必ず 2〜4 件にする
+        // choices 正規化＋強制フォールバック：必ず 2〜4 件にする
+        const parsed = normalizeChoices((jq as any).choices);
         const need = needCount(s);
-        let arr =
-          Array.isArray(jq.choices) && jq.choices.length
-            ? jq.choices.filter((c) => c && c.label)
-            : [];
 
+        let arr = parsed.filter((c) => c && c.label);
         if (arr.length < need) {
           const have = new Set(arr.map((c) => c.id));
           for (const c of FALLBACK[s]) {
@@ -140,7 +158,6 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
 
         setPhase("ask");
       } catch (e: any) {
-        if (!alive) return;
         setErr(e?.message ?? "failed_to_load");
         setPhase("error");
       } finally {
@@ -148,7 +165,9 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
         setLoading(false);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [initialTheme]);
 
   async function onChoose(choiceId: string) {

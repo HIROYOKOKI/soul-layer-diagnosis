@@ -12,8 +12,9 @@ type Scope = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 type Env = "dev" | "prod";
 
 type Item = {
+  id?: string | null;              // ← question_idに相当する場合もあるので保険で追加
   question_id?: string | null;
-  mode?: Slot | null;
+  mode?: Slot | null;              // ← UIではslot扱いで使用（normalizeでslot→modeに寄せる）
   scope?: Scope | null;
   code: EV;
   comment: string;
@@ -25,25 +26,49 @@ type Item = {
   __source?: "gpt" | "fallback";
 };
 
-function getJstSlot(): Slot {
-  const now = new Date();
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const h = jst.getUTCHours();
-  if (h >= 4 && h <= 10) return "morning";
-  if (h >= 11 && h <= 16) return "noon";
-  return "night";
+/** JSTの現在時刻のhourを取得（DST等にも強いIntlベース） */
+function getJstHour(): number {
+  const parts = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    hour: "numeric",
+    hour12: false,
+  }).formatToParts(new Date());
+  const hourStr = parts.find((p) => p.type === "hour")?.value ?? "0";
+  return parseInt(hourStr, 10);
 }
 
-// サーバー/API由来のオブジェクトや sessionStorage から来た素のJSONを UI用に正規化
+/** JSTのhourからmorning/noon/nightを決定（閾値は必要に応じて調整） */
+function slotByHourJST(h: number): Slot {
+  if (h >= 5 && h < 11) return "morning"; // 05:00-10:59
+  if (h >= 11 && h < 17) return "noon";   // 11:00-16:59
+  return "night";                         // 17:00-04:59
+}
+
+/** 現在のJSTスロット */
+function getJstSlot(): Slot {
+  return slotByHourJST(getJstHour());
+}
+
+/** question_id / id からスロットを推定（例: daily-YYYY-MM-DD-morning[-SCOPE]） */
+function deriveSlotFromId(maybeId?: string | null): Slot | null {
+  if (!maybeId) return null;
+  const m = String(maybeId).match(
+    /daily-\d{4}-\d{2}-\d{2}-(morning|noon|night)(?:-|$)/i
+  );
+  return (m?.[1]?.toLowerCase() as Slot) ?? null;
+}
+
+/** サーバ/セッションの素データをUI用に正規化（slot→modeに寄せる） */
 function normalize(raw: any | null): Item | null {
   if (!raw) return null;
-  const slot = (raw.mode ?? raw.slot ?? null) as Slot | null;
+  const slot = (raw.slot ?? raw.mode ?? null) as Slot | null;
   const scope = (raw.scope ?? null) as Scope | null;
   const affirm = raw.affirm ?? raw.affirmation ?? raw.quote ?? null;
 
   return {
+    id: raw.id ?? raw.question_id ?? null,
     question_id: raw.question_id ?? null,
-    mode: slot,
+    mode: slot, // ← 今後はUIでは mode をslotとして扱う
     scope,
     code: (raw.code ?? "E") as EV,
     comment: String(raw.comment ?? ""),
@@ -94,17 +119,15 @@ export default function ResultClient() {
     };
   }, []);
 
-  // ▼ 追加：先頭に「◯◯さん、」を保証する（表示用だけに適用）
+  // ▼ 表示時だけ先頭に「◯◯さん、」を保証（保存内容は元のまま）
   const ensurePrefix = useCallback(
     (text?: string | null) => {
       if (!text || !text.trim()) return "";
       const name = meName?.trim();
-      if (!name) return text; // 名前が無ければ何もしない
-      const prefix = `${name}さん、`;
-      // すでに付いている/改行で始まる等を吸収
+      if (!name) return text;
+      const prefix = `${name}さん, `;
       const t = String(text);
       if (t.startsWith(prefix)) return t;
-      // 先頭の全角/半角スペースなど除去後の判定
       const trimmedHead = t.replace(/^[\s\u3000]+/, "");
       if (trimmedHead.startsWith(prefix)) return t;
       return `${prefix}${t}`;
@@ -112,7 +135,7 @@ export default function ResultClient() {
     [meName]
   );
 
-  // ── 初期ロード：①直前の生成結果（sessionStorage）→ ②フォールバック最新1件 → ③テーマ取得
+  // ── 初期ロード：①sessionStorage → ②最新API → ③テーマ取得
   useEffect(() => {
     let mounted = true;
 
@@ -207,6 +230,16 @@ export default function ResultClient() {
     });
   }, [hasAdvice]);
 
+  // UI表示用の堅牢なスロット決定（mode → question_id/id → JST）
+  const displaySlot: Slot = useMemo(() => {
+    const fromItem = (item?.mode as Slot | null) ?? null;
+    if (fromItem) return fromItem;
+    const fromId =
+      deriveSlotFromId(item?.question_id ?? item?.id ?? null);
+    if (fromId) return fromId;
+    return getJstSlot();
+  }, [item?.mode, item?.question_id, item?.id]);
+
   async function onSave() {
     if (!item || saving) return;
     setSaving(true);
@@ -220,7 +253,12 @@ export default function ResultClient() {
         return;
       }
 
-      const slot: Slot = item.mode || getJstSlot();
+      // 保存時も堅牢に：item.mode → question_idから推定 → JST
+      const slot: Slot =
+        (item.mode as Slot | null) ??
+        deriveSlotFromId(item.question_id ?? item.id ?? null) ??
+        getJstSlot();
+
       const scope: Scope = (item.scope as Scope) || currentScope || "LIFE";
       const theme = scope.toLowerCase();
       const env: Env = (item.env as Env) || "dev";
@@ -238,7 +276,7 @@ export default function ResultClient() {
         theme,
         code: item.code,
         score: null as number | null,
-        comment: item.comment,      // ← 保存は元の文そのまま
+        comment: item.comment,      // 保存は元の文そのまま
         advice: item.advice ?? null,
         affirm: item.affirm ?? null,
         quote: item.quote ?? null,
@@ -292,7 +330,7 @@ export default function ResultClient() {
             ) : (
               <a
                 href="/daily"
-                className="px-4 py-2 rounded-xl border border-white/20 hover:bg白/5"
+                className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5"
               >
                 デイリーへ
               </a>
@@ -322,7 +360,7 @@ export default function ResultClient() {
     console.log("RESULT SOURCE:", item.__source, item);
   }
 
-  // ▼ 表示時だけ prefix を当てたテキストを作る
+  // ▼ 表示時だけ prefix を当てたテキストを作る（保存は生データのまま）
   const shownComment = ensurePrefix(item.comment);
   const shownAdvice = item.advice ? ensurePrefix(item.advice) : "";
   const shownAffirm = item.affirm ? ensurePrefix(item.affirm) : "";
@@ -336,8 +374,7 @@ export default function ResultClient() {
               new Date(item.created_at).toLocaleString("ja-JP")}
           </span>
           <span>
-            テーマ: {item.scope ?? currentScope ?? "—"} / スロット:{" "}
-            {item.mode ?? "—"}
+            テーマ: {item.scope ?? currentScope ?? "—"} / スロット: {displaySlot}
           </span>
         </div>
 

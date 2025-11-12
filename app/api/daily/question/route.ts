@@ -1,6 +1,4 @@
-// =============================================================
-// app/api/daily/question/route.ts（JSTスロット確定版）
-// =============================================================
+// app/api/daily/question/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -10,17 +8,14 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import OpenAI from "openai";
 import { LUNEA_SYSTEM_PROMPT_FOR } from "@/app/_data/characters/lunea";
 
-/* ===== 型定義 ===== */
 type Slot = "morning" | "noon" | "night";
 type Theme = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 type EV = "E" | "V" | "Λ" | "Ǝ";
 
-/* ===== ユーザー名取得 ===== */
 async function getUserName() {
   const sb = createRouteHandlerClient({ cookies });
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return null;
-
   const { data: prof } = await sb
     .from("profiles")
     .select("name, display_id, user_no")
@@ -34,7 +29,6 @@ async function getUserName() {
   return (byProfile || byMeta || byEmail || null) as string | null;
 }
 
-/* ===== フォールバック選択肢 ===== */
 const FALLBACK: Record<Slot, { key: EV; label: string }[]> = {
   morning: [
     { key: "E", label: "直感で素早く動く" },
@@ -57,39 +51,40 @@ const NEED = (slot: Slot) => (slot === "morning" ? 4 : slot === "noon" ? 3 : 2);
 const ORIGIN = (reqUrl: string) =>
   process.env.NEXT_PUBLIC_SITE_URL ?? new URL(reqUrl).origin;
 
-/* ===== JSTスロット ===== */
-function getJstHour(): number {
-  const parts = new Intl.DateTimeFormat("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    hour: "numeric",
-    hour12: false,
-  }).formatToParts(new Date());
-  const hourStr = parts.find((p) => p.type === "hour")?.value ?? "0";
-  return parseInt(hourStr, 10);
-}
+// JSTのスロット（/api/today と同等）
 function getJstSlot(): Slot {
-  const h = getJstHour();
-  if (h >= 5 && h < 12) return "morning"; // 05:00-11:59
-  if (h >= 12 && h < 18) return "noon";   // 12:00-17:59
-  return "night";                          // 18:00-04:59
+  try {
+    const parts = new Intl.DateTimeFormat("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      hour: "numeric",
+      hour12: false,
+    }).formatToParts(new Date());
+    const h = parseInt(parts.find(p => p.type === "hour")?.value ?? "0", 10);
+    if (h >= 5 && h < 12) return "morning";
+    if (h >= 12 && h < 18) return "noon";
+    return "night";
+  } catch {
+    const jstHour = new Date(Date.now() + 9 * 60 * 60 * 1000).getUTCHours();
+    if (jstHour >= 5 && jstHour < 12) return "morning";
+    if (jstHour >= 12 && jstHour < 18) return "noon";
+    return "night";
+  }
 }
+
 function seedFromUUID(uuid: string): number {
   const head = uuid.replace(/-/g, "").slice(0, 8);
   return Number.parseInt(head, 16) >>> 0;
 }
 
-/* =============================================================
-   GET: 質問生成（LUNEA_SYSTEM_PROMPT_FOR(name)を使用）
-   ============================================================= */
 export async function GET(req: Request) {
   const origin = ORIGIN(req.url);
   const url = new URL(req.url);
   const cookieHeader = (req.headers.get("cookie") ?? "") as string;
 
-  // 1) ユーザー名
+  // ユーザー名
   const userName = await getUserName();
 
-  // 2) テーマ取得（/api/theme）
+  // テーマ（/api/theme）
   let theme: Theme = "LOVE";
   try {
     const r = await fetch(`${origin}/api/theme`, {
@@ -99,23 +94,20 @@ export async function GET(req: Request) {
     const j = await r.json().catch(() => ({}));
     const t = String(j?.scope ?? j?.theme ?? "LOVE").toUpperCase();
     if (["WORK", "LOVE", "FUTURE", "LIFE"].includes(t)) theme = t as Theme;
-  } catch { /* noop */ }
+  } catch {}
 
-  // 3) スロット（クエリで明示指定があれば優先。なければJSTに従う）
-  const slotQ = url.searchParams.get("slot");
+  // スロット：?slot=... を優先。無ければJSTで決定
+  const q = url.searchParams.get("slot");
   const slot: Slot =
-    slotQ === "morning" || slotQ === "noon" || slotQ === "night"
-      ? (slotQ as Slot)
-      : getJstSlot();
-
+    q === "morning" || q === "noon" || q === "night" ? (q as Slot) : getJstSlot();
   const need = NEED(slot);
 
-  // 4) OpenAIで質問生成（失敗時は /api/daily/generate をフォールバック）
+  // 生成（OpenAI失敗時は /api/daily/generate をフォールバック）
   let text = "";
   let options: { key?: string; label?: string }[] = [];
 
   try {
-    const client = new OpenAI(); // ← トップレベルnewは禁止なので関数内で生成
+    const client = new OpenAI();
     const messages = [
       { role: "system", content: LUNEA_SYSTEM_PROMPT_FOR(userName ?? undefined) },
       {
@@ -128,28 +120,22 @@ export async function GET(req: Request) {
         }),
       },
     ];
-
     const res = await client.chat.completions.create({
       model: "gpt-5-mini",
       messages,
       temperature: 0.7,
       response_format: { type: "json_object" },
     });
-
     const raw = res.choices[0]?.message?.content ?? "{}";
     const json = JSON.parse(raw);
     text = json.question ?? "";
     options = Array.isArray(json.options) ? json.options : [];
   } catch {
-    // フォールバック：内部APIに委譲
     try {
       const r = await fetch(`${origin}/api/daily/generate`, {
         method: "POST",
         cache: "no-store",
-        headers: {
-          "Content-Type": "application/json",
-          cookie: cookieHeader,
-        },
+        headers: { "Content-Type": "application/json", cookie: cookieHeader },
         body: JSON.stringify({ slot, theme }),
       });
       const j = await r.json().catch(() => ({}));
@@ -157,10 +143,10 @@ export async function GET(req: Request) {
         text = String(j.text ?? "");
         options = Array.isArray(j.options) ? j.options : [];
       }
-    } catch { /* noop */ }
+    } catch {}
   }
 
-  // 5) 選択肢フォールバック（数/ラベルを補正）
+  // フォールバックで個数・ラベル整形
   const keys: EV[] = ["E", "V", "Λ", "Ǝ"];
   let choices = (options || [])
     .slice(0, need)
@@ -170,7 +156,6 @@ export async function GET(req: Request) {
       return { key: k, label };
     })
     .filter((c) => c.label);
-
   const have = new Set(choices.map((c) => c.key));
   for (const c of FALLBACK[slot]) {
     if (choices.length >= need) break;
@@ -182,7 +167,6 @@ export async function GET(req: Request) {
   if (choices.length === 0) choices = FALLBACK[slot].slice(0, need);
   if (choices.length > need) choices = choices.slice(0, need);
 
-  // 6) メタ・Cookie保存
   const questionId = crypto.randomUUID();
   const seed = seedFromUUID(questionId);
   const createdAt = new Date().toISOString();
@@ -199,7 +183,6 @@ export async function GET(req: Request) {
   jar.set("daily_slot", slot, { httpOnly: true, sameSite: "lax", path: "/" });
   jar.set("daily_theme", theme, { httpOnly: true, sameSite: "lax", path: "/" });
 
-  // 7) レスポンス
   return NextResponse.json(
     {
       ok: true,
@@ -217,9 +200,6 @@ export async function GET(req: Request) {
   );
 }
 
-/* =============================================================
-   POST: フォールバック委譲（変更なし）
-   ============================================================= */
 export async function POST(req: Request) {
   const origin = ORIGIN(req.url);
   const bodyText = await req.text();

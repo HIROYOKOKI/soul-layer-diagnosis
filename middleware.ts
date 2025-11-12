@@ -1,20 +1,12 @@
-// middleware.ts
-import { NextResponse, type NextRequest } from "next/server";
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
+// middleware.ts（デバッグ用の完全パススルー）
+import { NextRequest, NextResponse } from "next/server";
 
-export const config = {
-  matcher: ["/mypage", "/api/mypage/:path*"], // 守りたいルート
-};
-
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
-  const supabase = createMiddlewareClient({ req, res });
-  const { data: { session } } = await supabase.auth.getSession();
-
-  if (!session) {
-    const next = encodeURIComponent(req.nextUrl.pathname + req.nextUrl.search);
-    // 例: /login?next=/mypage
-    return NextResponse.redirect(new URL(`/login?next=${next}`, req.url));
-  }
-  return res;
+export async function middleware(_req: NextRequest) {
+  // 何もせず通す
+  return NextResponse.next();
 }
+
+// ★ middleware自体を最小適用（あるいは削除と同等効果）
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};

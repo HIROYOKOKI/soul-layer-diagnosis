@@ -7,7 +7,7 @@ import { cookies } from "next/headers";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import OpenAI from "openai";
 import { LUNEA_SYSTEM_PROMPT_FOR } from "@/app/_data/characters/lunea";
-// ここに余計な import を入れない（@/lib/evla は存在しない）
+
 type Slot = "morning" | "noon" | "night";
 type Theme = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 type EV = "E" | "V" | "Λ" | "Ǝ";
@@ -21,11 +21,9 @@ async function getUserName() {
     .select("name, display_id, user_no")
     .eq("id", user.id)
     .maybeSingle();
-
   const byProfile = prof?.name || prof?.display_id || prof?.user_no;
   const byMeta = (user.user_metadata as any)?.name as string | undefined;
   const byEmail = user.email?.split("@")[0];
-
   return (byProfile || byMeta || byEmail || null) as string | null;
 }
 
@@ -48,10 +46,8 @@ const FALLBACK: Record<Slot, { key: EV; label: string }[]> = {
 };
 
 const NEED = (slot: Slot) => (slot === "morning" ? 4 : slot === "noon" ? 3 : 2);
-const ORIGIN = (reqUrl: string) =>
-  process.env.NEXT_PUBLIC_SITE_URL ?? new URL(reqUrl).origin;
+const ORIGIN = (u: string) => process.env.NEXT_PUBLIC_SITE_URL ?? new URL(u).origin;
 
-// JSTのスロット（/api/today と同等）
 function getJstSlot(): Slot {
   try {
     const parts = new Intl.DateTimeFormat("ja-JP", {
@@ -64,9 +60,9 @@ function getJstSlot(): Slot {
     if (h >= 12 && h < 18) return "noon";
     return "night";
   } catch {
-    const jstHour = new Date(Date.now() + 9 * 60 * 60 * 1000).getUTCHours();
-    if (jstHour >= 5 && jstHour < 12) return "morning";
-    if (jstHour >= 12 && jstHour < 18) return "noon";
+    const jh = new Date(Date.now() + 9 * 3600 * 1000).getUTCHours();
+    if (jh >= 5 && jh < 12) return "morning";
+    if (jh >= 12 && jh < 18) return "noon";
     return "night";
   }
 }
@@ -81,10 +77,8 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const cookieHeader = (req.headers.get("cookie") ?? "") as string;
 
-  // ユーザー名
+  // userName / theme
   const userName = await getUserName();
-
-  // テーマ（/api/theme）
   let theme: Theme = "LOVE";
   try {
     const r = await fetch(`${origin}/api/theme`, {
@@ -92,29 +86,25 @@ export async function GET(req: Request) {
       headers: { cookie: cookieHeader },
     });
     const j = await r.json().catch(() => ({}));
-    const t = String(j?.scope ?? j?.theme ?? "LOVE").toUpperCase();
+    const t = String(j?.scope ?? j?.theme ?? "").toUpperCase();
     if (["WORK", "LOVE", "FUTURE", "LIFE"].includes(t)) theme = t as Theme;
   } catch {}
 
-  // スロット：?slot=... を優先。無ければJSTで決定
-  const q = url.searchParams.get("slot");
+  // slot: ?slot= を優先、無ければJST
+  const qs = url.searchParams.get("slot");
   const slot: Slot =
-    q === "morning" || q === "noon" || q === "night" ? (q as Slot) : getJstSlot();
+    qs === "morning" || qs === "noon" || qs === "night" ? (qs as Slot) : getJstSlot();
   const need = NEED(slot);
 
-  // 生成（OpenAI失敗時は /api/daily/generate をフォールバック）
+  // 生成（OpenAI失敗時はフォールバック）
   let text = "";
   let options: { key?: string; label?: string }[] = [];
-
   try {
     const client = new OpenAI();
     const messages = [
       { role: "system", content: LUNEA_SYSTEM_PROMPT_FOR(userName ?? undefined) },
-      {
-        role: "user",
-        content: JSON.stringify({
-          slot,
-          theme,
+      { role: "user", content: JSON.stringify({
+          slot, theme,
           instruction:
             "ルネアとして1問4択の質問を生成してください。質問は50〜100文字以内、選択肢は20〜50文字以内で、すべて日本語で自然に。",
         }),
@@ -131,30 +121,23 @@ export async function GET(req: Request) {
     text = json.question ?? "";
     options = Array.isArray(json.options) ? json.options : [];
   } catch {
-    try {
-      const r = await fetch(`${origin}/api/daily/generate`, {
-        method: "POST",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json", cookie: cookieHeader },
-        body: JSON.stringify({ slot, theme }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (r.ok && j?.ok) {
-        text = String(j.text ?? "");
-        options = Array.isArray(j.options) ? j.options : [];
-      }
-    } catch {}
+    // ローカルフォールバック
+    text =
+      slot === "morning"
+        ? "朝、最初の一歩として今のあなたに合うのはどれ？"
+        : slot === "noon"
+        ? "昼、このあと数時間の過ごし方として近いのはどれ？"
+        : "夜、今日をどう締めくくりたい？";
+    options = FALLBACK[slot];
   }
 
-  // フォールバックで個数・ラベル整形
   const keys: EV[] = ["E", "V", "Λ", "Ǝ"];
   let choices = (options || [])
     .slice(0, need)
-    .map((o, i) => {
-      const k = keys.includes(o?.key as EV) ? (o!.key as EV) : (keys[i] as EV);
-      const label = (o?.label ?? "").toString().trim();
-      return { key: k, label };
-    })
+    .map((o, i) => ({
+      key: (keys.includes(o?.key as EV) ? o!.key : keys[i]) as EV,
+      label: String(o?.label ?? "").trim(),
+    }))
     .filter((c) => c.label);
   const have = new Set(choices.map((c) => c.key));
   for (const c of FALLBACK[slot]) {
@@ -170,51 +153,28 @@ export async function GET(req: Request) {
   const questionId = crypto.randomUUID();
   const seed = seedFromUUID(questionId);
   const createdAt = new Date().toISOString();
-  const question =
-    (text?.trim() as string) ||
+  const question = (text?.trim() ||
     (slot === "morning"
       ? "今のあなたに必要な最初の一歩はどれ？"
       : slot === "noon"
       ? "このあと数時間で進めたい進路は？"
-      : "今日はどんな締めくくりが心地いい？");
+      : "今日はどんな締めくくりが心地いい？"))) as string;
 
   const jar = cookies();
   jar.set("daily_question_id", questionId, { httpOnly: true, sameSite: "lax", path: "/" });
   jar.set("daily_slot", slot, { httpOnly: true, sameSite: "lax", path: "/" });
   jar.set("daily_theme", theme, { httpOnly: true, sameSite: "lax", path: "/" });
 
-  return NextResponse.json(
-    {
-      ok: true,
-      question_id: questionId,
-      seed,
-      slot,
-      theme,
-      question: question.slice(0, 100),
-      choices: choices.map((c) => ({ id: c.key, label: c.label })),
-      created_at: createdAt,
-      env: "prod",
-      _proxied: true,
-    },
-    { headers: { "cache-control": "no-store" } }
-  );
-}
-
-export async function POST(req: Request) {
-  const origin = ORIGIN(req.url);
-  const bodyText = await req.text();
-  const r = await fetch(`${origin}/api/daily/generate`, {
-    method: "POST",
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      cookie: (req.headers.get("cookie") ?? "") as string,
-    },
-    body: bodyText,
-  });
-  const j = await r.json();
-  return NextResponse.json(j, {
-    status: r.status,
-    headers: { "cache-control": "no-store" },
-  });
+  return NextResponse.json({
+    ok: true,
+    question_id: questionId,
+    seed,
+    slot,
+    theme,
+    question: question.slice(0, 100),
+    choices: choices.map((c) => ({ id: c.key, label: c.label })),
+    created_at: createdAt,
+    env: "prod",
+    _proxied: false,
+  }, { headers: { "cache-control": "no-store" }});
 }

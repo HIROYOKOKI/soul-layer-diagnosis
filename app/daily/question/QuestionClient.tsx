@@ -27,8 +27,8 @@ const FALLBACK: Record<Slot, { id: string; label: string }[]> = {
 
 const needCount = (slot: Slot) => (slot === "morning" ? 4 : slot === "noon" ? 3 : 2);
 
-/* JSTでの現在スロット（クライアントで再判定） */
-function getJstSlotClient(date = new Date()): Slot {
+/* JSTでの現在スロット（サーバが返せない時の最終フォールバック） */
+function getJstSlotFallback(date = new Date()): Slot {
   const h = Number(
     new Intl.DateTimeFormat("ja-JP", {
       timeZone: "Asia/Tokyo",
@@ -48,18 +48,16 @@ function ensureNamePrefix(text: string | undefined, name?: string | null): strin
   const n = (name ?? "").trim();
   if (!n) return t;
   const prefix = `${n}さん、`;
-  // 先頭の空白（半角/全角）を無視して判定
   const headTrimmed = t.replace(/^[\s\u3000]+/, "");
   return headTrimmed.startsWith(prefix) ? t : `${prefix}${t}`;
 }
 
-/* ===== choices の形を {id,label} に正規化（堅牢化） ===== */
+/* ===== choices を {id,label} に正規化 ===== */
 function normalizeChoices(input: any): { id: string; label: string }[] {
   if (!Array.isArray(input)) return [];
   return input
     .map((c) => {
       if (!c) return null;
-      // よくあるバリエーション: {id,label} / {key,text} / {value,label}
       const id = String(c.id ?? c.key ?? c.value ?? "").trim();
       const label = String(c.label ?? c.text ?? "").trim();
       if (!id || !label) return null;
@@ -72,11 +70,11 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
   const [phase, setPhase] = useState<Phase>("ask");
   const [loading, setLoading] = useState(false);
 
-  // ヘッダ表示とフォールバックに使う“信頼できる”スロット
-  const [slot, setSlot] = useState<Slot>(getJstSlotClient());
+  // 画面のヘッダ・フォールバックに使う“信頼できる”スロット（原則 /api/today の値）
+  const [slot, setSlot] = useState<Slot>(getJstSlotFallback());
 
   // MyPageから渡されたテーマで固定（APIのthemeは無視）
-  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [theme] = useState<Theme>(initialTheme);
 
   const [seed, setSeed] = useState<number>(0);
   const [question, setQuestion] = useState("");
@@ -84,7 +82,7 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
   const [result, setResult] = useState<DailyAnswerResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  // /api/me からのユーザー名（表示用の最終保険）
+  // /api/me からのユーザー名（表示用）
   const [meName, setMeName] = useState<string | null>(null);
 
   // ユーザー名取得（最初に一度だけ）
@@ -113,25 +111,34 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
     };
   }, []);
 
-  // 質問の取得
+  // 質問の取得：/api/today → /api/daily/question?slot=XXXX
   useEffect(() => {
     let alive = true;
     (async () => {
       setLoading(true);
       try {
-        // /api/daily/question を叩く（レスポンスの slot / theme は採用しない）
-        const rq = await fetch(`/api/daily/question`, { cache: "no-store" });
-        const jq = (await rq.json()) as DailyQuestionResponse;
-        if (!jq.ok) throw new Error(jq.error || "failed_to_load");
-
-        // スロットはクライアントで再計算したものを使う
-        const s = getJstSlotClient();
+        // 1) サーバ基準のJSTスロットを取得
+        let s: Slot | null = null;
+        try {
+          const tRes = await fetch("/api/today", { cache: "no-store" });
+          const tJson = await tRes.json().catch(() => null);
+          const v = tJson?.slot;
+          if (v === "morning" || v === "noon" || v === "night") s = v;
+        } catch {
+          s = null;
+        }
+        if (!s) s = getJstSlotFallback(); // 取れない場合のみローカルで補完
         if (!alive) return;
         setSlot(s);
 
+        // 2) 取得した slot をクエリに付けて質問APIを叩く
+        const rq = await fetch(`/api/daily/question?slot=${s}`, { cache: "no-store" });
+        const jq = (await rq.json()) as DailyQuestionResponse;
+        if (!jq.ok) throw new Error((jq as any)?.error || "failed_to_load");
+
         setSeed((jq as any).seed || 0);
 
-        // 問いのテキスト（API出力 or ローカル既定）→ 表示直前に ensureNamePrefix する
+        // 問いテキスト（API出力 or ローカル既定）
         const baseQ =
           (jq as any).question ||
           (s === "morning"
@@ -141,10 +148,9 @@ export default function QuestionClient({ initialTheme }: { initialTheme: Theme }
             : "今日はどんな締めくくりが心地いい？");
         setQuestion(String(baseQ ?? ""));
 
-        // choices 正規化＋強制フォールバック：必ず 2〜4 件にする
+        // choices 正規化＋フォールバック
         const parsed = normalizeChoices((jq as any).choices);
         const need = needCount(s);
-
         let arr = parsed.filter((c) => c && c.label);
         if (arr.length < need) {
           const have = new Set(arr.map((c) => c.id));

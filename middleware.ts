@@ -1,30 +1,41 @@
-// middleware.ts（安全版A：限定マッチ）
+// middleware.ts（安全版B：スキップ条件を追加）
 import { NextRequest, NextResponse } from "next/server";
 import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
 
 export async function middleware(req: NextRequest) {
+  const { pathname } = new URL(req.url);
+
+  // 下記は middleware をスキップ（APIの健全性確保）
+  if (
+    pathname.startsWith("/api/health") ||
+    pathname.startsWith("/api/ping") ||
+    pathname.startsWith("/api/today") ||
+    pathname.startsWith("/api/daily/question") ||
+    pathname.startsWith("/api/daily/generate") ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon") ||
+    pathname.match(/\.(ico|png|jpg|jpeg|svg|gif|webp|css|js|map)$/)
+  ) {
+    return NextResponse.next();
+  }
+
   const res = NextResponse.next();
 
-  // 必要なenvが無いときは Supabase 初期化をスキップ（素通り）
+  // env が無ければ素通り
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseAnon) return res;
 
   try {
     const supabase = createMiddlewareClient({ req, res });
-    await supabase.auth.getSession(); // セッション更新だけ
+    await supabase.auth.getSession();
   } catch {
-    // 失敗してもAPIを止めず素通り
+    // 失敗しても止めない
   }
   return res;
 }
 
-// ★ 認証が必要なページだけに絞る
+// 何でも通す設定のままでもOK（上で除外しているため）
 export const config = {
-  matcher: [
-    "/mypage/:path*",
-    "/settings/:path*",
-    "/profile/result/:path*",
-    // 必要に応じて追加
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

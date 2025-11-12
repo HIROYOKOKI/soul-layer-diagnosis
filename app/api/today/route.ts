@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 
-// A. Intl（推奨）：ICUあり環境なら最も正確
+// Intl（優先）でJSTのhour取得
 function hourByIntl(): number {
   try {
     const parts = new Intl.DateTimeFormat("ja-JP", {
@@ -12,18 +12,17 @@ function hourByIntl(): number {
       hour: "numeric",
       hour12: false,
     }).formatToParts(new Date());
-    const h = parts.find((p) => p.type === "hour")?.value ?? "0";
+    const h = parts.find(p => p.type === "hour")?.value ?? "0";
     return parseInt(h, 10);
   } catch {
     return NaN;
   }
 }
 
-// B. 手計算フォールバック：UTCに+9hしてUTC時を読む（ICUが無い環境でも動く）
+// フォールバック：UTCに+9h
 function hourByAdd9(): number {
-  const now = Date.now();
-  const jst = new Date(now + 9 * 60 * 60 * 1000);
-  return jst.getUTCHours(); // 0-23
+  const jst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return jst.getUTCHours();
 }
 
 function toSlot(h: number): "morning" | "noon" | "night" {
@@ -37,15 +36,13 @@ export async function GET() {
   const hourJST = Number.isNaN(hIntl) ? hourByAdd9() : hIntl;
   const slot = toSlot(hourJST);
 
-  // デバッグ用に両方式の値も返す（フロントは .slot だけ使えばOK）
-  const debug = {
-    hourIntl: Number.isNaN(hIntl) ? null : hIntl,
-    hourAdd9: hourByAdd9(),
-    serverNowISO: new Date().toISOString(),
-  };
-
   return NextResponse.json(
-    { ok: true, slot, hourJST, ...debug },
+    {
+      ok: true,
+      slot,
+      hourJST,
+      serverNowISO: new Date().toISOString(),
+    },
     { headers: { "cache-control": "no-store" } }
   );
 }

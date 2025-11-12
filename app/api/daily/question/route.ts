@@ -7,7 +7,7 @@ import { cookies } from "next/headers";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import OpenAI from "openai";
 import { LUNEA_SYSTEM_PROMPT_FOR } from "@/app/_data/characters/lunea";
-
+// ここに余計な import を入れない（@/lib/evla は存在しない）
 type Slot = "morning" | "noon" | "night";
 type Theme = "WORK" | "LOVE" | "FUTURE" | "LIFE";
 type EV = "E" | "V" | "Λ" | "Ǝ";

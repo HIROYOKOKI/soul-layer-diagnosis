@@ -1,4 +1,4 @@
-# A) /api/daily/answer  を完全ローカル実装に上書き
+//api/daily/answer  を完全ローカル実装に上書き
 cat > app/api/daily/answer/route.ts <<'TS'
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -1,17 +1,36 @@
+// app/login/Client.tsx
 "use client";
-import { useState } from "react";
+
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
 
-export default function LoginClient() {
+type Props = {
+  next?: string;
+};
+
+export default function LoginClient({ next }: Props) {
   const sb = getBrowserSupabase();
+  const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  /** 安全な next（アプリ内部パスだけ許可） */
+  const safeNext = useMemo(() => {
+    const raw = next || "/mypage";
+    if (raw.startsWith("/") && !raw.startsWith("//")) return raw;
+    return "/mypage";
+  }, [next]);
+
+  /** Supabase の OAuth / Magic Link 用 redirectTo */
   const redirectTo =
     typeof window !== "undefined"
-      ? `${window.location.origin}/api/auth/callback?next=/mypage`
+      ? `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(
+          safeNext
+        )}`
       : "";
 
   async function syncCookie(
@@ -27,44 +46,62 @@ export default function LoginClient() {
   }
 
   const signInGoogle = async () => {
-    setLoading(true);
-    const { error } = await sb.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
-    if (error) setMsg(error.message);
-    setLoading(false);
+    try {
+      setLoading(true);
+      setMsg(null);
+      const { error } = await sb.auth.signInWithOAuth({
+        provider: "google",
+        options: redirectTo ? { redirectTo } : undefined,
+      });
+      if (error) setMsg(error.message);
+      // OAuth の場合は Supabase 側でリダイレクトが走るのでここでは何もしない
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signUp = async () => {
-    setLoading(true);
-    const { error } = await sb.auth.signUp({
-      email,
-      password: pass,
-      options: { emailRedirectTo: redirectTo },
-    });
-    setMsg(error ? error.message : "確認メールを送信しました。");
-    setLoading(false);
+    try {
+      setLoading(true);
+      setMsg(null);
+      const { error } = await sb.auth.signUp({
+        email,
+        password: pass,
+        options: redirectTo ? { emailRedirectTo: redirectTo } : {},
+      });
+      setMsg(error ? error.message : "確認メールを送信しました。メールボックスを確認してください。");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signIn = async () => {
-    setLoading(true);
-    const { data, error } = await sb.auth.signInWithPassword({
-      email,
-      password: pass,
-    });
-    if (error) setMsg(error.message);
-    else {
+    try {
+      setLoading(true);
+      setMsg(null);
+      const { data, error } = await sb.auth.signInWithPassword({
+        email,
+        password: pass,
+      });
+      if (error) {
+        setMsg(error.message);
+        return;
+      }
+      // cookie 同期
       await syncCookie("SIGNED_IN", data.session);
-      location.href = "/mypage";
+      // ✅ ログイン成功後は safeNext へ
+      router.replace(safeNext);
+    } catch (e: any) {
+      setMsg(e?.message ?? "ログインに失敗しました。時間をおいて再試行してください。");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const signOut = async () => {
     await sb.auth.signOut();
     await syncCookie("SIGNED_OUT");
-    location.reload();
+    router.replace("/"); // or location.reload()
   };
 
   return (

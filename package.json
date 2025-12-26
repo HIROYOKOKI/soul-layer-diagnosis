@@ -6,10 +6,7 @@
     "dev": "next dev -p 3000",
     "dev:free": "next dev",
     "dev:4000": "next dev -p 4000",
-<<<<<<< HEAD
     "dev:3000": "next dev -p 3000",
-=======
->>>>>>> 4494de4 (chore: remove middleware and cleanup)
     "build": "next build --turbopack",
     "start": "next start -p 3000",
     "lint": "eslint"
@@ -26,15 +23,9 @@
     "lucide-react": "^0.540.0",
     "next": "15.5.7",
     "openai": "^5.13.1",
-<<<<<<< HEAD
     "react": "19.1.2",
     "react-dom": "19.1.2",
-    "recharts": "^3.1.2",
-=======
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
     "recharts": "^3.2.1",
->>>>>>> 4494de4 (chore: remove middleware and cleanup)
     "uuid": "^11.1.0",
     "zod": "^3.25.76"
   },

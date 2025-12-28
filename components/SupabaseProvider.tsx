@@ -1,24 +1,25 @@
 // components/SupabaseProvider.tsx
 "use client";
 
-import { useState } from "react";
-import { SessionContextProvider } from "@supabase/auth-helpers-react";
-import { createBrowserSupabaseClient } from "@supabase/auth-helpers-nextjs";
-import type { Session } from "@supabase/supabase-js";
+import React, { createContext, useContext, useMemo } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getBrowserSupabase } from "@/lib/supabase-browser";
+
+const SupabaseContext = createContext<SupabaseClient | null>(null);
+
+export function useSupabase() {
+  const client = useContext(SupabaseContext);
+  if (!client) throw new Error("useSupabase must be used within <SupabaseProvider>");
+  return client;
+}
 
 export default function SupabaseProvider({
   children,
-  session,
 }: {
   children: React.ReactNode;
-  session: Session | null;
 }) {
-  // ブラウザで一度だけクライアントを生成
-  const [supabase] = useState(() => createBrowserSupabaseClient());
+  // ブラウザで一度だけ生成（lib内でシングルトン化している）
+  const supabase = useMemo(() => getBrowserSupabase(), []);
 
-  return (
-    <SessionContextProvider supabaseClient={supabase} initialSession={session}>
-      {children}
-    </SessionContextProvider>
-  );
+  return <SupabaseContext.Provider value={supabase}>{children}</SupabaseContext.Provider>;
 }

@@ -13,13 +13,7 @@ export function useSupabase() {
   return client;
 }
 
-export default function SupabaseProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  // ブラウザで一度だけ生成（lib内でシングルトン化している）
+export default function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => getBrowserSupabase(), []);
-
   return <SupabaseContext.Provider value={supabase}>{children}</SupabaseContext.Provider>;
 }

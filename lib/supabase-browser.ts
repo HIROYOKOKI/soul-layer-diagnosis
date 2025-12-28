@@ -1,8 +1,7 @@
-cat << 'EOF' > lib/supabase-browser.ts
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient, Session } from "@supabase/supabase-js";
 
 let _sb: SupabaseClient | null = null;
 
@@ -20,6 +19,7 @@ export function getBrowserSupabase(): SupabaseClient {
   return _sb;
 }
 
-export const getSupabaseBrowserClient = getBrowserSupabase;
-export const getBrowserSupabaseClient = getBrowserSupabase;
-EOF
+export async function getCurrentSession(): Promise<Session | null> {
+  const { data } = await getBrowserSupabase().auth.getSession();
+  return data.session ?? null;
+}

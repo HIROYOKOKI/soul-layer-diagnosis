@@ -1,4 +1,4 @@
-// components/SupabaseProvider.tsx
+cat << 'EOF' > components/SupabaseProvider.tsx
 "use client";
 
 import React, { createContext, useContext, useMemo } from "react";
@@ -17,3 +17,4 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
   const supabase = useMemo(() => getBrowserSupabase(), []);
   return <SupabaseContext.Provider value={supabase}>{children}</SupabaseContext.Provider>;
 }
+EOF

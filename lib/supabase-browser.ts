@@ -1,4 +1,4 @@
-// lib/supabase-browser.ts
+cat << 'EOF' > lib/supabase-browser.ts
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
@@ -22,3 +22,4 @@ export function getBrowserSupabase(): SupabaseClient {
 
 export const getSupabaseBrowserClient = getBrowserSupabase;
 export const getBrowserSupabaseClient = getBrowserSupabase;
+EOF

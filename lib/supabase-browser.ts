@@ -6,9 +6,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 let _sb: SupabaseClient | null = null;
 
-/**
- * 旧: getBrowserSupabase() を使っていたコード互換のため、この名前でexportする
- */
 export function getBrowserSupabase(): SupabaseClient {
   if (_sb) return _sb;
 
@@ -23,8 +20,5 @@ export function getBrowserSupabase(): SupabaseClient {
   return _sb;
 }
 
-/**
- * もし他の場所で getSupabaseBrowserClient / getBrowserSupabaseClient を期待してても大丈夫なように別名も用意
- */
 export const getSupabaseBrowserClient = getBrowserSupabase;
 export const getBrowserSupabaseClient = getBrowserSupabase;

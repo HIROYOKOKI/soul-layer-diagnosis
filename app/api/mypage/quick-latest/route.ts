@@ -1,7 +1,6 @@
 // app/api/mypage/quick-latest/route.ts
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { createSupabaseServerClient } from "@/app/_utils/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,15 +10,21 @@ type QuickKey = "EVΛƎ" | "EΛVƎ";
 type Env = "dev" | "prod";
 
 function ok<T>(data: T, status = 200) {
-  return NextResponse.json(data, { status, headers: { "cache-control": "no-store" } });
+  return NextResponse.json(data, {
+    status,
+    headers: { "cache-control": "no-store" },
+  });
 }
 function err(message: string, status = 500) {
-  return NextResponse.json({ ok: false, error: message }, { status, headers: { "cache-control": "no-store" } });
+  return NextResponse.json(
+    { ok: false, error: message },
+    { status, headers: { "cache-control": "no-store" } }
+  );
 }
 
 export async function GET(req: Request) {
   try {
-    const sb = createRouteHandlerClient({ cookies });
+    const sb = createSupabaseServerClient();
 
     // 認証ユーザー取得（未ログインは空を返す）
     const { data: auth, error: userErr } = await sb.auth.getUser();
@@ -30,7 +35,8 @@ export async function GET(req: Request) {
 
     // env/theme 切替（?env=prod で本番）
     const sp = new URL(req.url).searchParams;
-    const env: Env = (sp.get("env") ?? "dev").toLowerCase() === "prod" ? "prod" : "dev";
+    const env: Env =
+      (sp.get("env") ?? "dev").toLowerCase() === "prod" ? "prod" : "dev";
 
     // ===== 取得（最新1件）=====
     const { data, error } = await sb
@@ -43,7 +49,6 @@ export async function GET(req: Request) {
       .maybeSingle();
 
     if (error) return err(error.message, 500);
-
     if (!data) return ok({ ok: true, item: null }); // レコードなし
 
     // ===== 互換フォーマットに整形（既存フロントの型に合わせる）=====
@@ -52,10 +57,12 @@ export async function GET(req: Request) {
       type_key: data.type_key as QuickKey | null,
       type_label: data.type_label ?? null,
       created_at: data.created_at,
-      scores,                    // ← MyPage 既存の期待フィールド
+      scores, // ← MyPage 既存の期待フィールド
+
       // 旧スキーマ互換（安全のため残す）
       model: data.type_key as QuickKey | null,
       label: data.type_label ?? null,
+
       // 参考に返す追加フィールド
       order_v2: data.order_v2 ?? null,
       theme: data.theme ?? env,

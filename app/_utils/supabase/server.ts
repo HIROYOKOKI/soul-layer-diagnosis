@@ -2,14 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 export async function createSupabaseServerClient() {
-  const cookieStore = await cookies(); // ✅ Next 15 は await 必須
+  const cookieStore = await cookies();
 
-  return createServerClient(
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        // ✅ getAllを使わない（Next 15のsync-dynamic回避）
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
@@ -17,17 +16,17 @@ export async function createSupabaseServerClient() {
           try {
             cookieStore.set({ name, value, ...options });
           } catch {
-            // Server Component などで set 禁止の場合は無視
+            // Server Componentなどでset不可の場合があるので無視
           }
         },
         remove(name: string, options: any) {
           try {
             cookieStore.set({ name, value: "", ...options, maxAge: 0 });
-          } catch {
-            // 同上
-          }
+          } catch {}
         },
       },
     }
   );
+
+  return supabase;
 }

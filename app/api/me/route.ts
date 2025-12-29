@@ -1,33 +1,33 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/app/_utils/supabase/server";
 
-export async function createSupabaseServerClient() {
-  const cookieStore = await cookies();
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name: string, value: string, options: any) {
-          try {
-            // Next.js の CookieStore はこの形式が一番安定
-            cookieStore.set(name, value, options);
-          } catch {
-            // Server Component 等で set 禁止の場合があるので握りつぶし
-          }
-        },
-        remove(name: string, options: any) {
-          try {
-            cookieStore.set(name, "", { ...options, maxAge: 0 });
-          } catch {
-            // 同上
-          }
-        },
-      },
+export async function GET() {
+  try {
+    const supabase = await createSupabaseServerClient();
+
+    // 👇 ここに入れる（server.ts ではない）
+    console.log("SUPABASE TYPE", typeof supabase);
+    console.log("HAS AUTH?", !!(supabase as any)?.auth);
+    console.log("HAS getUser?", !!(supabase as any)?.auth?.getUser);
+
+    const { data, error } = await supabase.auth.getUser();
+
+    if (error || !data.user) {
+      return NextResponse.json(
+        { ok: false, error: "not_authenticated", detail: error?.message ?? null },
+        { status: 401 }
+      );
     }
-  );
+
+    return NextResponse.json({ ok: true, user: data.user });
+  } catch (e: any) {
+    console.error("API /me ERROR:", e);
+    return NextResponse.json(
+      { ok: false, error: "internal_error", detail: e?.message ?? String(e) },
+      { status: 500 }
+    );
+  }
 }

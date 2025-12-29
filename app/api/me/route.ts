@@ -9,26 +9,14 @@ export async function GET() {
   try {
     const supabase = createSupabaseServerClient();
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json(
-        { ok: false, error: "not_authenticated" },
-        { status: 401, headers: { "cache-control": "no-store" } }
-      );
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) {
+      return NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 });
     }
 
-    return NextResponse.json(
-      { ok: true, id: user.id },
-      { status: 200, headers: { "cache-control": "no-store" } }
-    );
+    // 必要なら profiles 参照を戻してOK（まずは動作優先で最小）
+    return NextResponse.json({ ok: true, id: user.id }, { status: 200 });
   } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: String(e?.message ?? e) },
-      { status: 500, headers: { "cache-control": "no-store" } }
-    );
+    return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
   }
 }

@@ -8,23 +8,36 @@ export async function GET() {
   try {
     const supabase = await createSupabaseServerClient();
 
-    // 👇 ここに入れる（server.ts ではない）
-    console.log("SUPABASE TYPE", typeof supabase);
-    console.log("HAS AUTH?", !!(supabase as any)?.auth);
-    console.log("HAS getUser?", !!(supabase as any)?.auth?.getUser);
+    // ✅ ログではなく「レスポンス用に」デバッグ情報を保持
+    const debug = {
+      supabaseType: typeof supabase,
+      hasAuth: !!(supabase as any)?.auth,
+      hasGetUser: !!(supabase as any)?.auth?.getUser,
+      keysPresent: {
+        url: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        anon: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      },
+    };
 
-    const { data, error } = await supabase.auth.getUser();
-
-    if (error || !data.user) {
+    // supabase.auth が無いならここで確定
+    if (!debug.hasAuth || !debug.hasGetUser) {
       return NextResponse.json(
-        { ok: false, error: "not_authenticated", detail: error?.message ?? null },
+        { ok: false, error: "supabase_client_invalid", debug },
+        { status: 500 }
+      );
+    }
+
+    const { data, error } = await (supabase as any).auth.getUser();
+
+    if (error || !data?.user) {
+      return NextResponse.json(
+        { ok: false, error: "not_authenticated", detail: error?.message ?? null, debug },
         { status: 401 }
       );
     }
 
-    return NextResponse.json({ ok: true, user: data.user });
+    return NextResponse.json({ ok: true, user: data.user, debug });
   } catch (e: any) {
-    console.error("API /me ERROR:", e);
     return NextResponse.json(
       { ok: false, error: "internal_error", detail: e?.message ?? String(e) },
       { status: 500 }

@@ -31,9 +31,6 @@ export async function GET() {
       idNoStr: data?.id_no_str ?? null,
     });
   } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: String(e?.message ?? e) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
   }
 }

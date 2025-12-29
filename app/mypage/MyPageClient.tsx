@@ -3,8 +3,6 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-// ※ まずは直書きで動作確認。Charts.tsx 経由は後で戻します。
-// import { RadarEVAE, type EVAEVector } from "@/components/charts/Charts";
 import {
   RadarChart as RcRadarChart,
   PolarGrid,
@@ -12,6 +10,7 @@ import {
   PolarRadiusAxis,
   Radar,
   Tooltip,
+  ResponsiveContainer,
 } from "recharts";
 
 type EV = "E" | "V" | "Λ" | "Ǝ";
@@ -47,6 +46,8 @@ type MyPageData = {
   profile?: Profile | null;
 };
 
+type RadarPoint = { key: EV; label: EV; value: number };
+
 export default function MyPageClient({
   initialData,
   userId,
@@ -54,17 +55,15 @@ export default function MyPageClient({
   initialData: MyPageData;
   userId: string;
 }) {
-  // ===== state =====
   const [data, setData] = useState<MyPageData>(initialData ?? {});
   const [loadingDaily, setLoadingDaily] = useState(false);
-  const [mounted, setMounted] = useState(false); // ← マウント後のみ描画
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
   const userName = data.user?.name?.trim() || "No Name";
   const dispId = data.user?.displayId?.trim() || userId;
 
-  // ===== utils =====
   const fmtJST = (iso?: string | null) => {
     if (!iso) return "";
     try {
@@ -77,7 +76,7 @@ export default function MyPageClient({
         minute: "2-digit",
       });
     } catch {
-      return iso;
+      return String(iso);
     }
   };
 
@@ -87,7 +86,7 @@ export default function MyPageClient({
     return Math.max(0, Math.min(1, n));
   };
 
-  // ===== fetch daily: 1d:001 → latest =====
+  // daily: 1d:001 → latest
   useEffect(() => {
     let aborted = false;
     (async () => {
@@ -99,6 +98,7 @@ export default function MyPageClient({
           setData((p) => ({ ...p, daily: j1.item as Daily }));
           return;
         }
+
         const r2 = await fetch("/api/mypage/daily-latest");
         const j2 = await r2.json().catch(() => ({} as any));
         if (!aborted && j2?.ok) {
@@ -107,27 +107,106 @@ export default function MyPageClient({
       } catch (e) {
         console.error(e);
       } finally {
-        !aborted && setLoadingDaily(false);
+        if (!aborted) setLoadingDaily(false);
       }
     })();
+
     return () => {
       aborted = true;
     };
   }, []);
 
-  // ===== Radar用ダミー or 実データ =====
-  // まずは確実に出すため、ダミー固定。動いたら下の実データに差し替え。
-  const radarData = useMemo(() => {
-    // 実データに切り替える場合はこの block をコメント解除：
-    // const ev = data.daily?.evla || null;
-    // if (ev) {
-    //   return [
-    //     { key: "E", label: "E", value: norm01(ev.E ?? 0) },
-    //     { key: "V", label: "V", value: norm01(ev.V ?? 0) },
-    //     { key: "Λ", label: "Λ", value: norm01((ev as any)["Λ"] ?? (ev as any).L ?? 0) },
-    //     { key: "Ǝ", label: "Ǝ", value: norm01((ev as any)["Ǝ"] ?? (ev as any).Eexists ?? 0) },
-    //   ];
-    // }
-    // const code = data.daily?.code as EV | undefined;
-    // const s = norm01(data.daily?.score ?? 0.6);
-    // const base = { E: 0.25, V: 0.25, "Λ": 0.25, "Ǝ": 0.25 } as
+  // ✅ まずはビルドを通す：ダミー固定（後で実データに戻せる）
+  const radarData: RadarPoint[] = useMemo(() => {
+    return [
+      { key: "E", label: "E", value: 0.25 },
+      { key: "V", label: "V", value: 0.25 },
+      { key: "Λ", label: "Λ", value: 0.25 },
+      { key: "Ǝ", label: "Ǝ", value: 0.25 },
+    ];
+  }, []);
+
+  // マウント前に Recharts を描くと環境によって崩れるのでガード
+  if (!mounted) return null;
+
+  return (
+    <div style={{ padding: 20 }}>
+      <div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 18 }}>
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 999,
+            overflow: "hidden",
+            border: "1px solid rgba(0,0,0,0.12)",
+            display: "grid",
+            placeItems: "center",
+            background: "#fff",
+          }}
+        >
+          {data.user?.avatarUrl ? (
+            <Image
+              src={data.user.avatarUrl}
+              alt="avatar"
+              width={44}
+              height={44}
+              style={{ objectFit: "cover" }}
+            />
+          ) : (
+            <span style={{ fontSize: 12, opacity: 0.7 }}>No Img</span>
+          )}
+        </div>
+
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 18 }}>{userName}</div>
+          <div style={{ fontSize: 12, opacity: 0.75 }}>ID: {dispId}</div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          border: "1px solid rgba(0,0,0,0.12)",
+          borderRadius: 14,
+          padding: 14,
+          marginBottom: 16,
+          background: "#fff",
+        }}
+      >
+        <div style={{ fontWeight: 700, marginBottom: 10 }}>構造レーダー（暫定表示）</div>
+
+        <div style={{ width: "100%", height: 260 }}>
+          <ResponsiveContainer>
+            <RcRadarChart data={radarData}>
+              <PolarGrid />
+              <PolarAngleAxis dataKey="label" />
+              <PolarRadiusAxis domain={[0, 1]} />
+              <Tooltip />
+              <Radar dataKey="value" />
+            </RcRadarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
+          {loadingDaily ? "Daily読み込み中…" : `Daily更新: ${fmtJST(data.daily?.created_at) || "-"}`}
+        </div>
+      </div>
+
+      <div
+        style={{
+          border: "1px solid rgba(0,0,0,0.12)",
+          borderRadius: 14,
+          padding: 14,
+          background: "#fff",
+        }}
+      >
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>Daily</div>
+        <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.55 }}>
+          <div>code: {data.daily?.code ?? "-"}</div>
+          <div>comment: {data.daily?.comment ?? "-"}</div>
+          <div>advice: {data.daily?.advice ?? "-"}</div>
+          <div>affirm: {data.daily?.affirm ?? "-"}</div>
+        </div>
+      </div>
+    </div>
+  );
+}

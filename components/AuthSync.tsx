@@ -1,7 +1,7 @@
 // components/AuthSync.tsx
 "use client";
 import { useEffect } from "react";
-import { getBrowserSupabase } from "@/lib/supabase-browser";
+import { getBrowserSupabase } from "../lib/supabase-browser";
 
 export default function AuthSync() {
   useEffect(() => {

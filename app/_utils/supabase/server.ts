@@ -10,19 +10,21 @@ export async function createSupabaseServerClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        // ✅ async にして await
-        async getAll() {
-          return await cookieStore.getAll();
+        // ✅ Next 15 対応：get(name) だけ使う（getAllを使わない）
+        get(name: string) {
+          return cookieStore.get(name)?.value;
         },
-        // ✅ setAll はそのままでOK
-        setAll(cookiesToSet) {
+        set(name: string, value: string, options: any) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
+            cookieStore.set({ name, value, ...options });
           } catch {
-            // Server Component などで set 禁止のときは無視
+            // Server Componentでset不可などは握りつぶし
           }
+        },
+        remove(name: string, options: any) {
+          try {
+            cookieStore.set({ name, value: "", ...options, maxAge: 0 });
+          } catch {}
         },
       },
     }

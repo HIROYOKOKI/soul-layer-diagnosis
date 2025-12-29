@@ -1,16 +1,15 @@
-// app/_utils/supabase/server.ts
-import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
 export async function createSupabaseServerClient() {
-  const cookieStore = await cookies();
+  const cookieStore = await cookies(); // ✅ Next 15 は await 必須
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        // ✅ Next 15 対応：get(name) だけ使う（getAllを使わない）
+        // ✅ getAllを使わない（Next 15のsync-dynamic回避）
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
@@ -18,13 +17,15 @@ export async function createSupabaseServerClient() {
           try {
             cookieStore.set({ name, value, ...options });
           } catch {
-            // Server Componentでset不可などは握りつぶし
+            // Server Component などで set 禁止の場合は無視
           }
         },
         remove(name: string, options: any) {
           try {
             cookieStore.set({ name, value: "", ...options, maxAge: 0 });
-          } catch {}
+          } catch {
+            // 同上
+          }
         },
       },
     }

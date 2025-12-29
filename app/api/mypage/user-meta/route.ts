@@ -1,4 +1,3 @@
-// app/api/mypage/user-meta/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/app/_utils/supabase/server";
 
@@ -13,7 +12,6 @@ function genUserNo(userId: string) {
 export async function GET(_req: NextRequest) {
   try {
     const sb = createSupabaseServerClient();
-
     const { data: auth } = await sb.auth.getUser();
     const user = auth?.user ?? null;
 
@@ -73,4 +71,24 @@ export async function GET(_req: NextRequest) {
         {
           id: user.id,
           name: item.name,
-          display_id: ite_
+          display_id: item.display_id,
+          avatar_url: item.avatar_url,
+          user_no: item.user_no,
+        },
+        { onConflict: "id" }
+      );
+    } catch {
+      /* noop */
+    }
+
+    return NextResponse.json(
+      { ok: true, item },
+      { status: 200, headers: { "cache-control": "no-store" } }
+    );
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: e?.message ?? "unexpected_error" },
+      { status: 500, headers: { "cache-control": "no-store" } }
+    );
+  }
+}

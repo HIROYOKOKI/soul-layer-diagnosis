@@ -1,6 +1,6 @@
+// app/api/mypage/user-meta/route.ts
 import { NextResponse, type NextRequest } from "next/server";
-import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { createSupabaseServerClient } from "@/app/_utils/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +12,8 @@ function genUserNo(userId: string) {
 
 export async function GET(_req: NextRequest) {
   try {
-    const sb = createRouteHandlerClient({ cookies });
+    const sb = createSupabaseServerClient();
+
     const { data: auth } = await sb.auth.getUser();
     const user = auth?.user ?? null;
 
@@ -34,7 +35,9 @@ export async function GET(_req: NextRequest) {
         .eq("id", user.id)
         .maybeSingle();
       prof = row ?? null;
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
 
     // 2) 最新の profile_results から name を拾う（失敗無視）
     let latestProfileName: string | null = null;
@@ -47,12 +50,18 @@ export async function GET(_req: NextRequest) {
         .limit(1)
         .maybeSingle();
       latestProfileName = pr?.name ?? null;
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
 
     // 3) マージとフォールバック
     const item = {
       id: prof?.id ?? user.id,
-      name: prof?.name ?? latestProfileName ?? (user.user_metadata as any)?.name ?? emailLocal,
+      name:
+        prof?.name ??
+        latestProfileName ??
+        (user.user_metadata as any)?.name ??
+        emailLocal,
       display_id: prof?.display_id ?? null,
       avatar_url: prof?.avatar_url ?? null,
       user_no: prof?.user_no ?? genUserNo(user.id),
@@ -64,22 +73,4 @@ export async function GET(_req: NextRequest) {
         {
           id: user.id,
           name: item.name,
-          display_id: item.display_id,
-          avatar_url: item.avatar_url,
-          user_no: item.user_no,
-        },
-        { onConflict: "id" }
-      );
-    } catch { /* noop */ }
-
-    return NextResponse.json(
-      { ok: true, item },
-      { status: 200, headers: { "cache-control": "no-store" } }
-    );
-  } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: e?.message ?? "unexpected_error" },
-      { status: 500, headers: { "cache-control": "no-store" } }
-    );
-  }
-}
+          display_id: ite_

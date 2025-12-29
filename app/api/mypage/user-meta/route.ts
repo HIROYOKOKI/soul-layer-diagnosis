@@ -11,7 +11,8 @@ function genUserNo(userId: string) {
 
 export async function GET(_req: NextRequest) {
   try {
-    const sb = createSupabaseServerClient();
+    const sb = await createSupabaseServerClient(); // ✅ await 必須
+
     const { data: auth } = await sb.auth.getUser();
     const user = auth?.user ?? null;
 

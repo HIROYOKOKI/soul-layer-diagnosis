@@ -1,3 +1,6 @@
+cp app/api/me/route.ts app/api/me/route.ts.before_fix
+
+cat > app/api/me/route.ts <<'EOF'
 // app/api/me/route.ts
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/app/_utils/supabase/server";
@@ -34,3 +37,4 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
   }
 }
+EOF

@@ -1,4 +1,3 @@
-cat > app/api/me/route.ts <<'EOF'
 // app/api/me/route.ts
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/app/_utils/supabase/server";

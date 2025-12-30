@@ -48,9 +48,19 @@ type MyPageData = {
 
 type RadarPoint = { key: EV; label: EV; value: number };
 
-// /api/me の戻り（あなたの route.ts 仕様に合わせた最小）
-type MeResponse =
-  | { ok: true; id: string; idNo?: number | null; idNoStr?: string | null; user?: any }
+// /api/mypage/user-meta の戻り（あなたの実装に合わせる）
+type UserMetaResponse =
+  | {
+      ok: true;
+      item: {
+        id: string;
+        name: string | null;
+        display_id: string | null;
+        avatar_url: string | null;
+        user_no: string | null;
+      } | null;
+      unauthenticated?: boolean;
+    }
   | { ok: false; error?: string };
 
 export default function MyPageClient({
@@ -62,7 +72,7 @@ export default function MyPageClient({
 }) {
   const [data, setData] = useState<MyPageData>(initialData ?? {});
   const [loadingDaily, setLoadingDaily] = useState(false);
-  const [loadingMe, setLoadingMe] = useState(false);
+  const [loadingUserMeta, setLoadingUserMeta] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -92,51 +102,33 @@ export default function MyPageClient({
     return Math.max(0, Math.min(1, n));
   };
 
-  // ✅ user: /api/me から取得（本物に置き換える）
+  // ✅ user: /api/mypage/user-meta を使う（未ログインでも200→loginに飛ばさない）
   useEffect(() => {
     let aborted = false;
 
     (async () => {
-      setLoadingMe(true);
+      setLoadingUserMeta(true);
       try {
-        const r = await fetch("/api/me", { cache: "no-store" });
-        const j = (await r.json().catch(() => ({} as any))) as MeResponse;
-
+        const r = await fetch("/api/mypage/user-meta", { cache: "no-store" });
+        const j = (await r.json().catch(() => ({} as any))) as UserMetaResponse;
         if (aborted) return;
 
-        // 未ログインなら login に飛ばす（/login が無い場合は /welcome 等に変更）
-        if (r.status === 401) {
-          window.location.href = "/login";
-          return;
-        }
-
-        if ((j as any)?.ok) {
-          const ok = j as any;
-
-          // displayId は idNoStr → idNo → user.id の順で優先
-          const displayId =
-            (ok.idNoStr ? String(ok.idNoStr) : null) ??
-            (ok.idNo != null ? String(ok.idNo) : null) ??
-            (ok.id ? String(ok.id) : null) ??
-            "unknown";
-
-          // name は、現状 /api/me が user を返してないので仮：あとでprofiles連携する
-          // まずは “No Name” を消すため displayId を名前にも反映
-          const name = data.user?.name?.trim() || "User";
-
+        // 未ログインでも mypage を表示したいので、ここではリダイレクトしない
+        if (j?.ok && j.item) {
           setData((p) => ({
             ...p,
             user: {
-              name,
-              displayId,
-              avatarUrl: p.user?.avatarUrl ?? null,
+              name: j.item?.name ?? p.user?.name ?? "User",
+              // 表示IDは user_no を優先（なければ display_id、最後に userId）
+              displayId: j.item?.user_no ?? j.item?.display_id ?? p.user?.displayId ?? userId,
+              avatarUrl: j.item?.avatar_url ?? p.user?.avatarUrl ?? null,
             },
           }));
         }
       } catch (e) {
         console.error(e);
       } finally {
-        if (!aborted) setLoadingMe(false);
+        if (!aborted) setLoadingUserMeta(false);
       }
     })();
 
@@ -149,6 +141,7 @@ export default function MyPageClient({
   // daily: 1d:001 → latest
   useEffect(() => {
     let aborted = false;
+
     (async () => {
       setLoadingDaily(true);
       try {
@@ -159,7 +152,7 @@ export default function MyPageClient({
           return;
         }
 
-        const r2 = await fetch("/api/mypage/daily-latest");
+        const r2 = await fetch("/api/mypage/daily-latest", { cache: "no-store" });
         const j2 = await r2.json().catch(() => ({} as any));
         if (!aborted && j2?.ok) {
           setData((p) => ({ ...p, daily: j2.item as Daily }));
@@ -176,15 +169,45 @@ export default function MyPageClient({
     };
   }, []);
 
-  // ✅ まずはビルドを通す：ダミー固定（後で evla に戻す）
+  // ✅ Radar: evla 実データ優先（なければ code/score で軽いフォールバック）
   const radarData: RadarPoint[] = useMemo(() => {
+    const ev = data.daily?.evla || null;
+
+    if (ev) {
+      const e = norm01(ev.E ?? 0);
+      const v = norm01(ev.V ?? 0);
+      const l = norm01((ev as any)["Λ"] ?? (ev as any).L ?? 0);
+      const ee = norm01((ev as any)["Ǝ"] ?? (ev as any).Eexists ?? 0);
+
+      return [
+        { key: "E", label: "E", value: e },
+        { key: "V", label: "V", value: v },
+        { key: "Λ", label: "Λ", value: l },
+        { key: "Ǝ", label: "Ǝ", value: ee },
+      ];
+    }
+
+    const code = (data.daily?.code ?? null) as EV | null;
+    const s = norm01(data.daily?.score ?? 0);
+
+    if (code) {
+      const base: Record<EV, number> = { E: 0.22, V: 0.22, "Λ": 0.22, "Ǝ": 0.22 };
+      base[code] = Math.max(base[code], Math.min(1, 0.35 + s * 0.65));
+      return [
+        { key: "E", label: "E", value: base.E },
+        { key: "V", label: "V", value: base.V },
+        { key: "Λ", label: "Λ", value: base["Λ"] },
+        { key: "Ǝ", label: "Ǝ", value: base["Ǝ"] },
+      ];
+    }
+
     return [
       { key: "E", label: "E", value: 0.25 },
       { key: "V", label: "V", value: 0.25 },
       { key: "Λ", label: "Λ", value: 0.25 },
       { key: "Ǝ", label: "Ǝ", value: 0.25 },
     ];
-  }, []);
+  }, [data.daily?.evla, data.daily?.code, data.daily?.score]);
 
   if (!mounted) return null;
 
@@ -219,7 +242,7 @@ export default function MyPageClient({
         <div>
           <div style={{ fontWeight: 800, fontSize: 18 }}>{userName}</div>
           <div style={{ fontSize: 12, opacity: 0.75 }}>
-            ID: {dispId} {loadingMe ? "（確認中…）" : ""}
+            ID: {dispId} {loadingUserMeta ? "（読み込み中…）" : ""}
           </div>
         </div>
       </div>
@@ -233,7 +256,7 @@ export default function MyPageClient({
           background: "#fff",
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: 10 }}>構造レーダー（暫定表示）</div>
+        <div style={{ fontWeight: 700, marginBottom: 10 }}>構造レーダー</div>
 
         <div style={{ width: "100%", height: 260 }}>
           <ResponsiveContainer>

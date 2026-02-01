@@ -101,7 +101,11 @@ export default function ResultClient() {
     let active = true;
     (async () => {
       try {
-        const r = await fetch("/api/me", { cache: "no-store" });
+        const r = await fetch("/api/me", {
+  cache: "no-store",
+  credentials: "include",
+});
+
         const j = await r.json().catch(() => null);
         const name =
           j?.item?.name ||

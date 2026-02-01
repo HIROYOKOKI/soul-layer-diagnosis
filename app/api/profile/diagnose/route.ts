@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     // 4キー（fortune/personality/work/partner）を明示
     const system = [
       "あなたはAIアシスタント『ルネア（Lunea）』です。",
-      "入力プロフィールをもとに、今年（2025年）基準でやさしく短く語ります。",
+      "入力プロフィールをもとに、今年（2026年）基準でやさしく短く語ります。",
       "出力はJSON。キーは fortune, personality, work, partner。各セクションは指定文字数内。",
     ].join("\n");
 

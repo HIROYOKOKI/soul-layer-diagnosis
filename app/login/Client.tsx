@@ -110,8 +110,7 @@ export default function LoginClient({ next }: Props) {
       }
 
       // ① cookie 同期（サーバー側APIが user を取れるようにする）
-      await syncCookie("SIGNED_IN", data.session);
-
+      // await syncCookie("SIGNED_IN", data.session);
       // ② App Routerのサーバー側状態を更新（これが効く）
       router.refresh();
 
@@ -135,8 +134,7 @@ export default function LoginClient({ next }: Props) {
       await sb.auth.signOut();
 
       // cookie 同期
-      await syncCookie("SIGNED_OUT");
-
+      // await syncCookie("SIGNED_OUT");
       router.refresh();
       router.replace("/");
     } catch (e: any) {

@@ -16,7 +16,7 @@ export default function WelcomePage() {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) {
-        router.replace("/login?e=nologin");
+   
         return;
       }
       setOk(true);

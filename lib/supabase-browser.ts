@@ -1,16 +1,12 @@
 "use client";
-import { createBrowserClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
-let _sb: SupabaseClient | null = null;
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
-export function getBrowserSupabase(): SupabaseClient {
-  if (_sb) return _sb;
+// ブラウザで単一インスタンス化（Multiple GoTrueClientも抑制）
+let _client: ReturnType<typeof createClientComponentClient> | null = null;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  if (!url || !anon) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
-
-  _sb = createBrowserClient(url, anon);
-  return _sb;
+export function getBrowserSupabase() {
+  if (_client) return _client;
+  _client = createClientComponentClient();
+  return _client;
 }

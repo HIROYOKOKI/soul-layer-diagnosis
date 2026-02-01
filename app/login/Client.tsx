@@ -110,7 +110,13 @@ export default function LoginClient({ next }: Props) {
       }
 
       // ① cookie 同期（サーバー側APIが user を取れるようにする）
-      // await syncCookie("SIGNED_IN", data.session);
+      await fetch("/api/auth/callback", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  credentials: "same-origin",
+  body: JSON.stringify({ session: data.session }),
+});
+
       // ② App Routerのサーバー側状態を更新（これが効く）
       router.refresh();
 

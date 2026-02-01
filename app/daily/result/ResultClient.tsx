@@ -284,10 +284,13 @@ export default function ResultClient() {
       };
 
       const r = await fetch("/api/daily/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  credentials: "include",      // ← これが決定打
+  cache: "no-store",
+  body: JSON.stringify(payload),
+});
+
       const j = await r.json();
       if (!j?.ok) throw new Error(j?.error || "save_failed");
 

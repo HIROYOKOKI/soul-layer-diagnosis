@@ -37,12 +37,20 @@ export default function LoginClient({ next }: Props) {
     event: "SIGNED_IN" | "TOKEN_REFRESHED" | "SIGNED_OUT",
     session?: any
   ) {
-    await fetch("/api/auth/callback", {
+    // ※ callback route がPOST対応している前提
+    const res = await fetch("/api/auth/callback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
       body: JSON.stringify({ event, session }),
+      cache: "no-store",
     });
+
+    // 失敗時は原因が分かるようにする（黙殺しない）
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`syncCookie_failed: ${res.status} ${text}`.trim());
+    }
   }
 
   const signInGoogle = async () => {
@@ -54,7 +62,9 @@ export default function LoginClient({ next }: Props) {
         options: redirectTo ? { redirectTo } : undefined,
       });
       if (error) setMsg(error.message);
-      // OAuth の場合は Supabase 側でリダイレクトが走るのでここでは何もしない
+      // OAuth はSupabase側でリダイレクトが走るのでここでは何もしない
+    } catch (e: any) {
+      setMsg(e?.message ?? "Googleログインに失敗しました。");
     } finally {
       setLoading(false);
     }
@@ -64,12 +74,21 @@ export default function LoginClient({ next }: Props) {
     try {
       setLoading(true);
       setMsg(null);
+
       const { error } = await sb.auth.signUp({
         email,
         password: pass,
         options: redirectTo ? { emailRedirectTo: redirectTo } : {},
       });
-      setMsg(error ? error.message : "確認メールを送信しました。メールボックスを確認してください。");
+
+      // テスト時にメール確認OFFなら、ここで即ログイン状態になり得る
+      setMsg(
+        error
+          ? error.message
+          : "確認メールを送信しました。メールボックスを確認してください。"
+      );
+    } catch (e: any) {
+      setMsg(e?.message ?? "新規登録に失敗しました。");
     } finally {
       setLoading(false);
     }
@@ -79,29 +98,52 @@ export default function LoginClient({ next }: Props) {
     try {
       setLoading(true);
       setMsg(null);
+
       const { data, error } = await sb.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password: pass,
       });
+
       if (error) {
         setMsg(error.message);
         return;
       }
-      // cookie 同期
+
+      // ① cookie 同期（サーバー側APIが user を取れるようにする）
       await syncCookie("SIGNED_IN", data.session);
-      // ✅ ログイン成功後は safeNext へ
+
+      // ② App Routerのサーバー側状態を更新（これが効く）
+      router.refresh();
+
+      // ③ 遷移
       router.replace(safeNext);
     } catch (e: any) {
-      setMsg(e?.message ?? "ログインに失敗しました。時間をおいて再試行してください。");
+      setMsg(
+        e?.message ??
+          "ログインに失敗しました。時間をおいて再試行してください。"
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const signOut = async () => {
-    await sb.auth.signOut();
-    await syncCookie("SIGNED_OUT");
-    router.replace("/"); // or location.reload()
+    try {
+      setLoading(true);
+      setMsg(null);
+
+      await sb.auth.signOut();
+
+      // cookie 同期
+      await syncCookie("SIGNED_OUT");
+
+      router.refresh();
+      router.replace("/");
+    } catch (e: any) {
+      setMsg(e?.message ?? "ログアウトに失敗しました。");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -121,6 +163,7 @@ export default function LoginClient({ next }: Props) {
         onChange={(e) => setEmail(e.target.value)}
         placeholder="メール"
         className="w-full rounded border px-3 py-2 bg-white/5"
+        autoComplete="email"
       />
       <input
         value={pass}
@@ -128,6 +171,7 @@ export default function LoginClient({ next }: Props) {
         type="password"
         placeholder="パスワード"
         className="w-full rounded border px-3 py-2 bg-white/5"
+        autoComplete="current-password"
       />
 
       <div className="grid grid-cols-2 gap-2">
@@ -150,6 +194,7 @@ export default function LoginClient({ next }: Props) {
       <button
         onClick={signOut}
         className="text-xs text-white/60 underline"
+        disabled={loading}
       >
         ログアウト
       </button>
